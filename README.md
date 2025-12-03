@@ -28,6 +28,43 @@ Moubely is a stealthy, transparent, always-on-top AI assistant for your desktop.
   - **`Ctrl + R`**: Full reset (clears chat, transcript, and memory).
   - **`Ctrl + H`**: Snap a screenshot and attach it to the chat.
 
+## 💻 How to Run Locally
+
+### Prerequisites
+- **Node.js** (v18 or higher recommended)
+- **npm** (comes with Node.js) or **yarn**
+
+### Installation Steps
+
+1.  **Clone the Repository**
+    ```bash
+    git clone [https://github.com/your-username/moubely.git](https://github.com/your-username/moubely.git)
+    cd moubely
+    ```
+
+2.  **Install Dependencies**
+    ```bash
+    npm install
+    ```
+
+3.  **Setup Environment Variables**
+    Create a `.env` file in the root directory and add your Google Gemini API key:
+    ```bash
+    GEMINI_API_KEY=your_actual_api_key_here
+    ```
+    *(You can get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey))*
+
+4.  **Run the App**
+    Start the development server and Electron app simultaneously:
+    ```bash
+    npm start
+    ```
+
+### Building for Production
+To create an executable file (e.g., `.dmg`, `.exe`, or `.AppImage`) for your operating system:
+```bash
+npm run dist
+
 ## 📂 Project Structure
 
 ```text
