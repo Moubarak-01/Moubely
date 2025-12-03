@@ -2,6 +2,17 @@
 
 Moubely is a stealthy, transparent, always-on-top AI assistant for your desktop. It provides real-time meeting assistance, screen analysis, and chat capabilities in a sleek, non-intrusive interface.
 
+## 🚀 Core Features
+
+- **👻 Stealth Overlay**: A fully transparent, click-through window that floats on top of your applications. It stays invisible until you need it, ensuring you never break flow.
+- **📸 Contextual Vision**: Instantly snap screenshots (`Ctrl + H`) of code errors, complex charts, or emails. Moubely "sees" your screen and provides specific, context-aware solutions.
+- **🎙️ Live Meeting Copilot**:
+  - **Real-time Transcription**: Captures system and microphone audio to transcribe meetings live.
+  - **Smart Assists**: One-click buttons to generate "What to say?" suggestions, follow-up questions, or instant recaps during the call.
+  - **Auto-Summaries**: Automatically detects when a meeting ends and drafts a professional follow-up email and summary.
+- **🧠 Multi-Model AI Engine**: Powered by **Gemini 2.0 Flash** for blazing fast responses, with fallback to **Gemini 1.5**. Also supports **Ollama** for completely local, private AI processing.
+- **⚡ Smart Modes**: Switch between **Developer** (code-focused), **Student** (explanatory), and **General** modes to tailor the AI's personality to your current task.
+
 ## 🌟 Latest Updates (Stability & Features)
 
 ### 🎙️ **Robust Live Transcription**
