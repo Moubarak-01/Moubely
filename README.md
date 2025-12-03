@@ -38,7 +38,7 @@ Moubely is a stealthy, transparent, always-on-top AI assistant for your desktop.
 
 1.  **Clone the Repository**
     ```bash
-    git clone [https://github.com/Moubarak-01/Moubely.git](https://github.com/Moubarak-01/Moubely.git)
+    git clone https://github.com/Moubarak-01/Moubely.git
     cd Moubely
     ```
 
@@ -65,9 +65,8 @@ To create an executable file (e.g., `.dmg`, `.exe`, or `.AppImage`) for your ope
 ```bash
 npm run dist
 
-## 📂 Project Structure
+📂 Project Structure
 
-```text
 / (root)
 ├── package.json
 ├── tsconfig.json
