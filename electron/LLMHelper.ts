@@ -1,5 +1,7 @@
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai"
 import fs from "fs"
+import path from "path"
+import { app } from "electron" 
 
 interface OllamaResponse {
   response: string
@@ -87,11 +89,27 @@ export class LLMHelper {
     }
   }
 
+  private getStudentFiles(): string {
+    const dir = path.join(app.getPath("userData"), "student_profile");
+    if (!fs.existsSync(dir)) return "";
+
+    const files = fs.readdirSync(dir)
+      .filter(name => name.endsWith(".txt") || name.endsWith(".md") || name.endsWith(".pdf") || name.endsWith(".ts") || name.endsWith(".js"));
+
+    let content = "";
+    for (const file of files) {
+        try {
+            const filePath = path.join(dir, file);
+            const fileContent = fs.readFileSync(filePath, "utf8");
+            content += `\n\n# FILE: ${file}\n${fileContent}\n`;
+        } catch(e) { console.error(`Error reading ${file}`, e)}
+    }
+    return content;
+  }
+
   // --- AUDIO TRANSCRIPTION ---
   public async analyzeAudioFromBase64(data: string, mimeType: string) {
-    // FIX: VALIDATE DATA BEFORE API CALL
     if (!data || data.length < 100) {
-        // Too small to be valid audio, skip API call to prevent 400
         return { text: "", timestamp: Date.now() };
     }
 
@@ -107,10 +125,8 @@ export class LLMHelper {
 Task: Transcribe the speech in this audio segment verbatim.
 Requirements:
 1. Return ONLY the spoken words.
-2. Do NOT add labels like "Speaker" or timestamps (these are added by the system).
-3. Do NOT describe the audio (e.g., do not say "The audio contains silence").
-4. If there is no distinct speech, return nothing (empty string).
-5. If the audio is unclear but speech-like, write [unclear].
+2. Do NOT add labels like "Speaker" or timestamps.
+3. If there is no distinct speech, return nothing (empty string).
 `;
 
       let text = "";
@@ -126,7 +142,6 @@ Requirements:
 
     } catch (error) {
       console.error("Error analyzing audio from base64:", error);
-      // Suppress error to keep loop alive in frontend
       return { text: "", timestamp: Date.now() };
     }
   }
@@ -153,9 +168,48 @@ Requirements:
       } catch (e) { throw e; }
   }
 
-  public async chatWithGemini(message: string): Promise<string> {
-      if (this.useOllama) return this.callOllama(message);
-      if (this.model) return (await this.model.generateContent(message)).response.text();
+  // UPDATE: Accept history argument
+  public async chatWithGemini(message: string, history: any[] = [], mode: string = "General"): Promise<string> {
+      let systemInstruction = this.systemPrompt;
+
+      if (mode === "Student") {
+          const studentFiles = this.getStudentFiles();
+          
+          systemInstruction = `
+You are an expert Career and Computer Science Mentor.
+You have access to the user's uploaded profile files (Resume, Projects) below:${studentFiles ? `# ====== USER PROFILE / RESUME ======\n${studentFiles}\n# ===========================` : ""}
+
+**YOUR INSTRUCTION:**
+Analyze the user's question and classify it as either **TECHNICAL** or **BEHAVIORAL**.
+
+### 1. IF THE QUESTION IS TECHNICAL / CODING:
+(e.g., "Reverse a string", "How does Garbage Collection work?", "Time complexity of BFS")
+- Act as a Tutor.
+- **Do not give the answer immediately.**
+- Ask: "Do you want a **Hint (Idea)**, a **Brute Force Approach**, or the **Optimal Solution**?"
+- Wait for their choice. (Exception: If they already asked for "Optimal", give it).
+
+### 2. IF THE QUESTION IS BEHAVIORAL / SOFT SKILLS:
+(e.g., "Tell me about a time you failed", "What is your greatest weakness?", "Describe a conflict you resolved")
+- **DO NOT** ask for hints or brute force.
+- **DRAFT AN ANSWER DIRECTLY** for the user.
+- **CRITICAL:** You MUST use the **USER PROFILE** content above to personalize the answer.
+- Find a specific project or experience from their files that fits the question.
+- Structure the answer using the **STAR Method** (Situation, Task, Action, Result).
+- If you cannot find a relevant experience in the files, provide a generic template but explicitly tell the user: "I couldn't find a specific example of [topic] in your uploaded files, but here is how you should structure it..."
+
+Current User Question:${message}
+`;
+      }
+
+      // Format history into a string
+      const historyText = history.map(h => `${h.role === 'user' ? 'User' : 'AI'}: ${h.text}`).join('\n\n');
+
+      // Construct full prompt with history
+      const fullPrompt = `${systemInstruction}\n\n=== CHAT HISTORY ===\n${historyText}\n\n=== CURRENT MESSAGE ===\nUser: ${message}`;
+
+      if (this.useOllama) return this.callOllama(fullPrompt);
+      if (this.model) return (await this.model.generateContent(fullPrompt)).response.text();
       throw new Error("No LLM provider configured");
   }
 

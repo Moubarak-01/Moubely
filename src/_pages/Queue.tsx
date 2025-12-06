@@ -5,7 +5,7 @@ import {
   Loader2, Sparkles, MessageSquare, History,
   GripHorizontal, HelpCircle, MessageCircleQuestion, FileText,
   Scaling, Copy, Check, CheckCircle2, Trash2, Mail, Volume2,
-  Calendar, Clock, ArrowRight, MicOff, AlertCircle
+  Calendar, Clock, ArrowRight, MicOff, AlertCircle, Upload, UserCog
 } from "lucide-react"
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
@@ -163,6 +163,65 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
+// --- STUDENT SETUP MODAL ---
+const StudentModeSetupModal = ({ open, onClose, onSave }: { open: boolean, onClose: () => void, onSave: (files: File[]) => void }) => {
+  const [files, setFiles] = useState<File[]>([]);
+  
+  if (!open) return null;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+        const uploaded = Array.from(e.target.files).slice(0, 6);
+        setFiles(uploaded);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      <div className="bg-[#1e1e1e] border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <h2 className="text-xl font-semibold text-white mb-2">Student Mode Setup</h2>
+        <p className="text-gray-400 text-sm mb-4">
+          To tailor responses to your skill level, please upload your resume or recent project files (max 6).
+        </p>
+
+        <div className="border-2 border-dashed border-white/10 rounded-xl p-8 flex flex-col items-center justify-center bg-white/5 hover:bg-white/10 transition-colors relative">
+            <input 
+                type="file" 
+                multiple 
+                accept=".pdf,.txt,.md,.ts,.js,.py" 
+                onChange={handleFileChange}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            <Upload size={32} className="text-blue-400 mb-2"/>
+            <span className="text-sm text-gray-300">Click to upload files</span>
+            <span className="text-xs text-gray-500 mt-1">.txt, .md, .pdf, code files</span>
+        </div>
+
+        {files.length > 0 && (
+            <div className="mt-4 space-y-2">
+                {files.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-gray-300 bg-white/5 p-2 rounded">
+                        <FileText size={12}/>
+                        <span className="truncate">{f.name}</span>
+                    </div>
+                ))}
+            </div>
+        )}
+
+        <div className="flex gap-3 mt-6 justify-end">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/10 transition-colors">Skip / Cancel</button>
+          <button 
+            onClick={() => onSave(files)} 
+            className="px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
+          >
+            {files.length === 0 ? "Continue without files" : "Save & Enable"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- MAIN COMPONENT ---
 const Queue: React.FC<any> = ({ setView }) => {
   const [isExpanded, setIsExpanded] = useState(false)
@@ -188,6 +247,8 @@ const Queue: React.FC<any> = ({ setView }) => {
   const [meetingStartTime, setMeetingStartTime] = useState<number>(0)
   
   const [pastMeetings, setPastMeetings] = useState<MeetingSession[]>([])
+  
+  const [showStudentModal, setShowStudentModal] = useState(false);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -469,6 +530,33 @@ const Queue: React.FC<any> = ({ setView }) => {
     }
   }
 
+  // --- LOGIC: Handle Mode Switching ---
+  const handleModeSelect = async (selectedMode: string) => {
+      setMode(selectedMode);
+      setShowModeMenu(false);
+
+      if (selectedMode === "Student") {
+          const exists = await window.electronAPI.checkProfileExists();
+          if (!exists) {
+              setShowStudentModal(true);
+          }
+      }
+  };
+
+  const handleSaveStudentFiles = async (files: File[]) => {
+      if (files.length > 0) {
+          // Process files to send to Electron
+          const fileDataArray = await Promise.all(files.map(async (file) => {
+              const arrayBuffer = await file.arrayBuffer();
+              return { name: file.name, data: arrayBuffer };
+          }));
+          
+          await window.electronAPI.saveStudentFiles(fileDataArray);
+          setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "Student profile updated. I've analyzed your files.", timestamp: Date.now() }]);
+      }
+      setShowStudentModal(false);
+  };
+
   const handleSend = async (overrideText?: string) => {
     const textToSend = overrideText || input
     if (!textToSend.trim() && !pendingScreenshot) return
@@ -482,6 +570,15 @@ const Queue: React.FC<any> = ({ setView }) => {
 
     try {
       let response = ""
+      // UPDATE: Send history with the request to fix memory
+      const history = messages.map(m => ({ role: m.role, text: m.text }));
+
+      const args = {
+          message: textToSend,
+          mode: mode,
+          history: history 
+      };
+      
       const smartPrefix = isSmartMode ? `[Mode: ${mode}] [Expert Level] ` : `[Mode: ${mode}] `
       let context = "";
       if (isRecording || showPostMeeting) {
@@ -489,14 +586,20 @@ const Queue: React.FC<any> = ({ setView }) => {
           context = `\nCONTEXT (Meeting Transcript So Far): "${fullTranscript || "No audio detected yet."}"\n\n`;
       }
       
-      const formatInstruction = "\nPlease format your response using structured lists and text. Avoid markdown tables.";
-      const finalPrompt = smartPrefix + context + (textToSend || "Describe this screen") + formatInstruction;
-
       if (currentScreenshot) {
         setThinkingStep("Vision processing...")
+        // For vision, prompt concatenation is handled here
+        const formatInstruction = "\nPlease format your response using structured lists and text.";
+        const finalPrompt = smartPrefix + context + (textToSend || "Describe this screen") + formatInstruction;
+        // Vision might not support history array yet in backend, so we use string concat
         response = await window.electronAPI.chatWithImage(finalPrompt, currentScreenshot.path)
       } else {
-        response = await window.electronAPI.invoke("gemini-chat", finalPrompt)
+        // Standard chat supports history now
+        const formatInstruction = "\nPlease format your response using structured lists and text. Avoid markdown tables.";
+        const finalPrompt = smartPrefix + context + (textToSend || "Describe this screen") + formatInstruction;
+        
+        args.message = finalPrompt;
+        response = await window.electronAPI.invoke("gemini-chat", args)
       }
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "ai", text: response, timestamp: Date.now() }])
     } catch (error: any) {
@@ -505,10 +608,16 @@ const Queue: React.FC<any> = ({ setView }) => {
   }
 
   const triggerAssistAction = async (actionType: "Assist" | "WhatToSay" | "FollowUp" | "Recap") => {
-    const transcriptText = transcriptLogs.map(t => t.text).join(" ");
+    let transcriptText = transcriptLogs.map(t => t.text).join(" ");
     
-    if (!transcriptText || transcriptText.length < 5) {
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "I haven't heard enough yet. Keep talking!", timestamp: Date.now() }]);
+    // UPDATE: Fallback to chat history if transcript is empty
+    if (!transcriptText.trim() && messages.length > 0) {
+        // Use last 5 messages as context
+        transcriptText = messages.slice(-5).map(m => `${m.role.toUpperCase()}: ${m.text}`).join("\n");
+    }
+
+    if (!transcriptText.trim()) {
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "I haven't heard enough yet, and chat history is empty. Start a meeting or ask a question!", timestamp: Date.now() }]);
         return;
     }
 
@@ -517,14 +626,22 @@ const Queue: React.FC<any> = ({ setView }) => {
     
     let prompt = ""
     switch (actionType) {
-      case "Assist": prompt = `Transcript: "${transcriptText}". \nProvide helpful facts/context.`; break
-      case "WhatToSay": prompt = `Transcript: "${transcriptText}". \nSuggest 3 smart responses.`; break
-      case "FollowUp": prompt = `Transcript: "${transcriptText}". \nGenerate 3 follow-up questions.`; break
-      case "Recap": prompt = `Transcript: "${transcriptText}". \nProvide a concise summary.`; break
+      case "Assist": prompt = `Based on the conversation context: "${transcriptText}". \nProvide helpful facts, context, or next steps.`; break
+      case "WhatToSay": prompt = `Based on the conversation context: "${transcriptText}". \nSuggest 3 smart responses.`; break
+      case "FollowUp": prompt = `Based on the conversation context: "${transcriptText}". \nGenerate 3 follow-up questions.`; break
+      case "Recap": prompt = `Based on the conversation context: "${transcriptText}". \nProvide a concise summary.`; break
     }
     
+    // UPDATE: Send history with assist actions too
+    const history = messages.map(m => ({ role: m.role, text: m.text }));
+    const args = {
+        message: prompt,
+        mode: mode,
+        history: history 
+    };
+
     try {
-        const response = await window.electronAPI.invoke("gemini-chat", prompt)
+        const response = await window.electronAPI.invoke("gemini-chat", args)
         setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: response, timestamp: Date.now() }])
     } catch (e: any) { console.error(e) } finally { setIsThinking(false) }
   }
@@ -540,6 +657,11 @@ const Queue: React.FC<any> = ({ setView }) => {
 
   return (
     <div className={`moubely-window ${isExpanded ? 'expanded' : ''} flex flex-col h-full relative`}>
+      <StudentModeSetupModal 
+        open={showStudentModal} 
+        onClose={() => { setShowStudentModal(false); if(mode === "Student") setMode("General"); }} 
+        onSave={handleSaveStudentFiles}
+      />
       <div className="px-4 pt-3 pb-0 z-50">
         {!isExpanded && (
           <div className="flex justify-center mb-3 animate-in fade-in slide-in-from-top-2">
@@ -725,14 +847,37 @@ const Queue: React.FC<any> = ({ setView }) => {
                    <div className="flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
                       <button onClick={handleUseScreen} className="control-btn hover:bg-white/15 py-2 px-3"><Monitor size={14} className="text-blue-400"/><span>Use Screen</span></button>
                       <button onClick={() => setIsSmartMode(!isSmartMode)} className={`control-btn py-2 px-3 ${isSmartMode ? 'active' : ''}`}><Zap size={14} className={isSmartMode ? 'fill-current' : ''}/><span>Smart</span></button>
+                      
+                      {/* MODE SELECTOR */}
                       <div className="relative">
                         <button onClick={() => setShowModeMenu(!showModeMenu)} className="control-btn hover:bg-white/15 py-2 px-3"><span>{mode}</span><ChevronDown size={12}/></button>
                         {showModeMenu && (
                             <div className="absolute bottom-full left-0 mb-2 w-32 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]">
-                                {['General', 'Developer', 'Student'].map((m) => <button key={m} onClick={() => { setMode(m); setShowModeMenu(false); }} className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 ${mode === m ? 'text-blue-400 bg-white/5' : 'text-gray-300'}`}>{m}</button>)}
+                                {['General', 'Developer', 'Student'].map((m) => (
+                                    <button 
+                                        key={m} 
+                                        onClick={() => handleModeSelect(m)} 
+                                        className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 ${mode === m ? 'text-blue-400 bg-white/5' : 'text-gray-300'}`}
+                                    >
+                                        {m}
+                                    </button>
+                                ))}
                             </div>
                         )}
                       </div>
+
+                      {/* NEW: UPDATE PROFILE BUTTON (Only visible in Student Mode) */}
+                      {mode === "Student" && (
+                          <button 
+                            onClick={() => setShowStudentModal(true)}
+                            className="control-btn hover:bg-white/15 py-2 px-3 text-blue-300"
+                            title="Update Profile / Resume"
+                          >
+                             <UserCog size={14} />
+                             <span>Update Profile</span>
+                          </button>
+                      )}
+
                    </div>
                 )}
              </div>

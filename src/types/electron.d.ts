@@ -26,10 +26,24 @@ export interface ElectronAPI {
   analyzeAudioFile: (path: string) => Promise<{ text: string; timestamp: number }>
   quitApp: () => Promise<void>
   invoke: (channel: string, ...args: any[]) => Promise<any>
+  
+  // New Methods
+  setWindowSize: (dimensions: { width: number, height: number }) => Promise<void>
+  setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => Promise<void>
+  chatWithImage: (message: string, imagePath: string) => Promise<string>
+  getCurrentLlmConfig: () => Promise<{ provider: "ollama" | "gemini"; model: string; isOllama: boolean }>
+  getAvailableOllamaModels: () => Promise<string[]>
+  switchToOllama: (model?: string, url?: string) => Promise<{ success: boolean; error?: string }>
+  switchToGemini: (apiKey?: string) => Promise<{ success: boolean; error?: string }>
+  testLlmConnection: () => Promise<{ success: boolean; error?: string }>
+
+  // NEW: Student Mode methods
+  checkProfileExists: () => Promise<boolean>
+  saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => Promise<boolean>
 }
 
 declare global {
   interface Window {
     electronAPI: ElectronAPI
   }
-} 
+}

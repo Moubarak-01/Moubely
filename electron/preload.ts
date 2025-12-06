@@ -7,7 +7,7 @@ interface ElectronAPI {
     height: number
   }) => Promise<void>
   
-  // NEW: Manual Window Resizing
+  // Manual Window Resizing
   setWindowSize: (dimensions: { width: number, height: number }) => Promise<void>
 
   getScreenshots: () => Promise<Array<{ path: string; preview: string }>>
@@ -53,6 +53,10 @@ interface ElectronAPI {
 
   // Chat with Image
   chatWithImage: (message: string, imagePath: string) => Promise<string>
+
+  // NEW: Student Mode Handlers
+  checkProfileExists: () => Promise<boolean>
+  saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => Promise<boolean>
 }
 
 export const PROCESSING_EVENTS = {
@@ -72,7 +76,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   updateContentDimensions: (dimensions: { width: number; height: number }) =>
     ipcRenderer.invoke("update-content-dimensions", dimensions),
   
-  // NEW: Manual Window Resizing
+  // Manual Window Resizing
   setWindowSize: (dimensions: { width: number, height: number }) => 
     ipcRenderer.invoke("set-window-size", dimensions),
 
@@ -199,12 +203,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
   
   invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
   
-  // NEW: Expose the mouse event handling function
+  // Expose the mouse event handling function
   setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => 
     ipcRenderer.invoke("set-ignore-mouse-events", ignore, options),
 
-  // NEW: Chat with Image
+  // Chat with Image
   chatWithImage: (message: string, imagePath: string) => 
     ipcRenderer.invoke("chat-with-image", { message, imagePath }),
+
+  // NEW: Student Mode Handlers
+  checkProfileExists: () => ipcRenderer.invoke("check-profile-exists"),
+  saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => 
+    ipcRenderer.invoke("save-student-files", files),
 
 } as ElectronAPI)

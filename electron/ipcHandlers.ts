@@ -1,5 +1,10 @@
 import { ipcMain, app, BrowserWindow } from "electron"
 import { AppState } from "./main"
+import fs from "fs"
+import path from "path"
+
+// Define the payload type explicitly
+type ChatPayload = string | { message: string; mode?: string; history?: any[] };
 
 export function initializeIpcHandlers(appState: AppState): void {
   // Window Resizing (Manual)
@@ -110,10 +115,22 @@ export function initializeIpcHandlers(appState: AppState): void {
     }
   })
 
-  // Chat Handlers
-  ipcMain.handle("gemini-chat", async (event, message: string) => {
+  // Chat Handlers (FIXED TYPE ERROR & MEMORY SUPPORT)
+  ipcMain.handle("gemini-chat", async (event, payload: ChatPayload) => {
     try {
-      const result = await appState.processingHelper.getLLMHelper().chatWithGemini(message);
+      let prompt = "";
+      let currentMode = "General";
+      let history: any[] = [];
+
+      if (typeof payload === 'string') {
+          prompt = payload;
+      } else {
+          prompt = payload.message;
+          currentMode = payload.mode || "General";
+          history = payload.history || [];
+      }
+
+      const result = await appState.processingHelper.getLLMHelper().chatWithGemini(prompt, history, currentMode);
       return result;
     } catch (error: any) {
       console.error("Error in gemini-chat handler:", error);
@@ -201,6 +218,40 @@ export function initializeIpcHandlers(appState: AppState): void {
       return await llmHelper.testConnection();
     } catch (error: any) {
       return { success: false, error: error.message };
+    }
+  });
+
+  // --- STUDENT MODE HANDLERS ---
+  
+  ipcMain.handle("check-profile-exists", async () => {
+    const saveDir = path.join(app.getPath("userData"), "student_profile");
+    try {
+      return fs.existsSync(saveDir) && fs.readdirSync(saveDir).length > 0;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  ipcMain.handle("save-student-files", async (event, files: { name: string, data: ArrayBuffer }[]) => {
+    const saveDir = path.join(app.getPath("userData"), "student_profile");
+
+    try {
+      if (!fs.existsSync(saveDir)) {
+        fs.mkdirSync(saveDir, { recursive: true });
+      }
+
+      // Clear old files
+      const existing = fs.readdirSync(saveDir);
+      existing.forEach(f => fs.unlinkSync(path.join(saveDir, f)));
+
+      for (const f of files) {
+        const buffer = Buffer.from(f.data);
+        fs.writeFileSync(path.join(saveDir, f.name), buffer);
+      }
+      return true;
+    } catch (error) {
+      console.error("Error saving student files:", error);
+      return false;
     }
   });
 }
