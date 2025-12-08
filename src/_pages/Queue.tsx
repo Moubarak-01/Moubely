@@ -497,21 +497,29 @@ const Queue: React.FC<any> = ({ setView }) => {
     setActiveTab("Email"); 
     
     setIsThinking(true);
-    setThinkingStep("Generating summary...");
+    setThinkingStep("Drafting summary...");
     const fullTranscript = transcriptLogs.map(t => t.text).join(" ");
     
     let generatedEmail = "";
+    let generatedTitle = `Meeting ${new Date().toLocaleDateString()}`;
+
     try {
         if (fullTranscript.length > 10) {
-            const prompt = `Based on this transcript, draft a professional follow-up email:\n\n${fullTranscript}`;
-            const response = await window.electronAPI.invoke("gemini-chat", prompt);
-            generatedEmail = response;
-            setEmailDraft(response);
+            // Parallel execution: Get email and title
+            const [emailResponse, titleResponse] = await Promise.all([
+                window.electronAPI.invoke("gemini-chat", `Based on this transcript, draft a professional follow-up email:\n\n${fullTranscript}`),
+                window.electronAPI.invoke("gemini-chat", `Based on this transcript, generate a very short, concise title (under 6 words) for this meeting:\n\n${fullTranscript}`)
+            ]);
+            
+            generatedEmail = emailResponse;
+            // Clean up quotes if present in title
+            generatedTitle = titleResponse.replace(/^["']|["']$/g, '');
+            setEmailDraft(emailResponse);
         } else {
             setEmailDraft("No significant speech detected.");
         }
     } catch (e) {
-        setEmailDraft("Failed to generate email draft.");
+        setEmailDraft("Failed to generate content.");
     } finally {
         setIsThinking(false);
     }
@@ -522,7 +530,7 @@ const Queue: React.FC<any> = ({ setView }) => {
             date: Date.now(),
             transcript: transcriptLogs,
             emailDraft: generatedEmail,
-            title: `Meeting ${new Date().toLocaleDateString()}`
+            title: generatedTitle // Save smart title
         };
         const updatedHistory = [newMeeting, ...pastMeetings];
         setPastMeetings(updatedHistory);
@@ -610,9 +618,8 @@ const Queue: React.FC<any> = ({ setView }) => {
   const triggerAssistAction = async (actionType: "Assist" | "WhatToSay" | "FollowUp" | "Recap") => {
     let transcriptText = transcriptLogs.map(t => t.text).join(" ");
     
-    // UPDATE: Fallback to chat history if transcript is empty
+    // Fallback to chat history if transcript is empty
     if (!transcriptText.trim() && messages.length > 0) {
-        // Use last 5 messages as context
         transcriptText = messages.slice(-5).map(m => `${m.role.toUpperCase()}: ${m.text}`).join("\n");
     }
 
@@ -624,25 +631,45 @@ const Queue: React.FC<any> = ({ setView }) => {
     setActiveTab("Chat")
     setIsThinking(true)
     
-    let prompt = ""
+    // 1. Determine Prompt and User Display Message
+    let userDisplayMessage = "";
+    let systemPrompt = "";
+    
     switch (actionType) {
-      case "Assist": prompt = `Based on the conversation context: "${transcriptText}". \nProvide helpful facts, context, or next steps.`; break
-      case "WhatToSay": prompt = `Based on the conversation context: "${transcriptText}". \nSuggest 3 smart responses.`; break
-      case "FollowUp": prompt = `Based on the conversation context: "${transcriptText}". \nGenerate 3 follow-up questions.`; break
-      case "Recap": prompt = `Based on the conversation context: "${transcriptText}". \nProvide a concise summary.`; break
+      case "Assist": 
+          userDisplayMessage = "Assist me based on the current context.";
+          systemPrompt = `Based on the conversation context: "${transcriptText}". \nProvide helpful facts, context, or next steps.`; 
+          break;
+      case "WhatToSay": 
+          userDisplayMessage = "What should I say next?";
+          systemPrompt = `Based on the conversation context: "${transcriptText}". \nSuggest 3 smart responses.`; 
+          break;
+      case "FollowUp": 
+          userDisplayMessage = "Generate follow-up questions.";
+          systemPrompt = `Based on the conversation context: "${transcriptText}". \nGenerate 3 follow-up questions.`; 
+          break;
+      case "Recap": 
+          userDisplayMessage = "Recap the meeting so far.";
+          systemPrompt = `Based on the conversation context: "${transcriptText}". \nProvide a concise summary.`; 
+          break;
     }
     
-    // UPDATE: Send history with assist actions too
+    // 2. Add USER message to chat immediately (Visual feedback)
+    setMessages(prev => [...prev, { id: Date.now().toString(), role: "user", text: userDisplayMessage, timestamp: Date.now() }]);
+
+    // 3. Prepare history (inject the new user intent so AI knows what it's answering)
     const history = messages.map(m => ({ role: m.role, text: m.text }));
+    history.push({ role: "user", text: userDisplayMessage });
+
     const args = {
-        message: prompt,
+        message: systemPrompt,
         mode: mode,
         history: history 
     };
 
     try {
         const response = await window.electronAPI.invoke("gemini-chat", args)
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: response, timestamp: Date.now() }])
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "ai", text: response, timestamp: Date.now() }])
     } catch (e: any) { console.error(e) } finally { setIsThinking(false) }
   }
 
@@ -799,7 +826,7 @@ const Queue: React.FC<any> = ({ setView }) => {
                                   <div className="flex justify-between items-start mb-2">
                                       <div className="flex items-center gap-2 text-blue-300 font-medium">
                                           <Calendar size={14}/>
-                                          <span>{new Date(meeting.date).toLocaleDateString()}</span>
+                                          <span>{meeting.title || new Date(meeting.date).toLocaleDateString()}</span>
                                           <span className="text-gray-500">•</span>
                                           <Clock size={14}/>
                                           <span>{new Date(meeting.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
