@@ -1,9 +1,23 @@
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai"
+import OpenAI from "openai"
 import fs from "fs"
 import path from "path"
 import { app } from "electron"
 import axios from "axios"
 import FormData from "form-data"
+
+// --- CONFIGURATION ---
+// Priority chains. Note: 'type: github' uses the GitHub Token.
+const CHAT_MODELS = [
+    { type: 'github', model: 'DeepSeek-V3', name: 'DeepSeek V3 (GitHub)' }, // Primary
+    { type: 'github', model: 'gpt-4o', name: 'GPT-4o (GitHub)' },          // Fallback 1
+    { type: 'gemini', model: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' } // Fallback 2
+];
+
+const VISION_MODELS = [
+    { type: 'github', model: 'gpt-4o', name: 'GPT-4o Vision (GitHub)' },    // Primary Vision
+    { type: 'gemini', model: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' }     // Fallback Vision
+];
 
 interface OllamaResponse {
   response: string
@@ -12,287 +26,199 @@ interface OllamaResponse {
 
 export class LLMHelper {
   private genAI: GoogleGenerativeAI | null = null
-  private model: GenerativeModel | null = null
-  private readonly systemPrompt = `You are a dedicated Speech-to-Text engine.`
-  
-  // Providers
+  private githubClient: OpenAI | null = null
+  private groqClient: OpenAI | null = null
+
+  // State
   private useOllama: boolean = false
   private ollamaModel: string = "llama3.2"
   private ollamaUrl: string = "http://localhost:11434"
-  private githubToken: string | null = null
-  private groqApiKey: string | null = null
-
-  // Gemini Model Priority List (Fallback)
-  private readonly geminiModels = [
-    "gemini-1.5-flash-8b",       // Fast & High Quota
-    "gemini-1.5-flash",          
-    "gemini-1.5-pro"            
-  ]
+  private model: GenerativeModel | null = null // Current active Gemini model wrapper
+  private readonly systemPrompt = `You are a dedicated Speech-to-Text engine.`
 
   constructor(apiKey?: string, useOllama: boolean = false, ollamaModel?: string, ollamaUrl?: string) {
-    this.useOllama = useOllama
-    
-    // Load Keys from Env
-    this.githubToken = process.env.GITHUB_TOKEN || null;
-    this.groqApiKey = process.env.GROQ_API_KEY || null;
+    this.useOllama = useOllama;
 
     if (useOllama) {
-      this.ollamaUrl = ollamaUrl || "http://localhost:11434"
-      this.ollamaModel = ollamaModel || "gemma:latest"
-      console.log(`[LLMHelper] Using Ollama with model: ${this.ollamaModel}`)
-      this.initializeOllamaModel()
+      this.ollamaUrl = ollamaUrl || "http://localhost:11434";
+      this.ollamaModel = ollamaModel || "gemma:latest";
+      console.log(`[LLMHelper] Mode: Ollama (${this.ollamaModel})`);
+      this.initializeOllamaModel();
     } else {
-      // Initialize Gemini (Fallback)
-      if (apiKey) {
-          this.genAI = new GoogleGenerativeAI(apiKey)
-          this.model = this.genAI.getGenerativeModel({ model: this.geminiModels[0] })
-          console.log("[LLMHelper] Gemini Initialized (Fallback System)")
-      }
-      
-      if (this.groqApiKey) console.log("[LLMHelper] Groq API detected. Active for Speech-to-Text.");
-      if (this.githubToken) console.log("[LLMHelper] GitHub Token detected. Active for Chat.");
+      this.initializeProviders(apiKey);
     }
   }
 
-  // --- SPECIALIZED: GROQ WHISPER (Speech-to-Text) ---
-  private async callGroqWhisper(audioBuffer: Buffer): Promise<string> {
-      if (!this.groqApiKey) throw new Error("No Groq API Key");
+  private initializeProviders(geminiKey?: string) {
+      // 1. Gemini (Final Fallback)
+      if (geminiKey) {
+          this.genAI = new GoogleGenerativeAI(geminiKey);
+          this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+          console.log("[LLMHelper] Gemini Initialized (Fallback)");
+      }
 
-      try {
-          const form = new FormData();
-          form.append("file", audioBuffer, { filename: 'audio.wav', contentType: 'audio/wav' });
-          form.append("model", "whisper-large-v3"); // Groq's super-fast Whisper model
-          form.append("response_format", "json");
-
-          const response = await axios.post("https://api.groq.com/openai/v1/audio/transcriptions", form, {
-              headers: {
-                  ...form.getHeaders(),
-                  "Authorization": `Bearer ${this.groqApiKey}`
-              }
+      // 2. GitHub Models (Powers DeepSeek AND GPT-4o)
+      if (process.env.GITHUB_TOKEN) {
+          this.githubClient = new OpenAI({
+              baseURL: "https://models.inference.ai.azure.com", // GitHub Models Endpoint
+              apiKey: process.env.GITHUB_TOKEN
           });
+          console.log("[LLMHelper] GitHub Client Initialized (DeepSeek & GPT-4o)");
+      }
 
-          return response.data.text;
-      } catch (error: any) {
-          console.error("[LLMHelper] Groq Whisper failed:", error?.response?.data || error.message);
-          throw error;
+      // 3. Groq (Primary Audio)
+      if (process.env.GROQ_API_KEY) {
+          this.groqClient = new OpenAI({
+              baseURL: "https://api.groq.com/openai/v1",
+              apiKey: process.env.GROQ_API_KEY
+          });
+          console.log("[LLMHelper] Groq Client Initialized (Primary Audio)");
       }
   }
 
-  // --- PRIMARY: GITHUB MODELS (Chat) ---
-  private async callGithub(messages: any[]) {
-    if (!this.githubToken) throw new Error("No GitHub Token provided.");
-    
-    try {
-      const response = await axios.post("https://models.inference.ai.azure.com/chat/completions", {
-            messages: messages,
-            model: "gpt-4o-mini",
-            temperature: 0.7,
-            max_tokens: 4096
-        }, {
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${this.githubToken}`
-        }
-      });
-
-      return {
-          response: {
-              text: () => response.data.choices[0].message.content
-          }
-      };
-    } catch (error: any) {
-        throw new Error(`GitHub API Error: ${error.response?.status} - ${JSON.stringify(error.response?.data)}`);
-    }
-  }
-
-  // --- FALLBACK: GEMINI ---
-  private async callGeminiFallback(params: any) {
-    if (!this.genAI) throw new Error("Gemini not configured for fallback");
-
-    for (const modelName of this.geminiModels) {
-        try {
-            const currentModel = this.genAI.getGenerativeModel({ model: modelName });
-            const finalParams = Array.isArray(params) ? params : [params];
-            const result = await currentModel.generateContent(finalParams);
-            this.model = currentModel;
-            return result;
-        } catch (error: any) {
-            if (error.message.includes("429") || error.message.includes("404")) continue;
-            console.warn(`[LLMHelper] Gemini ${modelName} failed:`, error.message);
-        }
-    }
-    throw new Error("All Gemini fallback models failed.");
-  }
-
-  // --- AUDIO ANALYSIS (Groq -> Gemini Fallback) ---
-  public async analyzeAudioFromBase64(data: string, mimeType: string) {
-    if (!data || data.length < 100) return { text: "", timestamp: Date.now() };
-
-    let text = "";
-    
-    // 1. Try Groq (Whisper)
-    if (this.groqApiKey) {
-        try {
-            const audioBuffer = Buffer.from(data, 'base64');
-            text = await this.callGroqWhisper(audioBuffer);
-            return { text: text.trim(), timestamp: Date.now() };
-        } catch (e) {
-            console.warn("[LLMHelper] Groq failed, trying Gemini fallback...");
-        }
-    }
-
-    // 2. Fallback to Gemini (Multimodal)
-    try {
-        const audioPart = { inlineData: { data, mimeType } };
-        const prompt = `Transcribe the speech verbatim. Return ONLY spoken words.`;
-        
-        if (this.useOllama) {
-             // Ollama audio support is limited, return empty or handle differently
-             text = "";
-        } else {
-             const result = await this.callGeminiFallback([prompt, audioPart]);
-             text = typeof result.response.text === 'function' ? result.response.text() : (result.response as any).text;
-        }
-    } catch (error) {
-        console.error("All audio providers failed:", error);
-    }
-
-    return { text: text?.trim() || "", timestamp: Date.now() };
-  }
-
-  public async analyzeAudioFile(audioPath: string) {
-      // 1. Try Groq
-      if (this.groqApiKey) {
-          try {
-              const buffer = await fs.promises.readFile(audioPath);
-              const text = await this.callGroqWhisper(buffer);
-              return { text: text.trim(), timestamp: Date.now() };
-          } catch (e) { console.warn("Groq file analysis failed, fallback..."); }
-      }
-
-      // 2. Fallback Gemini
-      try {
-        const audioData = await fs.promises.readFile(audioPath);
-        const audioPart = { inlineData: { data: audioData.toString("base64"), mimeType: "audio/mp3" } };
-        const prompt = `Transcribe the speech verbatim.`;
-        const result = await this.callGeminiFallback([prompt, audioPart]);
-        const text = typeof result.response.text === 'function' ? result.response.text() : (result.response as any).text;
-        return { text, timestamp: Date.now() };
-      } catch (e) { throw e; }
-  }
-
-  // --- CHAT (GitHub -> Gemini Fallback) ---
+  // --- 1. CHAT HANDLER (DeepSeek -> GPT-4o -> Gemini) ---
   public async chatWithGemini(message: string, history: any[] = [], mode: string = "General"): Promise<string> {
-      let systemInstruction = this.systemPrompt;
+      if (this.useOllama) return this.callOllama(message);
 
-      if (mode === "Student") {
-          const studentFiles = this.getStudentFiles();
-          systemInstruction = `
-You are an expert Career and Computer Science Mentor.
-You have access to the user's uploaded profile files (Resume, Projects) below:${studentFiles ? `# ====== USER PROFILE / RESUME ======\n${studentFiles}\n# ===========================` : ""}
-
-**YOUR INSTRUCTION:**
-Analyze the user's question and classify it as either **TECHNICAL** or **BEHAVIORAL**.
-
-### 1. IF THE QUESTION IS TECHNICAL / CODING:
-- Act as a Tutor.
-- **Do not give the answer immediately.**
-- Ask: "Do you want a **Hint (Idea)**, a **Brute Force Approach**, or the **Optimal Solution**?"
-
-### 2. IF THE QUESTION IS BEHAVIORAL / SOFT SKILLS:
-- **DRAFT AN ANSWER DIRECTLY** for the user.
-- **CRITICAL:** Use the **USER PROFILE** content above to personalize the answer.
-- Structure the answer using the **STAR Method**.
-
-Current User Question:${message}
-`;
-      }
-
-      if (this.useOllama) return this.callOllama(`${systemInstruction}\nUser: ${message}`);
+      const systemInstruction = this.getSystemInstruction(mode);
       
-      const historyText = history.map(h => `${h.role === 'user' ? 'User' : 'AI'}: ${h.text}`).join('\n\n');
-      const fullPrompt = `${systemInstruction}\n\n=== CHAT HISTORY ===\n${historyText}\n\n=== CURRENT MESSAGE ===\nUser: ${message}`;
+      // Convert history to OpenAI format
+      const messages = [
+          { role: "system", content: systemInstruction },
+          ...history.map(h => ({ role: h.role, content: h.text })),
+          { role: "user", content: message }
+      ];
 
-      // 1. Try GitHub (Text Chat)
-      if (this.githubToken) {
+      // Try providers in order
+      for (const config of CHAT_MODELS) {
           try {
-               let messages = [{ role: "system", content: systemInstruction }];
-               // Add simplified history if needed, or just full prompt logic
-               messages.push({ role: "user", content: `History:\n${historyText}\n\nCurrent:\n${message}`});
-               
-               const result = await this.callGithub(messages);
-               return result.response.text();
-          } catch (e: any) {
-              console.warn(`GitHub Chat failed: ${e.message}. Switching to Gemini...`);
+              if (config.type === 'github' && this.githubClient) {
+                  // This client handles BOTH DeepSeek and GPT-4o
+                  // console.log(`[LLMHelper] Trying ${config.name}...`);
+                  const completion = await this.githubClient.chat.completions.create({
+                      messages: messages as any,
+                      model: config.model, // Swaps between 'DeepSeek-V3' and 'gpt-4o'
+                      temperature: 0.7
+                  });
+                  return completion.choices[0].message.content || "";
+              }
+
+              if (config.type === 'gemini' && this.genAI) {
+                  // Gemini Fallback
+                  const geminiModel = this.genAI.getGenerativeModel({ model: config.model });
+                  const chat = geminiModel.startChat({
+                      history: history.map(h => ({
+                          role: h.role === 'ai' ? 'model' : 'user',
+                          parts: [{ text: h.text }]
+                      }))
+                  });
+                  const result = await chat.sendMessage(systemInstruction + "\n\nUser: " + message);
+                  return result.response.text();
+              }
+          } catch (error: any) {
+              console.warn(`[LLMHelper] ${config.name} failed: ${error.message}`);
+              continue; // Try next model
           }
       }
 
-      // 2. Fallback Gemini
-      try {
-          const result = await this.callGeminiFallback(fullPrompt);
-          return typeof result.response.text === 'function' ? result.response.text() : (result.response as any).text;
-      } catch (error: any) {
-          return `⚠️ Error: All AI providers failed.\nDetails: ${error.message}`;
-      }
+      throw new Error("All AI Chat providers (DeepSeek, GitHub, Gemini) failed.");
   }
 
-  // --- IMAGES (Gemini Only - GitHub 4o-mini supports it but format is complex, staying safe with Gemini) ---
-  public async analyzeImageFile(imagePath: string) {
-      try {
-        const imageData = await fs.promises.readFile(imagePath);
-        const imagePart = { inlineData: { data: imageData.toString("base64"), mimeType: "image/png" } };
-        const prompt = `Describe this image concisely.`;
-        const result = await this.callGeminiFallback([prompt, imagePart]);
-        const text = typeof result.response.text === 'function' ? result.response.text() : (result.response as any).text;
-        return { text, timestamp: Date.now() };
-      } catch (e) { throw e; }
-  }
-  
-  public async chatWithImage(message: string, imagePath: string) {
+  // --- 2. IMAGE HANDLER (GPT-4o -> Gemini) ---
+  public async chatWithImage(message: string, imagePath: string): Promise<string> {
       const imageData = await fs.promises.readFile(imagePath);
-      const imagePart = { inlineData: { data: imageData.toString("base64"), mimeType: "image/png" } };
-      const prompt = `User Question: "${message}"\nAnswer based on the image.`;
-      const result = await this.callGeminiFallback([prompt, imagePart]);
-      return typeof result.response.text === 'function' ? result.response.text() : (result.response as any).text;
+      const base64Image = imageData.toString("base64");
+      
+      for (const config of VISION_MODELS) {
+          try {
+              // 1. GitHub / OpenAI Vision
+              if (config.type === 'github' && this.githubClient) {
+                  const response = await this.githubClient.chat.completions.create({
+                      model: config.model,
+                      messages: [
+                          {
+                              role: "user",
+                              content: [
+                                  { type: "text", text: message },
+                                  { type: "image_url", image_url: { url: `data:image/png;base64,${base64Image}` } }
+                              ]
+                          }
+                      ] as any
+                  });
+                  return response.choices[0].message.content || "";
+              }
+
+              // 2. Gemini Vision
+              if (config.type === 'gemini' && this.genAI) {
+                  const geminiModel = this.genAI.getGenerativeModel({ model: config.model });
+                  const imagePart = { inlineData: { data: base64Image, mimeType: "image/png" } };
+                  const result = await geminiModel.generateContent([message, imagePart]);
+                  return result.response.text();
+              }
+
+          } catch (error: any) {
+              console.warn(`[LLMHelper] ${config.name} failed for image: ${error.message}`);
+              continue;
+          }
+      }
+
+      throw new Error("All Vision providers failed.");
   }
 
-  // --- UTILS ---
-  private async fileToGenerativePart(imagePath: string) {
-    const imageData = await fs.promises.readFile(imagePath)
-    return { inlineData: { data: imageData.toString("base64"), mimeType: "image/png" } }
+  // --- 3. AUDIO HANDLER (Groq -> Gemini) ---
+  public async analyzeAudioFromBase64(data: string, mimeType: string) {
+      if (!data || data.length < 100) return { text: "", timestamp: Date.now() };
+
+      // 1. Try Groq (Whisper) - FASTEST
+      if (this.groqClient) {
+          try {
+              // Standard OpenAI SDK 'toFile' workaround for Buffers
+              const buffer = Buffer.from(data, 'base64');
+              const file = await OpenAI.toFile(buffer, 'audio.webm', { type: 'audio/webm' });
+              
+              const transcription = await this.groqClient.audio.transcriptions.create({
+                  file: file,
+                  model: "whisper-large-v3",
+                  response_format: "json",
+                  temperature: 0.0
+              });
+
+              return { text: transcription.text.trim(), timestamp: Date.now() };
+
+          } catch (error: any) {
+              console.warn(`[LLMHelper] Groq Whisper failed: ${error.message}. Switching to Gemini...`);
+          }
+      }
+
+      // 2. Fallback to Gemini
+      if (this.genAI) {
+          try {
+              const geminiModel = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" }); 
+              const audioPart = { inlineData: { data, mimeType } };
+              const result = await geminiModel.generateContent(["Transcribe this audio verbatim.", audioPart]);
+              return { text: result.response.text().trim(), timestamp: Date.now() };
+          } catch (error: any) {
+              console.error("[LLMHelper] Gemini Audio fallback failed:", error);
+          }
+      }
+
+      return { text: "", timestamp: Date.now() };
   }
 
-  private cleanJsonResponse(text: string): string {
-    text = text.replace(/^```(?:json)?\n/, '').replace(/\n```$/, '');
-    text = text.trim();
-    return text;
-  }
+  // --- HELPER METHODS ---
 
-  // --- OLLAMA METHODS (Unchanged) ---
-  private async callOllama(prompt: string): Promise<string> {
-    try {
-      const response = await fetch(`${this.ollamaUrl}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: this.ollamaModel, prompt: prompt, stream: false, options: { temperature: 0.7 } }),
-      })
-      if (!response.ok) throw new Error(`Ollama API error: ${response.status}`)
-      const data: OllamaResponse = await response.json()
-      return data.response
-    } catch (error: any) { throw new Error(`Failed to connect to Ollama: ${error.message}`) }
-  }
+  private getSystemInstruction(mode: string): string {
+      const studentFiles = (mode === "Student") ? this.getStudentFiles() : "";
+      
+      let prompt = `You are a helpful AI assistant named Moubely.`;
+      
+      if (mode === "Student") {
+          prompt += `\n\nCONTEXT: You are a Mentor. Use the user's files to personalize advice:\n${studentFiles}\n\nINSTRUCTION: Ask probing questions. Do not give direct answers for code.`;
+      } else if (mode === "Developer") {
+          prompt += `\n\nCONTEXT: You are a Senior Engineer. Be concise, technical, and provide production-ready code.`;
+      }
 
-  private async checkOllamaAvailable(): Promise<boolean> {
-    try { const response = await fetch(`${this.ollamaUrl}/api/tags`); return response.ok } catch { return false }
-  }
-
-  private async initializeOllamaModel(): Promise<void> {
-    try {
-      const availableModels = await this.getOllamaModels()
-      if (availableModels.length === 0) return
-      if (!availableModels.includes(this.ollamaModel)) { this.ollamaModel = availableModels[0] }
-      await this.callOllama("Hello")
-    } catch (error: any) { console.error(`[LLMHelper] Failed to initialize Ollama model: ${error.message}`) }
+      return prompt;
   }
 
   private getStudentFiles(): string {
@@ -305,54 +231,105 @@ Current User Question:${message}
     }
     return content;
   }
-  
+
+  // --- LEGACY/UTILITY SUPPORT ---
+  public async analyzeAudioFile(audioPath: string) {
+      const buffer = await fs.promises.readFile(audioPath);
+      return this.analyzeAudioFromBase64(buffer.toString('base64'), 'audio/mp3');
+  }
+
+  // FIX: Return an object { text, timestamp } to satisfy ProcessingHelper
+  public async analyzeImageFile(imagePath: string) {
+      const text = await this.chatWithImage("Describe this image concisely.", imagePath);
+      return { text, timestamp: Date.now() };
+  }
+
   public async extractProblemFromImages(imagePaths: string[]) {
-    try {
-      const imageParts = await Promise.all(imagePaths.map(path => this.fileToGenerativePart(path)))
-      const prompt = `Analyze these images and extract problem info JSON.`;
-      const result = await this.callGeminiFallback([prompt, ...imageParts])
-      return JSON.parse(this.cleanJsonResponse(typeof result.response.text === 'function' ? result.response.text() : (result.response as any).text))
-    } catch (error) { throw error }
+      if (!this.genAI) throw new Error("Gemini required for multi-image extraction");
+      
+      const imageParts = await Promise.all(imagePaths.map(async (p) => {
+          const d = await fs.promises.readFile(p);
+          return { inlineData: { data: d.toString('base64'), mimeType: "image/png" } };
+      }));
+
+      const model = this.genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const prompt = "Extract the problem statement, context, and requirements from these images as a JSON object.";
+      const result = await model.generateContent([prompt, ...imageParts]);
+      const text = result.response.text().replace(/^```json/, '').replace(/```$/, '');
+      return JSON.parse(text);
   }
 
   public async generateSolution(problemInfo: any) {
-    const prompt = `${this.systemPrompt}\n\nSolve this:\n${JSON.stringify(problemInfo, null, 2)}`;
-    try {
-      // Prefer GitHub for Logic/Code Generation if available
-      if (this.githubToken) {
-          try {
-              const result = await this.callGithub([{role: "user", content: prompt}]);
-              return JSON.parse(this.cleanJsonResponse(result.response.text()));
-          } catch(e) { console.warn("GitHub solution gen failed, using Gemini..."); }
+      const prompt = `Solve this problem:\n${JSON.stringify(problemInfo)}`;
+      // Use standard chat flow so it benefits from DeepSeek
+      const solutionText = await this.chatWithGemini(prompt, [], "Developer");
+      
+      try {
+          const cleaned = solutionText.replace(/^```json/, '').replace(/```$/, '');
+          return JSON.parse(cleaned);
+      } catch {
+          return { solution: { code: solutionText, explanation: "Generated by DeepSeek/GPT" } };
       }
-      const result = await this.callGeminiFallback(prompt)
-      return JSON.parse(this.cleanJsonResponse(typeof result.response.text === 'function' ? result.response.text() : (result.response as any).text))
-    } catch (error) { throw error; }
   }
 
+  // --- ADDED MISSING METHOD: debugSolutionWithImages ---
   public async debugSolutionWithImages(problemInfo: any, currentCode: string, debugImagePaths: string[]) {
-      // Must use Gemini for Image Analysis
-      const imageParts = await Promise.all(debugImagePaths.map(path => this.fileToGenerativePart(path)))
-      const prompt = `Debug this solution given images.`;
-      const result = await this.callGeminiFallback([prompt, ...imageParts])
-      return JSON.parse(this.cleanJsonResponse(typeof result.response.text === 'function' ? result.response.text() : (result.response as any).text))
+      const prompt = `
+      I am debugging a solution. 
+      Original Problem: ${JSON.stringify(problemInfo)}
+      Current Code: ${currentCode}
+      
+      Please look at the attached screenshot (the error or output) and fix the code.
+      Return JSON: { "solution": { "code": "fixed code", "explanation": "what was fixed" } }
+      `;
+
+      // We use the first debug image with the Vision Handler
+      // If there are multiple, handling them with GPT-4o or Gemini is complex in this simplified structure,
+      // so we prioritize the first one for now.
+      if (debugImagePaths.length > 0) {
+          const responseText = await this.chatWithImage(prompt, debugImagePaths[0]);
+          try {
+              const cleaned = responseText.replace(/^```json/, '').replace(/```$/, '');
+              return JSON.parse(cleaned);
+          } catch {
+              return { solution: { code: currentCode, explanation: "Could not parse fix: " + responseText } };
+          }
+      }
+      
+      throw new Error("No debug images provided.");
   }
 
-  public isUsingOllama() { return this.useOllama; }
-  public getCurrentProvider() { return this.useOllama ? "ollama" : (this.githubToken ? "github+groq" : "gemini"); }
-  public getCurrentModel() { return this.useOllama ? this.ollamaModel : "hybrid"; }
-  public async getOllamaModels() { if (!this.useOllama) return []; try { const r = await fetch(`${this.ollamaUrl}/api/tags`); const d = await r.json(); return d.models?.map((m: any) => m.name) || []; } catch { return [] } } 
+  // Ollama Support (Legacy)
+  private async callOllama(prompt: string): Promise<string> {
+    try {
+      const response = await fetch(`${this.ollamaUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: this.ollamaModel, prompt: prompt, stream: false, options: { temperature: 0.7 } }),
+      })
+      if (!response.ok) throw new Error(`Ollama error: ${response.status}`)
+      const data: OllamaResponse = await response.json()
+      return data.response
+    } catch (error: any) { throw new Error(`Ollama failed: ${error.message}`) }
+  }
+
+  private async initializeOllamaModel(): Promise<void> {
+     this.callOllama("hi").catch(e => console.error("Ollama check failed", e));
+  }
   
-  public async switchToOllama(model?: string, url?: string) { this.useOllama = true; if(url) this.ollamaUrl=url; if(model) this.ollamaModel=model; else await this.initializeOllamaModel(); }
-  public async switchToGemini(apiKey?: string) { if(apiKey) { this.genAI = new GoogleGenerativeAI(apiKey); this.model = this.genAI.getGenerativeModel({ model: this.geminiModels[0] }); } this.useOllama = false; }
+  public async getOllamaModels() { if (!this.useOllama) return []; try { const r = await fetch(`${this.ollamaUrl}/api/tags`); const d = await r.json(); return d.models?.map((m: any) => m.name) || []; } catch { return [] } } 
+  public isUsingOllama() { return this.useOllama; }
+  public getCurrentProvider() { return this.useOllama ? "ollama" : "hybrid-cloud"; }
+  public getCurrentModel() { return "auto-switching"; }
+  
+  public async switchToOllama(model?: string, url?: string) { this.useOllama = true; if(url) this.ollamaUrl=url; if(model) this.ollamaModel=model; }
+  public async switchToGemini(apiKey?: string) { if(apiKey) this.initializeProviders(apiKey); this.useOllama = false; }
+  
   public async testConnection() { 
-      try { 
-        if(this.useOllama) { await this.checkOllamaAvailable(); return {success:true}; } 
-        // Test primary chain
-        if (this.groqApiKey) await this.callGroqWhisper(Buffer.from("UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=", "base64")); // tiny wav header
-        else if (this.githubToken) await this.callGithub([{role:"user", content:"hi"}]);
-        else await this.callGeminiFallback("hi");
-        return {success:true}; 
-      } catch(e:any) { return {success:false, error:e.message}; } 
+      try {
+          if (this.useOllama) { await this.callOllama("hi"); }
+          else { await this.chatWithGemini("hi"); }
+          return { success: true };
+      } catch (e: any) { return { success: false, error: e.message }; }
   }
 }
