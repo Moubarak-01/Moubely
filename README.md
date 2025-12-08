@@ -1,85 +1,108 @@
-# Moubely - Intelligent Desktop Assistant
-
+Moubely - Intelligent Desktop Assistant
 Moubely is a stealthy, transparent, always-on-top AI assistant for your desktop. It provides real-time meeting assistance, screen analysis, and chat capabilities in a sleek, non-intrusive interface.
 
-## 🚀 Core Features
+🚀 Core Features
+👻 Stealth Overlay: A fully transparent, click-through window that floats on top of your applications. It stays invisible until you need it, ensuring you never break flow.
 
-- **👻 Stealth Overlay**: A fully transparent, click-through window that floats on top of your applications. It stays invisible until you need it, ensuring you never break flow.
-- **📸 Contextual Vision**: Instantly snap screenshots (`Ctrl + H`) of code errors, complex charts, or emails. Moubely "sees" your screen and provides specific, context-aware solutions.
-- **🎙️ Live Meeting Copilot**:
-  - **Real-time Transcription**: Captures system and microphone audio to transcribe meetings live.
-  - **Smart Assists**: One-click buttons to generate "What to say?" suggestions, follow-up questions, or instant recaps during the call.
-  - **Auto-Summaries**: Automatically detects when a meeting ends and drafts a professional follow-up email and summary.
-- **🧠 Multi-Model AI Engine**: Powered by **Gemini 2.0 Flash** for blazing fast responses, with fallback to **Gemini 1.5**. Also supports **Ollama** for completely local, private AI processing.
-- **⚡ Smart Modes**: Switch between **Developer** (code-focused), **Student** (explanatory), and **General** modes to tailor the AI's personality to your current task.
+📸 Contextual Vision: Instantly snap screenshots (Ctrl + H) of code errors, complex charts, or emails. Moubely "sees" your screen and provides specific, context-aware solutions using Google Gemini.
 
-## 🌟 Latest Updates (Stability & Features)
+🎙️ Live Meeting Copilot:
 
-### 🎙️ **Robust Live Transcription**
-- **Restart Loop Engine:** We completely rewrote the recording logic. Moubely now processes audio in smart 5-second chunks with a seamless restart loop. This eliminates `400 Bad Request` and `429 Too Many Requests` errors, ensuring your transcript **never freezes** during long meetings.
-- **Smart Fallback:** The AI now automatically switches between `gemini-2.0-flash-exp` and `gemini-1.5-flash`. If one model is down or rate-limited, Moubely instantly swaps to the other to keep your assistant running.
-- **Audio Visualizer:** A new real-time waveform visualizer in the Transcript tab lets you confirm instantly that Moubely is hearing you (and your system audio).
+Ultra-Fast Transcription: Powered by Groq (Whisper-Large-V3) for near-instant, verbatim speech-to-text.
 
-### 🛠️ **UI & UX Polish**
-- **Copy Code Fixed:** The "Copy" button on code blocks now works perfectly (no more `[object Object]` errors).
-- **Auto-Expanding Input:** The chat bar smoothly expands as you type and scrolls automatically, so you never lose sight of your prompt.
-- **New Shortcuts:**
-  - **`Ctrl + N`**: Start a fresh chat session instantly.
-  - **`Ctrl + R`**: Full reset (clears chat, transcript, and memory).
-  - **`Ctrl + H`**: Snap a screenshot and attach it to the chat.
+Smart Assists: One-click buttons to generate suggestions, follow-up questions, or instant recaps.
 
-## 💻 How to Run Locally
+🧠 Hybrid AI Engine: Moubely now utilizes a specialized "Three-Brain" architecture:
 
-### Prerequisites
-- **Node.js** (v18 or higher recommended)
-- **npm** (comes with Node.js) or **yarn**
+Ears: Groq for audio processing.
 
-### Installation Steps
+Brain: GitHub Models (GPT-4o-mini) for logic and chat.
 
-1.  **Clone the Repository**
-    ```bash
-    git clone https://github.com/Moubarak-01/Moubely.git
-    cd Moubely
-    ```
+Eyes: Google Gemini for image analysis and fallback support.
 
-2.  **Install Dependencies**
-    ```bash
-    npm install
-    ```
+⚡ Smart Modes: Switch between Developer (code-focused), Student (explanatory), and General modes to tailor the AI's personality to your current task.
 
-3.  **Setup Environment Variables**
-    Create a `.env` file in the root directory and add your Google Gemini API key:
-    ```bash
-    GEMINI_API_KEY=your_actual_api_key_here
-    ```
-    *(You can get a free API key from [Google AI Studio](https://aistudio.google.com/app/apikey))*
+🛠️ Latest Updates: The Hybrid Architecture
+We have completely overhauled the backend to solve stability issues and maximize performance. Here is a breakdown of the recent changes and fixes:
 
-4.  **Run the App**
-    Start the development server and Electron app simultaneously:
-    ```bash
-    npm start
-    ```
+1. Solved: The "429/404" Rate Limit Loop
+The Issue: Relying solely on the free tier of Gemini resulted in frequent 429 Too Many Requests or 404 Model Not Found errors when models (like gemini-2.0-flash) were busy or experimental.
 
-### Building for Production
-To create an executable file (e.g., `.dmg`, `.exe`, or `.AppImage`) for your operating system:
-```bash
+The Fix: We implemented a Cascading Fallback System.
+
+Primary: The app now defaults to GitHub Models (GPT-4o-mini) via Azure, which provides robust, high-availability text processing.
+
+Fallback: If GitHub fails, it automatically retries with a prioritized list of Gemini models (1.5-flash-8b -> 1.5-flash -> 1.5-pro).
+
+2. Solved: Azure "Content Filter" & Audio Routing
+The Issue: When we attempted to use GitHub Models as a drop-in replacement, we hit 400 Bad Request errors citing "Content Filters." This happened because we were sending raw audio/binary data to a text-completion endpoint.
+
+The Fix: We implemented Smart Routing in the LLMHelper.
+
+Text Requests are routed to GitHub.
+
+Audio Requests are routed to Groq.
+
+Image Requests (Multimodal) are routed to Gemini. This ensures every data type is handled by the model best suited for it, bypassing format errors.
+
+3. Implemented: Groq for Real-Time Speed
+The Upgrade: Previous transcription had latency. We integrated Groq's Whisper API, which processes audio 10x faster than real-time. This eliminates the "freezing" feeling during live transcription.
+
+💻 How to Run Locally
+Prerequisites
+Node.js (v18 or higher recommended)
+
+npm (comes with Node.js) or yarn
+
+Installation Steps
+Clone the Repository
+
+Bash
+
+git clone https://github.com/Moubarak-01/Moubely.git
+cd Moubely
+Install Dependencies
+
+Bash
+
+npm install
+Setup Environment Variables (Crucial) Create a .env file in the root directory. You now need three keys for the full hybrid experience, though the app will work (with fallbacks) if you only have some.
+
+Code snippet
+
+# 1. For Vision & Fallback (Get at aistudio.google.com)
+GEMINI_API_KEY=your_google_key_here
+
+# 2. For Logic/Chat (Get at github.com/settings/tokens)
+GITHUB_TOKEN=your_github_token_here
+
+# 3. For Speech-to-Text (Get at console.groq.com)
+GROQ_API_KEY=your_groq_key_here
+Run the App Start the development server and Electron app simultaneously:
+
+Bash
+
+npm start
+Building for Production
+To create an executable file (e.g., .dmg, .exe, or .AppImage) for your operating system:
+
+Bash
+
 npm run dist
-
 📂 Project Structure
-
 / (root)
 ├── package.json
 ├── tsconfig.json
-├── .env                <-- You need to create this (GEMINI_API_KEY=...)
+├── .env                <-- Contains GEMINI, GITHUB, and GROQ keys
 ├── electron/
 │   ├── main.ts
-│   ├── ipcHandlers.ts  <-- Backend logic (Resizing, AI calls)
-│   ├── LLMHelper.ts    <-- AI Brain (Gemini/Ollama with Fallback Logic)
-│   ├── WindowHelper.ts <-- Window management
-│   └── preload.ts      <-- Bridge
+│   ├── ipcHandlers.ts  <-- Backend logic & IPC routing
+│   ├── LLMHelper.ts    <-- The Hybrid Brain (Manages Smart Routing & Fallbacks)
+│   ├── ProcessingHelper.ts
+│   └── WindowHelper.ts
 ├── src/
 │   ├── App.tsx         <-- Main Entry
 │   ├── _pages/
-│   │   └── Queue.tsx   <-- The Core UI (Chat, Transcript, Visualizer)
-│   └── index.css       <-- Glassmorphism Styles
+│   │   └── Queue.tsx   <-- Core UI (Chat, Transcript, Visualizer)
+│   └── components/     <-- React Components
 └── index.html
