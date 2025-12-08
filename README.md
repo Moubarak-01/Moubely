@@ -11,35 +11,36 @@ Moubely is a stealthy, transparent, always-on-top AI assistant for your desktop.
   - **Smart Assists**: One-click buttons to generate suggestions, follow-up questions, or instant recaps.
   - **Auto-Summaries & Titles**: Automatically detects when a meeting ends, drafts a professional follow-up email, and generates a smart, concise title for the session.
 - **🧠 Hybrid AI Engine**: A "Three-Brain" architecture optimized for speed and stability:
-  - **Ears:** **Groq** for audio processing.
-  - **Brain:** **GitHub Models (GPT-4o-mini)** for logic and chat.
-  - **Eyes:** **Google Gemini** for image analysis and fallback support.
+  - **Ears:** **Groq** for high-speed audio processing.
+  - **Brain:** **GitHub Models (DeepSeek-V3 & GPT-4o)** for complex logic and chat.
+  - **Eyes:** **GPT-4o Vision** (via GitHub) with **Gemini** as a fallback.
 - **⚡ Smart Modes**: Switch between **Developer** (code-focused), **Student** (explanatory), and **General** modes to tailor the AI's personality to your current task.
 
-## 🌟 Latest Updates (Stability & Features)
+---
 
-### 🛠️ **Architecture Overhaul: Solving the "Loop of Death"**
-We encountered significant stability issues with the single-model approach. Here is how we fixed them:
+## 🛠️ Engineering Challenges & Architecture Overhaul
 
-1.  **Issue: Rate Limits (429) & Model Not Found (404)**
-    * **The Problem:** Relying solely on the free tier of Gemini caused frequent `429 Too Many Requests` errors during long sessions, and some models returned `404` depending on region.
-    * **The Fix:** We implemented a **Cascading Fallback System**. The app now prioritizes **GitHub Models (GPT-4o-mini)** for text. If that fails, it instantly falls back to a prioritized list of Gemini models (`1.5-flash-8b` -> `1.5-flash` -> `1.5-pro`).
+We recently rebuilt the backend to solve critical stability issues. Here is a breakdown of the problems we faced and the solutions we implemented:
 
-2.  **Issue: Azure Content Filters (400 Errors)**
-    * **The Problem:** When we tried using GitHub Models for everything, audio data triggered Azure's "Content Filters" because the text endpoint couldn't interpret binary audio, resulting in `400 Bad Request` crashes.
-    * **The Fix:** We built a **Smart Routing Engine** in `LLMHelper.ts`:
-        * **Text** → Routes to **GitHub Models** (Logic).
-        * **Audio** → Routes to **Groq** (Whisper).
-        * **Images** → Routes to **Gemini** (Vision).
+### 1. The "Loop of Death" (Rate Limits & 404s)
+* **The Problem:** Relying solely on the free tier of a single provider (Gemini) caused frequent `429 Too Many Requests` errors during long sessions. Additionally, specific experimental models would occasionally return `404 Model Not Found` depending on region or availability.
+* **The Fix:** We implemented a **Cascading Fallback System**.
+    * **Primary:** The app now defaults to **DeepSeek-V3** (via GitHub Models) for chat.
+    * **Fallback:** If that fails, it instantly switches to **GPT-4o**.
+    * **Safety Net:** If both fail, it gracefully falls back to **Gemini 1.5 Flash**.
 
-3.  **Issue: Transcription Latency**
-    * **The Problem:** Standard API transcription was too slow for real-time feedback.
-    * **The Fix:** Integrated **Groq**, which processes audio ~10x faster than real-time, eliminating the "freeze" during dictation.
+### 2. Azure Content Filters (400 Bad Request)
+* **The Problem:** When we attempted to use GitHub Models for everything, sending raw audio binary data to the text completion endpoint triggered Azure's "Content Filters," crashing the app with `400` errors.
+* **The Fix:** We built a **Smart Routing Engine** in `LLMHelper.ts`. The app now identifies the data type before sending:
+    * **Text** → Routes to **GitHub Models** (Logic).
+    * **Audio** → Routes to **Groq** (Whisper).
+    * **Images** → Routes to **GitHub Vision** or **Gemini**.
 
-### ✨ **New Implementations**
-- **Smart Meeting Titles**: No more "Meeting 12/07." Moubely now analyzes the transcript context to generate specific titles like "Marketing Strategy Sync" or "Q4 Budget Review."
-- **User-Mimicking Prompts**: Clicking buttons like "What to say?" now inserts a user message (e.g., *"What should I say next?"*) into the chat history. This makes the interaction feel natural and keeps a record of your requests.
-- **Robust Restart Loop**: The recording engine now processes audio in smart 5-second chunks with a seamless restart loop, ensuring the microphone never disconnects during hour-long meetings.
+### 3. Transcription Latency
+* **The Problem:** Standard API transcription was too slow for real-time conversation feedback.
+* **The Fix:** We integrated **Groq**, which processes audio ~10x faster than real-time, eliminating the "freeze" during dictation.
+
+---
 
 ## 💻 How to Run Locally
 
@@ -61,16 +62,17 @@ We encountered significant stability issues with the single-model approach. Here
     ```
 
 3.  **Setup Environment Variables (Crucial)**
-    Create a `.env` file in the root directory. You now need **three keys** for the full hybrid experience (though the app works with just one via fallbacks).
+    Create a `.env` file in the root directory. You need **three keys** for the full hybrid experience.
 
-    ```bash
-    # 1. For Vision & Fallback (Get at aistudio.google.com)
+    ```env
+    # 1. For Vision & Safety Net Fallback (Get at aistudio.google.com)
     GEMINI_API_KEY=your_google_key_here
 
-    # 2. For Logic/Chat (Get at [github.com/settings/tokens](https://github.com/settings/tokens))
+    # 2. For Logic, Chat, & Vision (Get at [github.com/marketplace/models](https://github.com/marketplace/models))
+    # This single token powers BOTH DeepSeek-V3 and GPT-4o
     GITHUB_TOKEN=your_github_token_here
 
-    # 3. For Speech-to-Text (Get at console.groq.com)
+    # 3. For Ultra-Fast Speech-to-Text (Get at console.groq.com)
     GROQ_API_KEY=your_groq_key_here
     ```
 
