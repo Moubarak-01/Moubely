@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
+import remarkMath from 'remark-math';     // 👈 Detects math ($$)
+import rehypeKatex from 'rehype-katex';   // 👈 Renders math
 import { Check, Copy, Terminal } from 'lucide-react';
-import 'highlight.js/styles/atom-one-dark.css'; // Ensure this is installed: npm install highlight.js
+import 'highlight.js/styles/atom-one-dark.css';
 
 // --- CUSTOM CODE BLOCK COMPONENT ---
-// This adds the "Copy" button and language label to every code snippet
+// (No changes here, keeping your existing code)
 const CodeBlock = ({ inline, className, children, ...props }: any) => {
   const [isCopied, setIsCopied] = useState(false);
   const match = /language-(\w+)/.exec(className || '');
@@ -28,7 +30,6 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
 
   return (
     <div className="my-4 rounded-lg overflow-hidden border border-white/10 bg-[#1e1e1e] shadow-lg">
-      {/* Code Header: Language + Copy Button */}
       <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
         <div className="flex items-center gap-2">
           <Terminal size={14} className="text-gray-400" />
@@ -43,7 +44,6 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
         </button>
       </div>
       
-      {/* The Code Itself */}
       <div className="p-4 overflow-x-auto">
         <code className={`!bg-transparent !p-0 text-sm font-mono ${className}`} {...props}>
           {children}
@@ -56,15 +56,22 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
 // --- MAIN COMPONENT ---
 const AIResponse = ({ content }: { content: string }) => {
   return (
-    // 'no-drag' and 'selectable' are CRITICAL for copying text
     <div className="no-drag selectable w-full max-w-none text-left">
       <ReactMarkdown
-        rehypePlugins={[rehypeHighlight]}
+        // 1. Parse the math syntax
+        remarkPlugins={[remarkMath]}
+        // 2. Render the math (Katex) and Highlight code
+        rehypePlugins={[rehypeKatex, rehypeHighlight]}
         components={{
           code: CodeBlock,
+          // Custom paragraph to make sure text around math looks good
+          p: ({children}) => <p className="mb-4 leading-7 text-gray-300 last:mb-0">{children}</p>,
         }}
         className="prose prose-invert prose-sm max-w-none
-          /* GEMINI TYPOGRAPHY TWEAKS */
+          /* MATH STYLING OVERRIDES */
+          [&_.katex]:text-base [&_.katex]:font-serif [&_.katex-display]:my-4
+          
+          /* YOUR EXISTING STYLES */
           prose-p:text-gray-300 prose-p:leading-7 prose-p:mb-4
           prose-headings:text-white prose-headings:font-medium prose-headings:mb-3 prose-headings:mt-6
           prose-strong:text-white prose-strong:font-semibold
