@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
-import remarkMath from 'remark-math';     // 👈 Detects math ($$)
-import rehypeKatex from 'rehype-katex';   // 👈 Renders math
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { Check, Copy, Terminal } from 'lucide-react';
 import 'highlight.js/styles/atom-one-dark.css';
+// Ensure CSS is loaded to prevent double-math rendering
+import 'katex/dist/katex.min.css';
 
-// --- CUSTOM CODE BLOCK COMPONENT ---
-// (No changes here, keeping your existing code)
+// --- CUSTOM CODE BLOCK ---
 const CodeBlock = ({ inline, className, children, ...props }: any) => {
   const [isCopied, setIsCopied] = useState(false);
   const match = /language-(\w+)/.exec(className || '');
@@ -53,33 +54,104 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
   );
 };
 
+// --- CONFIGURATION ---
+const katexOptions: any = {
+  output: 'html',
+  strict: false,
+  throwOnError: false,
+  globalGroup: true,
+};
+
+// --- CONTENT PRE-PROCESSOR (The "Bold" Fix) ---
+const preprocessContent = (content: string) => {
+  if (!content) return "";
+
+  let processed = content
+    // 1. Un-escape dollar signs
+    .replace(/\\+(\$)/g, '$')
+    
+    // 2. Normalize LaTeX brackets
+    .replace(/\\\[/g, '$$')
+    .replace(/\\\]/g, '$$')
+    .replace(/\\\(/g, '$')
+    .replace(/\\\)/g, '$');
+
+  // 3. FORCE BLOCK MATH (Fixes spacing)
+  // Ensures "$$ ... $$" has blank lines around it so it renders as a block
+  processed = processed.replace(/(\$\$[\s\S]*?\$\$)/g, '\n\n$1\n\n');
+
+  // 4. AUTO-HEADER PROMOTION (The "Bold Title" Fix)
+  // Detects lines that look like titles (Short, Capitalized, No period at end)
+  // Examples: "Matter", "Area of a Circle", "Quadratic Formula"
+  // Converts them to: ### Matter
+  processed = processed.replace(/^\s*(\**[A-Z][a-zA-Z0-9\s\-\(\)'"]{2,50}\**):?\s*$/gm, '\n\n### $1\n\n');
+
+  // 5. Cleanup extra newlines created by step 4
+  processed = processed.replace(/\n{3,}/g, '\n\n');
+
+  return processed;
+};
+
 // --- MAIN COMPONENT ---
 const AIResponse = ({ content }: { content: string }) => {
+  const cleanedContent = useMemo(() => preprocessContent(content), [content]);
+
   return (
     <div className="no-drag selectable w-full max-w-none text-left">
       <ReactMarkdown
-        // 1. Parse the math syntax
         remarkPlugins={[remarkMath]}
-        // 2. Render the math (Katex) and Highlight code
-        rehypePlugins={[rehypeKatex, rehypeHighlight]}
+        rehypePlugins={[
+          [rehypeKatex, katexOptions] as any,
+          rehypeHighlight as any
+        ]}
         components={{
           code: CodeBlock,
-          // Custom paragraph to make sure text around math looks good
-          p: ({children}) => <p className="mb-4 leading-7 text-gray-300 last:mb-0">{children}</p>,
+          p: ({children}) => (
+            <p className="mb-4 leading-7 text-gray-300 last:mb-0 relative">
+              {children}
+            </p>
+          ),
         }}
         className="prose prose-invert prose-sm max-w-none
-          /* MATH STYLING OVERRIDES */
-          [&_.katex]:text-base [&_.katex]:font-serif [&_.katex-display]:my-4
           
-          /* YOUR EXISTING STYLES */
-          prose-p:text-gray-300 prose-p:leading-7 prose-p:mb-4
-          prose-headings:text-white prose-headings:font-medium prose-headings:mb-3 prose-headings:mt-6
-          prose-strong:text-white prose-strong:font-semibold
+          /* --- FIX: HIDE DUPLICATE MATH --- */
+          /* This hides the accessible text that causes the 'A=πr2A=...' glitch */
+          [&_.katex-mathml]:hidden
+
+          /* --- MATH STYLING --- */
+          [&_.katex]:text-[1.2em] 
+          [&_.katex]:text-[#e5e7eb] 
+          [&_.katex]:font-normal
+          
+          /* Display Math Box */
+          [&_.katex-display]:my-6
+          [&_.katex-display]:py-4
+          [&_.katex-display]:px-6
+          [&_.katex-display]:bg-white/5
+          [&_.katex-display]:rounded-xl
+          [&_.katex-display]:overflow-x-auto
+          [&_.katex-display]:flex
+          [&_.katex-display]:justify-center
+          
+          /* Inline Math Padding */
+          [&_.katex-html]:px-1
+          
+          /* --- BOLD HEADER STYLING (The Highlighted Look) --- */
+          prose-headings:text-blue-300
+          prose-headings:font-extrabold 
+          prose-headings:text-xl
+          prose-headings:tracking-tight
+          prose-headings:mb-3 
+          prose-headings:mt-8
+          
+          /* --- GENERAL --- */
+          prose-p:text-gray-300 prose-p:leading-relaxed prose-p:mb-4
+          prose-strong:text-white prose-strong:font-bold
           prose-ul:my-4 prose-ul:list-disc prose-ul:pl-4
-          prose-li:text-gray-300 prose-li:my-1
+          prose-li:text-gray-300 prose-li:my-2
           prose-a:text-blue-400 prose-a:no-underline hover:prose-a:underline"
       >
-        {content}
+        {cleanedContent}
       </ReactMarkdown>
     </div>
   );
