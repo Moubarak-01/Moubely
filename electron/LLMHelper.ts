@@ -7,24 +7,13 @@ import { app } from "electron"
 import axios from "axios"
 import FormData from "form-data"
 
-// --- FIX: ROBUST PDF IMPORT ---
-// We import as * to catch all export types, then handle it safely below.
-import * as pdfLib from "pdf-parse"
-
-// Helper function to handle the PDF library safely
-async function safePdfParse(buffer: Buffer) {
-    // @ts-ignore - Bypasses the "not callable" TS error
-    const parser = pdfLib.default || pdfLib;
-    return parser(buffer);
-}
-
 // --- 1. GEMINI FALLBACK STRATEGY ---
 const GEMINI_STRATEGIES = [
-    'gemini-2.5-flash',       // 1. Primary (Multimodal, 20 RPD)
-    'gemma-2-27b-it',         // 2. High-Capacity (Text Only, 14.4k RPD)
-    'gemma-2-9b-it',          // 3. Balanced (Text Only)
-    'gemini-2.5-flash-lite',  // 4. Flash Fallback (Multimodal)
-    'gemma-2-2b-it',          // 5. Fast (Text Only)
+    'gemini-2.5-flash',       // 1. Primary
+    'gemma-2-27b-it',         // 2. High-Capacity
+    'gemma-2-9b-it',          // 3. Balanced
+    'gemini-2.5-flash-lite',  // 4. Fallback
+    'gemma-2-2b-it',          // 5. Fast
 ];
 
 // --- 2. UNIFIED MODEL CONFIG ---
@@ -142,21 +131,20 @@ export class LLMHelper {
   private async extractTextFromPdf(buffer: Buffer): Promise<string> {
       let extractedText = "";
 
-      // 1. Primary Attempt: Local PDF Parse (Fast/Free)
+      // 1. Primary Attempt: Local PDF Parse
       try {
-          // Use our safe helper instead of calling it directly
-          const data = await safePdfParse(buffer);
+          // 👇 FIX: Direct require inside function prevents top-level crashes
+          const pdfParse = require("pdf-parse");
+          const data = await pdfParse(buffer);
           
           if (data && data.text && data.text.trim().length > 50) {
               return data.text.trim();
           }
       } catch (e: any) {
-          // If local parse fails, we LOG it but DO NOT RETURN. We continue to OCR.
-          console.warn("[LLMHelper] Local PDF parse failed/empty:", e.message);
-          console.log("[LLMHelper] Switching to OCR Space fallback...");
+          console.warn("[LLMHelper] Local PDF parse failed/empty. Switching to OCR Space fallback...");
       }
 
-      // 2. Secondary Attempt: OCR Space API (For Scanned PDFs or Fallback)
+      // 2. Secondary Attempt: OCR Space API
       try {
           const ocrKey = process.env.OCR_SPACE_API_KEY;
           if (!ocrKey) {
@@ -170,10 +158,7 @@ export class LLMHelper {
           formData.append('OCREngine', '2'); 
 
           const response = await axios.post('https://api.ocr.space/parse/image', formData, {
-              headers: {
-                  ...formData.getHeaders(),
-                  'apikey': ocrKey
-              }
+              headers: { ...formData.getHeaders(), 'apikey': ocrKey }
           });
 
           if (response.data && response.data.ParsedResults) {
@@ -194,7 +179,6 @@ export class LLMHelper {
           const buffer = await fs.promises.readFile(filePath);
           
           if (ext === '.pdf') {
-              // Extract text automatically for fallback models
               const extractedText = await this.extractTextFromPdf(buffer);
               return { 
                   text: extractedText, 
@@ -269,11 +253,7 @@ export class LLMHelper {
             for (const file of files) {
                 const filePath = path.join(studentDir, file);
                 const { text, isPdf, base64, mimeType } = await this.getFileContext(filePath);
-                
-                // Keep extracted text for ALL models (Critical for fallbacks)
                 if (text) textContext += `\n\n=== PDF CONTENT (${file}) ===\n${text}`;
-                
-                // Keep base64 ONLY for Gemini Multimodal
                 if (isPdf && base64) {
                     pdfPartForGemini = { inlineData: { data: base64, mimeType: mimeType || "application/pdf" } };
                 }
@@ -291,7 +271,18 @@ export class LLMHelper {
       let systemInstruction = this.systemPrompt;
       if (mode === "Student") systemInstruction += "\nCONTEXT: Mentor mode. Use the attached files to guide the user.";
       if (fileContext) systemInstruction += `\n\n=== UPLOADED FILE ===\n${fileContext}\n`;
+      if (textContext) systemInstruction += `\n\n=== STUDENT FILES (TEXT) ===\n${textContext}\n`;
       if (notionContext) systemInstruction += `\n\n${notionContext}`; 
+
+      // 👇 FIX: Ensure history always starts with user
+      let validHistory = history.map(h => ({ 
+          role: h.role === 'ai' ? 'model' : 'user', 
+          parts: [{ text: h.text }] 
+      }));
+      // Remove any leading 'model' messages to satisfy Google API requirements
+      while (validHistory.length > 0 && validHistory[0].role === 'model') {
+          validHistory.shift();
+      }
 
       // 4. CASCADE STRATEGY
       for (const config of CHAT_MODELS) {
@@ -302,31 +293,15 @@ export class LLMHelper {
               if (config.type === 'gemini') {
                   if (!this.genAI) continue;
                   
-                  // DETECT MODEL CAPABILITY
                   const isTextOnlyModel = config.model.includes('gemma');
-                  
                   const geminiModel = this.genAI.getGenerativeModel({ model: config.model });
-                  const chat = geminiModel.startChat({ 
-                      history: history.map(h => ({ 
-                          role: h.role === 'ai' ? 'model' : 'user', 
-                          parts: [{ text: h.text }] 
-                      })) 
-                  });
+                  const chat = geminiModel.startChat({ history: validHistory });
                   
-                  // Construct Message
                   let promptText = systemInstruction + "\n\n" + message;
-                  
-                  // If model is Text Only (Gemma), append extracted text manually
-                  if (isTextOnlyModel && textContext) {
-                      promptText += `\n\n${textContext}`;
-                  }
+                  if (isTextOnlyModel && textContext) promptText += `\n\n${textContext}`;
 
                   let msgParts: any[] = [{ text: promptText }];
-                  
-                  // Only send PDF Blob if model is Multimodal (Flash)
-                  if (!isTextOnlyModel && pdfPartForGemini) {
-                      msgParts.push(pdfPartForGemini);
-                  }
+                  if (!isTextOnlyModel && pdfPartForGemini) msgParts.push(pdfPartForGemini);
 
                   const result = await chat.sendMessageStream(msgParts);
                   for await (const chunk of result.stream) {
@@ -345,9 +320,9 @@ export class LLMHelper {
                   else if (config.type === 'openai') client = this.openaiClient;
                   
                   if (client) {
-                      // Append extracted text to prompt for these text-only providers
                       let finalTextContext = textContext ? `\n\n${textContext}` : "";
-                      
+                      let isThinking = false; // State to track <think> blocks
+
                       const stream = await client.chat.completions.create({
                           messages: [
                               { role: "system", content: systemInstruction + finalTextContext },
@@ -360,10 +335,19 @@ export class LLMHelper {
                       });
 
                       for await (const chunk of stream) {
-                          const content = chunk.choices[0]?.delta?.content || "";
+                          let content = chunk.choices[0]?.delta?.content || "";
+                          
+                          // 👇 FIX: Filter out <think> tags for DeepSeek R1
+                          if (content.includes('<think>')) isThinking = true;
+                          if (content.includes('</think>')) {
+                              isThinking = false;
+                              // Remove the tag itself
+                              content = content.replace('</think>', ''); 
+                          }
+                          
+                          if (isThinking) continue; // Skip content while inside think block
+
                           if (content) {
-                              if (content.includes('<think>')) continue; 
-                              if (content.includes('</think>')) continue;
                               fullResponse += content;
                               if (onToken) onToken(content); 
                           }
