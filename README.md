@@ -8,10 +8,11 @@
 
 - **👻 Stealth Overlay**: A fully transparent, click-through window that floats on top of your applications. It stays invisible until you need it, ensuring you never break flow.
 - **📸 Contextual Vision**: Instantly snap screenshots (`Ctrl + H`) of code errors, complex charts, or emails. Moubely "sees" your screen using a multi-model approach (Gemini, Perplexity, or GPT-4o) depending on the content.
-- **🎙️ Live Meeting Copilot**:
-  - **Ultra-Fast Transcription**: Powered by **Groq (Whisper-Large-V3)** for near-instant, verbatim speech-to-text.
+- **🎙️ Hybrid Meeting Copilot**:
+  - **Local-First Transcription**: Powered by a custom **Local Whisper Server** (Tiny.en) running directly on your machine. It features a smart **Queue System** to handle fast speakers without overwhelming your laptop.
+  - **Cloud Fallback**: Automatically switches to **Groq** if the local server gets too busy, ensuring you never miss a word.
   - **Smart Assists**: One-click buttons to generate suggestions, follow-up questions, or instant recaps.
-  - **Strict Title Generation**: Automatically detects when a meeting ends and generates a clean, concise title (e.g., "Kingdom Come Dimension Song Discussion") without unnecessary labels.
+  - **Strict Title Generation**: Automatically detects when a meeting ends and generates a clean, concise title (e.g., "Kingdom Come Dimension Song Discussion").
 - **🧠 5-Layer Waterfall AI**: A robust architecture that ensures you always get an answer, even if one provider is down.
 - **⚡ Smart Modes**: Switch between **Developer** (DeepSeek Logic), **Student** (Explanatory), and **General** modes to tailor the AI's personality.
 
@@ -19,7 +20,7 @@
 
 ## 🛠️ Engineering Architecture: The "Waterfall" System
 
-We recently rebuilt the backend to solve critical stability issues (specifically `429 Too Many Requests` errors from free-tier APIs). Moubely now uses a **Smart Routing Engine** in `LLMHelper.ts` that automatically falls back to the next available AI if the primary one fails.
+We recently rebuilt the backend to solve critical stability issues. Moubely now uses a **Smart Routing Engine** in `LLMHelper.ts` that prioritizes free, local resources before falling back to cloud APIs.
 
 ### 1. The "Brains" (Chat & Logic) 🧠
 The app tries these models in order until one succeeds:
@@ -36,8 +37,8 @@ How Moubely analyzes your screenshots:
 3.  **GPT-4o Vision**: The fallback for critical coding screenshots.
 
 ### 3. The "Ears" (Audio) 👂
-1.  **Groq (Whisper)**: Primary. Transcribes audio ~10x faster than real-time.
-2.  **Gemini 2.0 Flash**: Secondary. Listens to audio files if Groq is unavailable.
+1.  **Local Whisper (Queue-Optimized)**: Primary. Uses `Xenova/whisper-tiny.en` running locally on port 3000. We implemented a **Queue System** to prevent `ECONNRESET` crashes on laptops by processing audio chunks sequentially.
+2.  **Groq (Whisper-Large-V3)**: Secondary. Instant cloud fallback if the local queue times out or fails.
 
 ### 4. Smart PDF Handling 📄
 We removed dependencies on external OCR keys.
@@ -73,17 +74,16 @@ While we have implemented LaTeX support (`$$x^2$$`) for mathematical formulas, *
     ```
 
 3.  **Setup Environment Variables (Crucial)**
-    Create a `.env` file in the root directory. You now need **five keys** for the full experience, though the app will work with just a few.
+    Create a `.env` file in the root directory.
 
     ```env
     # 1. THE BRAINS & EYES (Primary Chat + Vision)
     GEMINI_API_KEY=your_google_key_here
 
     # 2. THE LOGIC & BACKUP (DeepSeek + GPT-4o)
-    # Get this from GitHub Models Marketplace
     GITHUB_TOKEN=your_github_token_here
 
-    # 3. THE EARS & SPEED (Audio + Fast Chat)
+    # 3. THE CLOUD EARS (Audio Backup)
     GROQ_API_KEY=your_groq_key_here
 
     # 4. THE RESEARCHER (Search + General Vision)
@@ -93,8 +93,14 @@ While we have implemented LaTeX support (`$$x^2$$`) for mathematical formulas, *
     NOTION_TOKEN=your_notion_token_here
     ```
 
-4.  **Run the App**
-    Start the development server and Electron app simultaneously:
+4.  **Run the Local Whisper Server**
+    Open a terminal and start the audio engine:
+    ```bash
+    node local-whisper-server.mjs
+    ```
+
+5.  **Run the App**
+    Open a second terminal and start the electron app:
     ```bash
     npm start
     ```
@@ -107,6 +113,7 @@ npm run dist
 / (root)
 ├── package.json
 ├── .env                  <-- Contains API Keys
+├── local-whisper-server.mjs <-- The Local AI Audio Engine (Queue System)
 ├── electron/
 │   ├── main.ts
 │   ├── LLMHelper.ts      <-- The "Waterfall" Logic & Smart Router

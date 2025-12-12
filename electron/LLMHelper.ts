@@ -8,8 +8,11 @@ import { app } from "electron"
 import axios from "axios"
 import FormData from "form-data"
 import * as pdfLib from "pdf-parse"
+import http from "http"
 
-// Helper for safe PDF parsing
+// CRITICAL: Keep connection open to prevent ECONNRESET
+const httpAgent = new http.Agent({ keepAlive: true });
+
 async function safePdfParse(buffer: Buffer) {
     // @ts-ignore
     const parser = pdfLib.default || pdfLib;
@@ -210,35 +213,37 @@ export class LLMHelper {
       return "⚠️ All AI providers failed.";
   }
 
-  // --- AUDIO ANALYSIS (FIXED) ---
+  // --- AUDIO ANALYSIS (QUEUE + ENGLISH MODE) ---
 
-  /**
-   * Primary method for audio transcription.
-   * Priority: Local Whisper Server -> Fallback: Groq API
-   */
   public async analyzeAudioFile(audioPath: string): Promise<{ text: string, timestamp: number }> {
-      console.log(`[LLMHelper] Analyzing audio: ${audioPath}`);
+      console.log(`[LLMHelper] 📤 Sending to queue: ${audioPath}`);
       
-      // 1. Attempt Local Whisper Server
       try {
           const form = new FormData();
           form.append('file', fs.createReadStream(audioPath));
 
-          console.log('[LLMHelper] Attempting Local Whisper at port 3000...');
+          // Send to Server (Queue inside Server will handle the wait)
           const response = await axios.post('http://localhost:3000/v1/audio/transcriptions', form, {
               headers: form.getHeaders(),
-              timeout: 10000 // 10s timeout
+              timeout: 60000, // 60s timeout: We allow waiting in queue!
+              httpAgent: httpAgent // USE KEEP-ALIVE AGENT
           });
 
-          if (response.data && response.data.text) {
-              console.log(`[LLMHelper] ✅ Local Whisper Success: "${response.data.text}"`);
-              return { text: response.data.text.trim(), timestamp: Date.now() };
+          const text = response.data?.text?.trim();
+
+          if (text) {
+              console.log(`[LLMHelper] ✅ Local Whisper Success: "${text}"`);
+              return { text: text, timestamp: Date.now() };
+          } else {
+              console.log(`[LLMHelper] 🔇 Local Whisper heard silence.`);
+              return { text: "", timestamp: Date.now() };
           }
+
       } catch (localError: any) {
           console.warn(`[LLMHelper] ⚠️ Local Whisper failed: ${localError.message}`);
       }
 
-      // 2. Fallback to Groq Cloud
+      // Fallback to Groq only if Local CRASHES hard (not just busy)
       if (this.groqClient) {
           console.log('[LLMHelper] 🔄 Switching to Groq Cloud API...');
           try {
@@ -246,37 +251,27 @@ export class LLMHelper {
                   file: fs.createReadStream(audioPath),
                   model: 'whisper-large-v3-turbo',
                   response_format: 'json',
-                  language: 'en',
                   temperature: 0.0,
               });
-              console.log(`[LLMHelper] ✅ Groq Success: "${transcription.text}"`);
-              return { text: transcription.text.trim(), timestamp: Date.now() };
-          } catch (groqError) {
-              console.error('[LLMHelper] ❌ Groq Transcription Failed:', groqError);
-          }
+              const text = transcription.text.trim();
+              if (text) return { text: text, timestamp: Date.now() };
+          } catch (e) { }
       }
 
       return { text: "", timestamp: Date.now() };
   }
 
-  /**
-   * Helper: Converts base64 to temp file, then calls analyzeAudioFile
-   * This ensures we always use the robust path-based logic.
-   */
   public async analyzeAudioFromBase64(base64Data: string, mimeType: string) {
       if (!base64Data || base64Data.length < 100) return { text: "", timestamp: Date.now() };
       
-      // Create a temporary file
       const tempPath = path.join(os.tmpdir(), `temp_audio_${Date.now()}.wav`);
       
       try {
           const buffer = Buffer.from(base64Data, 'base64');
           await fs.promises.writeFile(tempPath, buffer);
           
-          // Delegate to the main function
           const result = await this.analyzeAudioFile(tempPath);
           
-          // Cleanup
           try { fs.unlinkSync(tempPath); } catch (e) {}
           
           return result;

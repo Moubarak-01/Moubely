@@ -8,44 +8,45 @@ import ffmpegPath from 'ffmpeg-static';
 import fs from 'fs';
 
 const { WaveFile } = wavefile;
-
-// Configure FFmpeg
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 const app = express();
 const port = 3000;
 
-// Setup upload handling
+// Increase payload limit for safety
+app.use(express.json({ limit: '50mb' }));
+app.use(cors());
+
 const upload = multer({ storage: multer.memoryStorage() });
 
-app.use(cors());
-app.use(express.json());
-
 let transcriber = null;
+let processingQueue = []; // Internal Server Queue
+let isProcessing = false; // Flag to check if busy
 
-console.log("⏳ Loading Local Whisper Model (this may take a moment)...");
+console.log("⏳ Loading Local Whisper Model (English-Only Tiny)...");
+
 const initModel = async () => {
-    // 'Xenova/whisper-tiny.en' is the fast, English-only model
-    transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en');
-    console.log("✅ Local Whisper Model Ready!");
+    // UPDATED: 'Xenova/whisper-tiny.en' (English Only)
+    // This is the fastest possible model for your laptop.
+    transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny.en', {
+        quantized: true,
+    });
+    console.log("✅ Local Whisper Ready! (English Only + Queue Active)");
 };
 initModel();
 
-// IMPORTANT: This is the specific address the app must call
-app.post('/v1/audio/transcriptions', upload.single('file'), async (req, res) => {
-    const tempInput = `temp_input_${Date.now()}`;
-    const tempOutput = `temp_output_${Date.now()}.wav`;
+// The Queue Processor
+const processQueue = async () => {
+    if (isProcessing || processingQueue.length === 0) return;
+
+    isProcessing = true;
+    const { req, res, tempInput, tempOutput } = processingQueue.shift();
 
     try {
-        if (!transcriber) return res.status(503).json({ error: "Model is still loading..." });
-        if (!req.file) return res.status(400).json({ error: "No file uploaded." });
-
-        console.log(`🎤 Processing ${req.file.size} bytes...`);
-
-        // 1. Write the raw upload to disk
+        // 1. Write File
         fs.writeFileSync(tempInput, req.file.buffer);
 
-        // 2. Convert to 16kHz Mono WAV using FFmpeg
+        // 2. Convert (Fastest settings)
         await new Promise((resolve, reject) => {
             ffmpeg(tempInput)
                 .toFormat('wav')
@@ -56,13 +57,12 @@ app.post('/v1/audio/transcriptions', upload.single('file'), async (req, res) => 
                 .save(tempOutput);
         });
 
-        // 3. Read the clean WAV file
+        // 3. Read
         const wavBuffer = fs.readFileSync(tempOutput);
         let wav = new WaveFile(wavBuffer);
-        wav.toBitDepth('32f'); 
+        wav.toBitDepth('32f');
         let audioData = wav.getSamples();
 
-        // Handle stereo to mono conversion if needed
         if (Array.isArray(audioData)) {
             if (audioData.length > 1) {
                 const mono = new Float32Array(audioData[0].length);
@@ -77,23 +77,39 @@ app.post('/v1/audio/transcriptions', upload.single('file'), async (req, res) => 
 
         // 4. Transcribe
         const result = await transcriber(audioData);
-        console.log(`✅ Text: "${result.text}"`);
-        
-        // 5. Cleanup temp files
+
+        // 5. Cleanup
         try { fs.unlinkSync(tempInput); } catch (e) {}
         try { fs.unlinkSync(tempOutput); } catch (e) {}
 
-        // SUCCESS: Send the JSON back to the app
+        // Send Result
         res.json({ text: result.text.trim() });
 
     } catch (error) {
-        // Cleanup on error
+        console.error("Processing Error:", error);
         try { fs.unlinkSync(tempInput); } catch (e) {}
         try { fs.unlinkSync(tempOutput); } catch (e) {}
-        
-        console.error("Transcribe Error:", error);
         res.status(500).json({ error: error.message });
+    } finally {
+        isProcessing = false;
+        // Immediate check for next item
+        setImmediate(processQueue);
     }
+};
+
+app.post('/v1/audio/transcriptions', upload.single('file'), (req, res) => {
+    if (!transcriber) return res.status(503).json({ error: "Model loading..." });
+    if (!req.file) return res.status(400).json({ error: "No file." });
+
+    const requestId = Date.now() + Math.random();
+    const tempInput = `temp_input_${requestId}`;
+    const tempOutput = `temp_output_${requestId}.wav`;
+
+    // Add to Queue instead of processing immediately
+    processingQueue.push({ req, res, tempInput, tempOutput });
+    
+    // Trigger processor
+    processQueue();
 });
 
 app.listen(port, () => {
