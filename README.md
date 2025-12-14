@@ -6,14 +6,14 @@
 
 ## 🚀 Core Features
 
-- **👻 Stealth Overlay**: A fully transparent, click-through window that floats on top of your applications. It stays invisible until you need it, ensuring you never break flow.
+- **👻 Stealth & Visibility Control**: Toggle instantly between **Stealth Mode** (invisible to screen sharing/recording) and **Visible Mode** (standard window for debugging or presentations) directly from the UI.
 - **📸 Contextual Vision**: Instantly snap screenshots (`Ctrl + H`) of code errors, complex charts, or emails. Moubely "sees" your screen using a multi-model approach (Gemini, Perplexity, or GPT-4o) depending on the content.
+- **🧠 Robust AI Waterfall with Quota Protection**: We have expanded our AI engine to support a wide range of **Gemini models** (Gemini 2.5 Flash, Lite, Pro, and standard 2.0). If one model hits a rate limit, Moubely automatically switches to the next available one to ensure you never get a "Quota Exceeded" error.
 - **🎙️ Hybrid Meeting Copilot**:
   - **Local-First Transcription**: Powered by a custom **Local Whisper Server** (Tiny.en) running directly on your machine. It features a smart **Queue System** to handle fast speakers without overwhelming your laptop.
   - **Cloud Fallback**: Automatically switches to **Groq** if the local server gets too busy, ensuring you never miss a word.
   - **Smart Assists**: One-click buttons to generate suggestions, follow-up questions, or instant recaps.
   - **Strict Title Generation**: Automatically detects when a meeting ends and generates a clean, concise title (e.g., "Kingdom Come Dimension Song Discussion").
-- **🧠 5-Layer Waterfall AI**: A robust architecture that ensures you always get an answer, even if one provider is down.
 - **⚡ Smart Modes**: Switch between **Developer** (DeepSeek Logic), **Student** (Explanatory), and **General** modes to tailor the AI's personality.
 
 ---
@@ -24,7 +24,7 @@ We recently rebuilt the backend to solve critical stability issues. Moubely now 
 
 ### 1. The "Brains" (Chat & Logic) 🧠
 The app tries these models in order until one succeeds:
-1.  **Gemini 2.5 Flash** (Primary - Fast & Multimodal)
+1.  **Gemini 2.5 Family** (Flash, Lite, Pro - Primary Loop)
 2.  **DeepSeek R1** (Logic Specialist - Great for Math/Coding)
 3.  **Perplexity Online** (Researcher - Real-time Web Search)
 4.  **GPT-4o** (Reliable Backup)
@@ -70,13 +70,6 @@ We encountered and solved several complex issues to ensure a smooth user experie
 ### 5. Smart Model Fallback
 * **The Problem:** If a specific API (like DeepSeek or Gemini) hit a rate limit, the chat would simply fail or hang.
 * **The Fix:** We refined the **Waterfall Logic** to include immediate failover. If Gemini fails, it silently tries DeepSeek. If DeepSeek fails, it automatically reroutes to GPT-4o or Perplexity, ensuring the user always gets a response without error messages.
-
----
-
-## 🚧 Known Issues & Roadmap
-
-### Formula Rendering
-While we have implemented LaTeX support (`$$x^2$$`) for mathematical formulas, **we are still refining the visual output.** Currently, complex equations may not always render with the crystal-clear formatting we aim for. We are actively working on improving the `rehype-katex` integration to fix this.
 
 ---
 
