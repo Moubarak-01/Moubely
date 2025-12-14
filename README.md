@@ -47,6 +47,32 @@ We removed dependencies on external OCR keys.
 
 ---
 
+## 🐛 Solved Engineering Challenges
+
+We encountered and solved several complex issues to ensure a smooth user experience:
+
+### 1. The "Stealth Mode" Toggle
+* **The Problem:** Users needed a way to switch between "Stealth" (invisible to screen share) and "Visible" modes for debugging, but the window state was hard-coded.
+* **The Fix:** We built a bridge between the Frontend and Electron's native window API (`setContentProtection`). We added a toggle button in the UI that instantly flips the OS-level visibility flag without needing to restart the app.
+
+### 2. The "Silent Crash" (Circular Dependency)
+* **The Problem:** The app would sometimes hang on startup ("App is ready" never appeared) because the `Main` process and `IPC Handlers` were importing each other, creating a deadlock.
+* **The Fix:** We refactored the architecture to use **Type-Only Imports** (`import type`). This broke the dependency loop, allowing the backend to initialize instantly.
+
+### 3. "Thinking" Process Clean-Up
+* **The Problem:** Advanced reasoning models (like DeepSeek) output their internal monologue (`<think>...`), which cluttered the chat interface with raw thought processes.
+* **The Fix:** We implemented a **Universal Response Cleaner** in the backend. It intercepts the AI's raw stream, detects these "thought bubbles," and filters them out in real-time, delivering only the final, polished answer to the user.
+
+### 4. Strict Formula Standardization
+* **The Problem:** Different AI models use different syntax for math (brackets `[...]` vs. dollar signs `$`), causing equations to break in the UI.
+* **The Fix:** We enforced a **Strict System Prompt** that overrides individual model defaults. We now force every AI to use standard LaTeX formatting (`$$`), guaranteeing that equations render correctly regardless of which model generated them.
+
+### 5. Smart Model Fallback
+* **The Problem:** If a specific API (like DeepSeek or Gemini) hit a rate limit, the chat would simply fail or hang.
+* **The Fix:** We refined the **Waterfall Logic** to include immediate failover. If Gemini fails, it silently tries DeepSeek. If DeepSeek fails, it automatically reroutes to GPT-4o or Perplexity, ensuring the user always gets a response without error messages.
+
+---
+
 ## 🚧 Known Issues & Roadmap
 
 ### Formula Rendering
