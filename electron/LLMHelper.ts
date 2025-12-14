@@ -19,7 +19,7 @@ async function safePdfParse(buffer: Buffer) {
     return parser(buffer);
 }
 
-// --- MODEL CONFIGURATIONS (User Requested Order) ---
+// --- MODEL CONFIGURATIONS ---
 const CHAT_MODELS = [
     // 1. Gemini (Primary)
     { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
@@ -32,18 +32,30 @@ const CHAT_MODELS = [
     { type: 'github', model: 'gpt-4o', name: 'GPT-4o' },
     
     // 4. Perplexity (Research)
-    { type: 'perplexity', model: 'llama-3.1-sonar-small-128k-online', name: 'Perplexity' },
+    { type: 'perplexity', model: 'sonar-reasoning-pro', name: 'Perplexity Pro' },
     
     // 5. Groq (Fast Fallback)
     { type: 'groq', model: 'llama-3.3-70b-versatile', name: 'Groq' }
 ];
 
-// Fallback list for Vision (Screenshots)
+// UPDATED: Vision Fallback Order with CORRECT Perplexity Models
 const VISION_MODELS = [
-    { type: 'gemini', model: 'gemini-2.0-flash' },      // Best
-    { type: 'gemini', model: 'gemini-1.5-flash' },      // Backup
-    { type: 'github', model: 'gpt-4o' },                // Azure/GitHub backup
-    { type: 'openai', model: 'gpt-4o' }                 // Paid OpenAI backup
+    // 1. Gemini (Primary) - Best Native Vision
+    { type: 'gemini', model: 'gemini-2.0-flash' },      
+    { type: 'gemini', model: 'gemini-1.5-flash' },      
+
+    // 2. Perplexity (Secondary) - Automatic retry list
+    // If 'reasoning-pro' fails, it immediately tries 'reasoning', then 'pro', etc.
+    { type: 'perplexity', model: 'sonar-reasoning-pro' },
+    { type: 'perplexity', model: 'sonar-reasoning' },
+    { type: 'perplexity', model: 'sonar-pro' },
+    { type: 'perplexity', model: 'sonar' },
+    
+    // 3. GitHub/Azure (Backup)
+    { type: 'github', model: 'gpt-4o' },
+    
+    // 4. OpenAI (Paid Fallback)
+    { type: 'openai', model: 'gpt-4o' }                 
 ];
 
 export class LLMHelper {
@@ -57,6 +69,7 @@ export class LLMHelper {
   private ollamaModel: string = "llama3.2"
   private ollamaUrl: string = "http://localhost:11434"
   
+  // Stricter Title Generation Rule
   private readonly systemPrompt = `
   You are 'Moubely', an intelligent AI assistant.
   
@@ -71,7 +84,7 @@ export class LLMHelper {
   - NEVER use the bracket syntax like \\[ ... \\] or \\( ... \\).
   - Your response MUST render correctly in a React Markdown component expecting '$' delimiters.
   
-  STRICT TITLE GENERATION RULE: If asking for a title, output ONLY the text.
+  STRICT TITLE GENERATION RULE: If asking for a title, output ONLY the title text string. Do NOT output reasoning, quotes, markdown, conversational filler, or headers. Just the raw title text.
   `;
 
   constructor(apiKey?: string, useOllama: boolean = false, ollamaModel?: string, ollamaUrl?: string) {
@@ -92,6 +105,12 @@ export class LLMHelper {
       if (process.env.PERPLEXITY_API_KEY) this.perplexityClient = new OpenAI({ baseURL: "https://api.perplexity.ai", apiKey: process.env.PERPLEXITY_API_KEY, dangerouslyAllowBrowser: true });
       if (process.env.GROQ_API_KEY) this.groqClient = new OpenAI({ baseURL: "https://api.groq.com/openai/v1", apiKey: process.env.GROQ_API_KEY, dangerouslyAllowBrowser: true });
       if (process.env.OPENAI_API_KEY) this.openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, dangerouslyAllowBrowser: true });
+  }
+
+  // --- HELPER: CLEANER ---
+  // Removes <think> tags and their content from the final string
+  private cleanResponse(text: string): string {
+      return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
   }
 
   private async extractTextFromPdf(buffer: Buffer): Promise<string> {
@@ -192,23 +211,24 @@ export class LLMHelper {
                   if (isTextOnly && textContext) prompt += `\n\n${textContext}`;
                   let parts: any[] = [{ text: prompt }];
                   if (!isTextOnly && pdfPartForGemini) parts.push(pdfPartForGemini);
+                  
                   const result = await chat.sendMessageStream(parts);
+                  // Gemini usually doesn't send <think> tags in standard response, but good to be safe if user switches models later
                   for await (const chunk of result.stream) {
                       const text = chunk.text();
                       fullResponse += text;
                       if (onToken) onToken(text); 
                   }
                   
-                  // --- LOGGING ---
                   console.log(`[LLMHelper] ✅ Chat Success using: ${config.model}`);
-                  
-                  return fullResponse;
+                  return fullResponse; // Gemini usually clean
               } else {
                   let client: OpenAI | null = null;
                   if (config.type === 'github') client = this.githubClient;
                   else if (config.type === 'groq') client = this.groqClient;
                   else if (config.type === 'perplexity') client = this.perplexityClient;
                   else if (config.type === 'openai') client = this.openaiClient;
+                  
                   if (client) {
                       const stream = await client.chat.completions.create({
                           messages: [{ role: "system", content: systemInstruction + (textContext ? `\n\n${textContext}` : "") }, ...history.map(h => ({ role: h.role === 'ai' ? 'assistant' : 'user', content: h.text })), { role: "user", content: message }] as any,
@@ -216,17 +236,44 @@ export class LLMHelper {
                           temperature: 0.7,
                           stream: true 
                       });
+                      
+                      // --- NEW: Streaming Thinking Filter ---
+                      let isThinking = false;
                       for await (const chunk of stream) {
                           let content = chunk.choices[0]?.delta?.content || "";
-                          if (content.includes('<think>')) continue;
-                          if (content.includes('</think>')) { content = content.split('</think>')[1] || ""; }
-                          if (content) { fullResponse += content; if (onToken) onToken(content); }
+                          if (!content) continue;
+
+                          // Check for start of thought
+                          if (content.includes('<think>')) {
+                              isThinking = true;
+                              // Split incase <think> is in middle of content
+                              const parts = content.split('<think>');
+                              if (parts[0]) {
+                                  fullResponse += parts[0];
+                                  if (onToken) onToken(parts[0]);
+                              }
+                              continue; 
+                          }
+
+                          // Check for end of thought
+                          if (content.includes('</think>')) {
+                              isThinking = false;
+                              const parts = content.split('</think>');
+                              content = parts[1] || ""; // Only process text AFTER the tag
+                          }
+
+                          // If in thinking mode, skip adding to response
+                          if (isThinking) continue;
+
+                          if (content) { 
+                              fullResponse += content; 
+                              if (onToken) onToken(content); 
+                          }
                       }
                       
-                      // --- LOGGING ---
                       console.log(`[LLMHelper] ✅ Chat Success using: ${config.model}`);
-                      
-                      return fullResponse;
+                      // Final safety clean
+                      return this.cleanResponse(fullResponse);
                   }
               }
           } catch (error) { continue; }
@@ -234,21 +281,20 @@ export class LLMHelper {
       return "⚠️ All AI providers failed.";
   }
 
-  // --- MULTI-MODEL IMAGE ANALYSIS (FALLBACK SYSTEM) ---
+  // --- MULTI-MODEL IMAGE ANALYSIS (UPDATED WITH PERPLEXITY LOOP) ---
   public async chatWithImage(message: string, imagePath: string): Promise<string> {
       console.log(`[LLMHelper] 🖼️ Analyzing image: ${imagePath}`);
       
       const imageBuffer = await fs.promises.readFile(imagePath);
       const base64Image = imageBuffer.toString("base64");
       const mimeType = imagePath.endsWith(".png") ? "image/png" : "image/jpeg";
-      // Ensure specific math instruction for Vision too
       const prompt = (message || "Describe this image in detail.") + "\n\nIMPORTANT: Use $$ for block math and $ for inline math. Do NOT use brackets.";
 
-      // Try each model in order. If one fails (Rate Limit 429), try the next.
       for (const config of VISION_MODELS) {
           try {
               console.log(`[LLMHelper] 🔄 Trying Vision Model: ${config.model} (${config.type})`);
 
+              // 1. GEMINI
               if (config.type === 'gemini') {
                   if (!this.genAI) continue;
                   const model = this.genAI.getGenerativeModel({ model: config.model });
@@ -256,13 +302,16 @@ export class LLMHelper {
                       prompt, 
                       { inlineData: { data: base64Image, mimeType: mimeType } }
                   ]);
-                  // --- LOGGING ---
                   console.log(`[LLMHelper] ✅ Vision Success using: ${config.model}`);
-                  
-                  return result.response.text();
+                  return this.cleanResponse(result.response.text());
               } 
-              else if (config.type === 'github' || config.type === 'openai') {
-                  const client = config.type === 'github' ? this.githubClient : this.openaiClient;
+              // 2. GITHUB / OPENAI / PERPLEXITY (OpenAI Compatible)
+              else if (config.type === 'github' || config.type === 'openai' || config.type === 'perplexity') {
+                  let client = null;
+                  if (config.type === 'github') client = this.githubClient;
+                  else if (config.type === 'openai') client = this.openaiClient;
+                  else if (config.type === 'perplexity') client = this.perplexityClient;
+
                   if (!client) continue;
                   
                   const response = await client.chat.completions.create({
@@ -277,14 +326,12 @@ export class LLMHelper {
                   });
                   const text = response.choices[0]?.message?.content;
                   if (text) {
-                      // --- LOGGING ---
                       console.log(`[LLMHelper] ✅ Vision Success using: ${config.model}`);
-                      return text;
+                      return this.cleanResponse(text);
                   }
               }
           } catch (error: any) {
               console.warn(`[LLMHelper] ⚠️ ${config.model} failed: ${error.message || 'Unknown error'}`);
-              // Continue to next model in loop...
           }
       }
 
@@ -293,7 +340,6 @@ export class LLMHelper {
 
   // --- AUDIO ANALYSIS ---
   public async analyzeAudioFile(audioPath: string): Promise<{ text: string, timestamp: number }> {
-      // --- LOGGING ---
       console.log(`[LLMHelper] 🎤 Analyzing Audio File: ${audioPath}`);
       
       try {
@@ -304,12 +350,10 @@ export class LLMHelper {
           });
           const text = response.data?.text?.trim();
           if (text) {
-              // --- LOGGING ---
               console.log("[LLMHelper] ✅ Audio transcribed via LOCAL Whisper");
               return { text: text, timestamp: Date.now() };
           }
       } catch (e) {
-          // --- LOGGING ---
           console.log("[LLMHelper] ⚠️ Local Whisper failed/busy. Switching to Cloud...");
       }
       
@@ -321,9 +365,7 @@ export class LLMHelper {
                   model: 'whisper-large-v3-turbo',
                   response_format: 'json',
               });
-              // --- LOGGING ---
               console.log("[LLMHelper] ✅ Audio transcribed via GROQ Cloud");
-              
               return { text: transcription.text.trim(), timestamp: Date.now() };
           } catch (e) { }
       }
@@ -345,12 +387,12 @@ export class LLMHelper {
   // --- STUBS & HELPERS ---
   public async generateSolution(problemInfo: any) {
       const solutionText = await this.chatWithGemini(`Solve:\n${JSON.stringify(problemInfo)}`, [], "Developer");
-      try { return JSON.parse(solutionText.replace(/^```json/, '').replace(/```$/, '')); } catch { return { solution: { code: solutionText, explanation: "AI Generated" } }; }
+      try { return JSON.parse(this.cleanResponse(solutionText).replace(/^```json/, '').replace(/```$/, '')); } catch { return { solution: { code: solutionText, explanation: "AI Generated" } }; }
   }
 
   public async debugSolutionWithImages(problemInfo: any, currentCode: string, debugImagePaths: string[]) {
       const response = await this.chatWithImage(`Debug:\n${JSON.stringify(problemInfo)}\nCode: ${currentCode}`, debugImagePaths[0]);
-      try { return JSON.parse(response.replace(/^```json/, '').replace(/```$/, '')); } catch { return { solution: { code: currentCode, explanation: response } }; }
+      try { return JSON.parse(this.cleanResponse(response).replace(/^```json/, '').replace(/```$/, '')); } catch { return { solution: { code: currentCode, explanation: response } }; }
   }
 
   public async testConnection() { return { success: true }; }
