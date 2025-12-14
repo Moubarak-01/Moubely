@@ -1,22 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron"
 
-// Types for the exposed Electron API
 interface ElectronAPI {
-  updateContentDimensions: (dimensions: {
-    width: number
-    height: number
-  }) => Promise<void>
-  
-  // Manual Window Resizing
+  updateContentDimensions: (dimensions: { width: number; height: number }) => Promise<void>
   setWindowSize: (dimensions: { width: number, height: number }) => Promise<void>
 
   getScreenshots: () => Promise<Array<{ path: string; preview: string }>>
-  deleteScreenshot: (
-    path: string
-  ) => Promise<{ success: boolean; error?: string }>
-  onScreenshotTaken: (
-    callback: (data: { path: string; preview: string }) => void
-  ) => () => void
+  deleteScreenshot: (path: string) => Promise<{ success: boolean; error?: string }>
+  
+  onScreenshotTaken: (callback: (data: { path: string; preview: string }) => void) => () => void
   onSolutionsReady: (callback: (solutions: string) => void) => () => void
   onResetView: (callback: () => void) => () => void
   onSolutionStart: (callback: () => void) => () => void
@@ -26,20 +17,21 @@ interface ElectronAPI {
   onProcessingNoScreenshots: (callback: () => void) => () => void
   onProblemExtracted: (callback: (data: any) => void) => () => void
   onSolutionSuccess: (callback: (data: any) => void) => () => void
-
   onUnauthorized: (callback: () => void) => () => void
   onDebugError: (callback: (error: string) => void) => () => void
+  
   takeScreenshot: () => Promise<void>
   moveWindowLeft: () => Promise<void>
   moveWindowRight: () => Promise<void>
   moveWindowUp: () => Promise<void>
   moveWindowDown: () => Promise<void>
+  
   analyzeAudioFromBase64: (data: string, mimeType: string) => Promise<{ text: string; timestamp: number }>
   analyzeAudioFile: (path: string) => Promise<{ text: string; timestamp: number }>
   analyzeImageFile: (path: string) => Promise<void>
+  
   quitApp: () => Promise<void>
   
-  // LLM Model Management
   getCurrentLlmConfig: () => Promise<{ provider: "ollama" | "gemini"; model: string; isOllama: boolean }>
   getAvailableOllamaModels: () => Promise<string[]>
   switchToOllama: (model?: string, url?: string) => Promise<{ success: boolean; error?: string }>
@@ -47,16 +39,13 @@ interface ElectronAPI {
   testLlmConnection: () => Promise<{ success: boolean; error?: string }>
   
   invoke: (channel: string, ...args: any[]) => Promise<any>
-  
-  // Mouse event handling
   setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => Promise<void>
-
-  // Chat with Image
   chatWithImage: (message: string, imagePath: string) => Promise<string>
-
-  // NEW: Student Mode Handlers
   checkProfileExists: () => Promise<boolean>
   saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => Promise<boolean>
+
+  toggleStealthMode: () => Promise<boolean>
+  getStealthMode: () => Promise<boolean>
 }
 
 export const PROCESSING_EVENTS = {
@@ -71,120 +60,74 @@ export const PROCESSING_EVENTS = {
   DEBUG_ERROR: "debug-error"
 } as const
 
-// Expose the Electron API to the renderer process
 contextBridge.exposeInMainWorld("electronAPI", {
-  updateContentDimensions: (dimensions: { width: number; height: number }) =>
-    ipcRenderer.invoke("update-content-dimensions", dimensions),
-  
-  // Manual Window Resizing
-  setWindowSize: (dimensions: { width: number, height: number }) => 
-    ipcRenderer.invoke("set-window-size", dimensions),
+  updateContentDimensions: (dimensions: { width: number; height: number }) => ipcRenderer.invoke("update-content-dimensions", dimensions),
+  setWindowSize: (dimensions: { width: number, height: number }) => ipcRenderer.invoke("set-window-size", dimensions),
 
   takeScreenshot: () => ipcRenderer.invoke("take-screenshot"),
   getScreenshots: () => ipcRenderer.invoke("get-screenshots"),
-  deleteScreenshot: (path: string) =>
-    ipcRenderer.invoke("delete-screenshot", path),
+  deleteScreenshot: (path: string) => ipcRenderer.invoke("delete-screenshot", path),
 
-  // Event listeners
-  onScreenshotTaken: (
-    callback: (data: { path: string; preview: string }) => void
-  ) => {
-    const subscription = (_: any, data: { path: string; preview: string }) =>
-      callback(data)
+  onScreenshotTaken: (callback: (data: { path: string; preview: string }) => void) => {
+    const subscription = (_: any, data: { path: string; preview: string }) => callback(data)
     ipcRenderer.on("screenshot-taken", subscription)
-    return () => {
-      ipcRenderer.removeListener("screenshot-taken", subscription)
-    }
+    return () => { ipcRenderer.removeListener("screenshot-taken", subscription) }
   },
   onSolutionsReady: (callback: (solutions: string) => void) => {
     const subscription = (_: any, solutions: string) => callback(solutions)
     ipcRenderer.on("solutions-ready", subscription)
-    return () => {
-      ipcRenderer.removeListener("solutions-ready", subscription)
-    }
+    return () => { ipcRenderer.removeListener("solutions-ready", subscription) }
   },
   onResetView: (callback: () => void) => {
     const subscription = () => callback()
     ipcRenderer.on("reset-view", subscription)
-    return () => {
-      ipcRenderer.removeListener("reset-view", subscription)
-    }
+    return () => { ipcRenderer.removeListener("reset-view", subscription) }
   },
   onSolutionStart: (callback: () => void) => {
     const subscription = () => callback()
     ipcRenderer.on(PROCESSING_EVENTS.INITIAL_START, subscription)
-    return () => {
-      ipcRenderer.removeListener(PROCESSING_EVENTS.INITIAL_START, subscription)
-    }
+    return () => { ipcRenderer.removeListener(PROCESSING_EVENTS.INITIAL_START, subscription) }
   },
   onDebugStart: (callback: () => void) => {
     const subscription = () => callback()
     ipcRenderer.on(PROCESSING_EVENTS.DEBUG_START, subscription)
-    return () => {
-      ipcRenderer.removeListener(PROCESSING_EVENTS.DEBUG_START, subscription)
-    }
+    return () => { ipcRenderer.removeListener(PROCESSING_EVENTS.DEBUG_START, subscription) }
   },
-
   onDebugSuccess: (callback: (data: any) => void) => {
     ipcRenderer.on("debug-success", (_event, data) => callback(data))
-    return () => {
-      ipcRenderer.removeListener("debug-success", (_event, data) =>
-        callback(data)
-      )
-    }
+    return () => { ipcRenderer.removeListener("debug-success", (_event, data) => callback(data)) }
   },
   onDebugError: (callback: (error: string) => void) => {
     const subscription = (_: any, error: string) => callback(error)
     ipcRenderer.on(PROCESSING_EVENTS.DEBUG_ERROR, subscription)
-    return () => {
-      ipcRenderer.removeListener(PROCESSING_EVENTS.DEBUG_ERROR, subscription)
-    }
+    return () => { ipcRenderer.removeListener(PROCESSING_EVENTS.DEBUG_ERROR, subscription) }
   },
   onSolutionError: (callback: (error: string) => void) => {
     const subscription = (_: any, error: string) => callback(error)
     ipcRenderer.on(PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR, subscription)
-    return () => {
-      ipcRenderer.removeListener(
-        PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR,
-        subscription
-      )
-    }
+    return () => { ipcRenderer.removeListener(PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR, subscription) }
   },
   onProcessingNoScreenshots: (callback: () => void) => {
     const subscription = () => callback()
     ipcRenderer.on(PROCESSING_EVENTS.NO_SCREENSHOTS, subscription)
-    return () => {
-      ipcRenderer.removeListener(PROCESSING_EVENTS.NO_SCREENSHOTS, subscription)
-    }
+    return () => { ipcRenderer.removeListener(PROCESSING_EVENTS.NO_SCREENSHOTS, subscription) }
   },
-
   onProblemExtracted: (callback: (data: any) => void) => {
     const subscription = (_: any, data: any) => callback(data)
     ipcRenderer.on(PROCESSING_EVENTS.PROBLEM_EXTRACTED, subscription)
-    return () => {
-      ipcRenderer.removeListener(
-        PROCESSING_EVENTS.PROBLEM_EXTRACTED,
-        subscription
-      )
-    }
+    return () => { ipcRenderer.removeListener(PROCESSING_EVENTS.PROBLEM_EXTRACTED, subscription) }
   },
   onSolutionSuccess: (callback: (data: any) => void) => {
     const subscription = (_: any, data: any) => callback(data)
     ipcRenderer.on(PROCESSING_EVENTS.SOLUTION_SUCCESS, subscription)
-    return () => {
-      ipcRenderer.removeListener(
-        PROCESSING_EVENTS.SOLUTION_SUCCESS,
-        subscription
-      )
-    }
+    return () => { ipcRenderer.removeListener(PROCESSING_EVENTS.SOLUTION_SUCCESS, subscription) }
   },
   onUnauthorized: (callback: () => void) => {
     const subscription = () => callback()
     ipcRenderer.on(PROCESSING_EVENTS.UNAUTHORIZED, subscription)
-    return () => {
-      ipcRenderer.removeListener(PROCESSING_EVENTS.UNAUTHORIZED, subscription)
-    }
+    return () => { ipcRenderer.removeListener(PROCESSING_EVENTS.UNAUTHORIZED, subscription) }
   },
+
   moveWindowLeft: () => ipcRenderer.invoke("move-window-left"),
   moveWindowRight: () => ipcRenderer.invoke("move-window-right"),
   moveWindowUp: () => ipcRenderer.invoke("move-window-up"),
@@ -194,7 +137,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   analyzeImageFile: (path: string) => ipcRenderer.invoke("analyze-image-file", path),
   quitApp: () => ipcRenderer.invoke("quit-app"),
   
-  // LLM Model Management
   getCurrentLlmConfig: () => ipcRenderer.invoke("get-current-llm-config"),
   getAvailableOllamaModels: () => ipcRenderer.invoke("get-available-ollama-models"),
   switchToOllama: (model?: string, url?: string) => ipcRenderer.invoke("switch-to-ollama", model, url),
@@ -202,18 +144,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   testLlmConnection: () => ipcRenderer.invoke("test-llm-connection"),
   
   invoke: (channel: string, ...args: any[]) => ipcRenderer.invoke(channel, ...args),
-  
-  // Expose the mouse event handling function
-  setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => 
-    ipcRenderer.invoke("set-ignore-mouse-events", ignore, options),
-
-  // Chat with Image
-  chatWithImage: (message: string, imagePath: string) => 
-    ipcRenderer.invoke("chat-with-image", { message, imagePath }),
-
-  // NEW: Student Mode Handlers
+  setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => ipcRenderer.invoke("set-ignore-mouse-events", ignore, options),
+  chatWithImage: (message: string, imagePath: string) => ipcRenderer.invoke("chat-with-image", { message, imagePath }),
   checkProfileExists: () => ipcRenderer.invoke("check-profile-exists"),
-  saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => 
-    ipcRenderer.invoke("save-student-files", files),
+  saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => ipcRenderer.invoke("save-student-files", files),
 
+  toggleStealthMode: () => ipcRenderer.invoke("toggle-stealth-mode"),
+  getStealthMode: () => ipcRenderer.invoke("get-stealth-mode"),
 } as ElectronAPI)

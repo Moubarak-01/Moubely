@@ -23,17 +23,11 @@ export class WindowHelper {
     const [currentX, currentY] = this.mainWindow.getPosition()
     const primaryDisplay = screen.getPrimaryDisplay()
     const workArea = primaryDisplay.workAreaSize
-
-    // Allow wider width (up to full screen width)
     const maxAllowedWidth = workArea.width
-
-    // Force valid integers. 
-    // We allow shrinking down to 150x50 as requested to enable "Compact Mode" manually.
     const newWidth = Math.max(150, Math.min(Math.round(width), maxAllowedWidth))
     const newHeight = Math.max(50, Math.round(height))
 
     this.mainWindow.setSize(newWidth, newHeight)
-    // Maintain position
     this.mainWindow.setPosition(currentX, currentY)
   }
 
@@ -43,8 +37,8 @@ export class WindowHelper {
     const windowSettings: Electron.BrowserWindowConstructorOptions = {
       width: 450,
       height: 600,
-      minWidth: 150,  // Allows shrinking
-      minHeight: 50,  // Allows shrinking
+      minWidth: 150,
+      minHeight: 50,
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: true,
@@ -57,12 +51,12 @@ export class WindowHelper {
       hasShadow: false,
       backgroundColor: "#00000000",
       focusable: true,
-      resizable: true, // Native resizing enabled
+      resizable: true,
       movable: true,
     }
 
     this.mainWindow = new BrowserWindow(windowSettings)
-    this.mainWindow.setContentProtection(true)
+    this.mainWindow.setContentProtection(true) // Default
 
     if (process.platform === "darwin") {
       this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
@@ -86,6 +80,16 @@ export class WindowHelper {
     this.mainWindow.on("closed", () => {
       this.mainWindow = null
     })
+  }
+
+  // --- STEALTH LOGIC ---
+  public setStealthMode(enabled: boolean): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return
+    // true = hidden from screenshots
+    this.mainWindow.setContentProtection(enabled)
+    if (process.platform === "darwin") {
+      this.mainWindow.setHiddenInMissionControl(enabled)
+    }
   }
 
   private centerWindow(): void {

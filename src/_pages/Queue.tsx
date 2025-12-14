@@ -5,7 +5,8 @@ import {
   Loader2, Sparkles, MessageSquare, History,
   GripHorizontal, HelpCircle, MessageCircleQuestion, FileText,
   Scaling, Copy, Check, Trash2, Mail,
-  Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog
+  Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
+  Eye, EyeOff 
 } from "lucide-react"
 
 // --- IMPORTS FOR FORMULAS & HIGHLIGHTING ---
@@ -16,13 +17,13 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/atom-one-dark.css';
 
-// --- TYPES (Updated to include preview image) ---
+// --- TYPES ---
 interface Message {
   id: string
   role: "user" | "ai"
   text: string
   screenshotPath?: string
-  screenshotPreview?: string // NEW: Stores the base64 image for display
+  screenshotPreview?: string
   timestamp: number
 }
 
@@ -41,7 +42,6 @@ interface MeetingSession {
   title?: string
 }
 
-// --- INTERNAL LOGIC (Context Switcher) ---
 interface ChatContext {
   isInMeeting: boolean;
   uploadedFilesContent: string;
@@ -53,7 +53,6 @@ const preparePayload = (userMessage: string, context: ChatContext) => {
   let systemInstruction = "";
   let dataToSend = "";
 
-  // 1. IMAGE MODE: Handles cases where user asks a question AND sends an image
   if (context.userImage) {
     systemInstruction = `
       You are an expert Coding Assistant with Vision capabilities.
@@ -66,13 +65,10 @@ const preparePayload = (userMessage: string, context: ChatContext) => {
       4. Use **bold** to highlight key variables or terms.
       5. If the image contains code, analyze it for bugs or improvements.
     `;
-    
-    // If user sent image with NO text, supply a default prompt
     if (!userMessage || !userMessage.trim()) {
         userMessage = "Analyze this screen and describe what is shown.";
     }
   } 
-  // 2. MEETING MODE (Student/Interview Mode)
   else if (context.isInMeeting) {
     systemInstruction = `
       You are a Technical Interview Assistant. 
@@ -86,12 +82,10 @@ const preparePayload = (userMessage: string, context: ChatContext) => {
     `;
     dataToSend = `CONTEXT FROM FILES:\n${context.uploadedFilesContent}\n\nLIVE TRANSCRIPT:\n${context.meetingTranscript}`;
   } 
-  // 3. DEFAULT MODE
   else {
     systemInstruction = "You are a helpful assistant for the Moubely application. Use LaTeX for math formulas. Use **bold** to highlight key terms or variables.";
   }
 
-  // Combine instructions + context + user question
   const finalPrompt = `${systemInstruction}\n\n${dataToSend ? dataToSend + "\n\n" : ""}USER QUESTION: ${userMessage}`;
   return finalPrompt;
 };
@@ -286,6 +280,9 @@ const Queue: React.FC<any> = ({ setView }) => {
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
 
+  // --- STEALTH MODE STATE ---
+  const [isStealth, setIsStealth] = useState(true);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null)
@@ -298,7 +295,6 @@ const Queue: React.FC<any> = ({ setView }) => {
   const resizeRef = useRef<{ startX: number, startY: number, startW: number, startH: number } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   
-  // -- SMART SCROLL REFS --
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const isAtBottomRef = useRef(true) 
   
@@ -314,6 +310,11 @@ const Queue: React.FC<any> = ({ setView }) => {
   useEffect(() => {
     window.electronAPI.setWindowSize({ width: 450, height: 120 })
     setIsExpanded(false) 
+    
+    // --- FETCH STEALTH MODE ON STARTUP ---
+    if (window.electronAPI.getStealthMode) {
+      window.electronAPI.getStealthMode().then(setIsStealth).catch(console.error);
+    }
     
     const saved = localStorage.getItem('moubely_meetings')
     if (saved) {
@@ -345,14 +346,20 @@ const Queue: React.FC<any> = ({ setView }) => {
     setMessages([{ id: "init", role: "ai", text: "Hi there. I'm Moubely. I'm ready to listen.", timestamp: Date.now() }]);
   }
 
-  // --- SMART SCROLL HANDLER ---
+  // --- TOGGLE STEALTH FUNCTION ---
+  const handleToggleStealth = async () => {
+    if (window.electronAPI.toggleStealthMode) {
+        const newState = await window.electronAPI.toggleStealthMode();
+        setIsStealth(newState);
+    }
+  };
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
       const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
       const distanceToBottom = scrollHeight - scrollTop - clientHeight;
       isAtBottomRef.current = distanceToBottom < 50;
   };
 
-  // --- SCROLL EFFECT ---
   useEffect(() => {
     if (activeTab === "Chat" && isAtBottomRef.current && chatContainerRef.current) {
         chatContainerRef.current.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: 'smooth' });
@@ -543,7 +550,6 @@ const Queue: React.FC<any> = ({ setView }) => {
       setShowStudentModal(false);
   };
 
-  // --- ERROR LOGGING SCREENSHOT HANDLER ---
   const handleUseScreen = async () => { 
     try { 
         console.log("Attempting screenshot..."); 
@@ -571,7 +577,6 @@ const Queue: React.FC<any> = ({ setView }) => {
   const loadMeeting = (m: MeetingSession) => { setTranscriptLogs(m.transcript); setEmailDraft(m.emailDraft); setShowPostMeeting(true); setActiveTab("Transcript"); setMessages([{id: Date.now().toString(), role: "ai", text: `Loaded meeting: ${new Date(m.date).toLocaleString()}`, timestamp: Date.now()}]); }
   const deleteMeeting = (id: string, e: React.MouseEvent) => { e.stopPropagation(); const u = pastMeetings.filter(m => m.id !== id); setPastMeetings(u); localStorage.setItem('moubely_meetings', JSON.stringify(u)); }
 
-  // --- HANDLE SEND (UPDATED: Saves preview image) ---
   const handleSend = async (overrideText?: string) => {
     const textToSend = overrideText || input
     if (!textToSend.trim() && !pendingScreenshot) return
@@ -582,7 +587,7 @@ const Queue: React.FC<any> = ({ setView }) => {
         role: "user", 
         text: textToSend || (currentScreenshot ? "Analyze this screen" : ""), 
         screenshotPath: currentScreenshot?.path,
-        screenshotPreview: currentScreenshot?.preview, // Save preview for display
+        screenshotPreview: currentScreenshot?.preview, 
         timestamp: Date.now() 
     }])
     
@@ -590,13 +595,12 @@ const Queue: React.FC<any> = ({ setView }) => {
     setPendingScreenshot(null)
     setIsThinking(true)
     setThinkingStep(currentScreenshot ? "Vision processing..." : "Thinking...")
-    isAtBottomRef.current = true; // Force scroll to bottom on new send
+    isAtBottomRef.current = true;
 
-    // 1. Prepare Smart Context
     const contextData = {
         isInMeeting: isRecording || showPostMeeting,
         meetingTranscript: transcriptLogs.map(t => t.text).join("\n"),
-        uploadedFilesContent: "", // Backend handles file reading
+        uploadedFilesContent: "", 
         userImage: currentScreenshot?.preview 
     };
 
@@ -674,6 +678,7 @@ const Queue: React.FC<any> = ({ setView }) => {
              <button onClick={handleStartSession} className={`status-pill interactive hover:scale-105 transition-all no-drag ${isRecording ? 'bg-blue-600' : 'bg-white/10 hover:bg-white/20'}`}>
                 {!isRecording ? <><Play size={12} fill="currentColor" /><span>Start Moubely</span></> : <><span>Session in progress</span><div className="w-2 h-2 bg-green-400 rounded-full animate-pulse ml-1"/></>}
              </button>
+             {/* REMOVED EXTRA BUTTON HERE */}
           </div>
         )}
         <div className="compact-bar interactive no-drag">
@@ -686,6 +691,15 @@ const Queue: React.FC<any> = ({ setView }) => {
             </div>
             <div className="flex-1 flex justify-center"><div className="draggable cursor-grab active:cursor-grabbing p-2 rounded hover:bg-white/5 group"><GripHorizontal size={20} className="text-gray-600 group-hover:text-gray-400"/></div></div>
             <div className="flex items-center gap-2">
+               {/* KEPT THIS BUTTON */}
+               <button 
+                 onClick={handleToggleStealth} 
+                 className={`icon-btn ${isStealth ? 'text-gray-500 hover:text-white' : 'text-yellow-500 hover:text-yellow-400'}`}
+                 title={isStealth ? "Stealth Mode ON (Hidden)" : "Stealth Mode OFF (Visible)"}
+               >
+                  {isStealth ? <EyeOff size={20}/> : <Eye size={20}/>}
+               </button>
+               
                <button onClick={handleExpandToggle} className="icon-btn">{isExpanded ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}</button>
                <button onClick={() => window.electronAPI.quitApp()} className="icon-btn hover:text-red-400"><X size={20}/></button>
             </div>
@@ -718,7 +732,6 @@ const Queue: React.FC<any> = ({ setView }) => {
                       <div key={msg.id} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                         {msg.role === "user" && (
                             <div className="group relative max-w-[85%]">
-                                {/* NEW: DISPLAY SCREENSHOT IF AVAILABLE */}
                                 {msg.screenshotPreview && (
                                     <div className="mb-2">
                                         <img 
