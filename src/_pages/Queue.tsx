@@ -4,19 +4,25 @@ import {
   X, Mic, Monitor, Zap, Send, 
   Loader2, Sparkles, MessageSquare, History,
   GripHorizontal, HelpCircle, MessageCircleQuestion, FileText,
-  Scaling, Copy, Check, CheckCircle2, Trash2, Mail, Volume2,
-  Calendar, Clock, ArrowRight, MicOff, AlertCircle, Upload, UserCog
+  Scaling, Copy, Check, Trash2, Mail,
+  Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog
 } from "lucide-react"
+
+// --- IMPORTS FOR FORMULAS & HIGHLIGHTING ---
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/atom-one-dark.css';
 
-// --- TYPES ---
+// --- TYPES (Updated to include preview image) ---
 interface Message {
   id: string
   role: "user" | "ai"
   text: string
   screenshotPath?: string
+  screenshotPreview?: string // NEW: Stores the base64 image for display
   timestamp: number
 }
 
@@ -34,6 +40,61 @@ interface MeetingSession {
   emailDraft: string
   title?: string
 }
+
+// --- INTERNAL LOGIC (Context Switcher) ---
+interface ChatContext {
+  isInMeeting: boolean;
+  uploadedFilesContent: string;
+  meetingTranscript: string;
+  userImage?: string;
+}
+
+const preparePayload = (userMessage: string, context: ChatContext) => {
+  let systemInstruction = "";
+  let dataToSend = "";
+
+  // 1. IMAGE MODE: Handles cases where user asks a question AND sends an image
+  if (context.userImage) {
+    systemInstruction = `
+      You are an expert Coding Assistant with Vision capabilities.
+      The user has attached an image/screenshot.
+
+      INSTRUCTIONS:
+      1. FIRST, answer the USER'S QUESTION directly. Do not ignore the text prompt.
+      2. SECOND, analyze the image to support your answer or provide context.
+      3. Use LaTeX for math formulas (e.g., $A = \\pi r^2$).
+      4. Use **bold** to highlight key variables or terms.
+      5. If the image contains code, analyze it for bugs or improvements.
+    `;
+    
+    // If user sent image with NO text, supply a default prompt
+    if (!userMessage || !userMessage.trim()) {
+        userMessage = "Analyze this screen and describe what is shown.";
+    }
+  } 
+  // 2. MEETING MODE (Student/Interview Mode)
+  else if (context.isInMeeting) {
+    systemInstruction = `
+      You are a Technical Interview Assistant. 
+      The user is currently in a live coding interview or meeting. 
+      Use the provided CONTEXT (files and transcript) to answer the user's question.
+      
+      RULES:
+      - Focus STRICTLY on the code, algorithm, or behavioral questions found in the context.
+      - Use LaTeX for time complexity (e.g., $O(n)$) and math formulas.
+      - Use **bold** for key variable names or terms to emphasize them.
+    `;
+    dataToSend = `CONTEXT FROM FILES:\n${context.uploadedFilesContent}\n\nLIVE TRANSCRIPT:\n${context.meetingTranscript}`;
+  } 
+  // 3. DEFAULT MODE
+  else {
+    systemInstruction = "You are a helpful assistant for the Moubely application. Use LaTeX for math formulas. Use **bold** to highlight key terms or variables.";
+  }
+
+  // Combine instructions + context + user question
+  const finalPrompt = `${systemInstruction}\n\n${dataToSend ? dataToSend + "\n\n" : ""}USER QUESTION: ${userMessage}`;
+  return finalPrompt;
+};
 
 // --- HELPER: Recursively extract text from React children ---
 const extractTextFromChildren = (children: any): string => {
@@ -63,9 +124,7 @@ const AudioVisualizer = ({ audioContext, source }: { audioContext: AudioContext 
                 analyser.fftSize = 64; 
                 source.connect(analyser);
                 analyserRef.current = analyser;
-             } catch(e) {
-                 return;
-             }
+             } catch(e) { return; }
         }
 
         const analyser = analyserRef.current;
@@ -78,7 +137,6 @@ const AudioVisualizer = ({ audioContext, source }: { audioContext: AudioContext 
             if (!ctx) return;
             rafRef.current = requestAnimationFrame(draw);
             analyser.getByteFrequencyData(dataArray);
-
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             const barWidth = (canvas.width / bufferLength) * 2.5;
@@ -90,19 +148,13 @@ const AudioVisualizer = ({ audioContext, source }: { audioContext: AudioContext 
                 const r = barHeight + 25 * (i / bufferLength);
                 const g = 250 * (i / bufferLength);
                 const b = 50;
-
                 ctx.fillStyle = `rgb(${r},${g},${b})`;
                 ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-
                 x += barWidth + 1;
             }
         };
-
         draw();
-
-        return () => {
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        };
+        return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
     }, [audioContext, source]);
 
     return <canvas ref={canvasRef} width={200} height={40} className="w-32 h-8 opacity-80" />;
@@ -113,8 +165,20 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
   return (
     <div className="text-[14px] leading-relaxed text-gray-200 markdown-content">
       <ReactMarkdown
-        rehypePlugins={[rehypeHighlight]}
+        remarkPlugins={[remarkMath]}
+        rehypePlugins={[rehypeHighlight, rehypeKatex]}
         components={{
+          h1: ({children}) => <h1 className="text-xl font-bold mt-4 mb-2 text-blue-400 border-b border-white/10 pb-2">{children}</h1>,
+          h2: ({children}) => <h2 className="text-lg font-bold mt-3 mb-2 text-purple-300">{children}</h2>,
+          h3: ({children}) => <h3 className="text-md font-semibold mt-2 mb-1 text-gray-100 uppercase tracking-wide opacity-80">{children}</h3>,
+          strong: ({children}) => <strong className="font-bold text-yellow-400">{children}</strong>,
+          ul: ({children}) => <ul className="list-disc ml-5 my-2 space-y-1 text-gray-300">{children}</ul>,
+          ol: ({children}) => <ol className="list-decimal ml-5 my-2 space-y-1 text-gray-300">{children}</ol>,
+          p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+          blockquote: ({children}) => <blockquote className="border-l-4 border-blue-500/50 pl-4 my-2 italic text-gray-400 bg-white/5 py-1 rounded-r">{children}</blockquote>,
+          div: ({node, className, children, ...props}) => {
+             return <div className={`my-4 p-2 rounded-lg text-center overflow-x-auto ${className || ''}`} {...props}>{children}</div>
+          },
           table: ({node, ...props}) => (
             <div className="overflow-x-auto my-4 border border-white/10 rounded-xl bg-white/5 shadow-sm">
               <table className="w-full text-left border-collapse text-sm" {...props} />
@@ -125,26 +189,20 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
           tbody: ({node, ...props}) => <tbody className="divide-y divide-white/5" {...props} />,
           tr: ({node, ...props}) => <tr className="hover:bg-white/5 transition-colors" {...props} />,
           td: ({node, ...props}) => <td className="p-3 text-gray-300" {...props} />,
-          
           code: ({node, inline, className, children, ...props}: any) => {
              const match = /language-(\w+)/.exec(className || '')
              const codeText = extractTextFromChildren(children).replace(/\n$/, '');
              const [isCopied, setIsCopied] = useState(false)
-
              const handleCopyCode = () => {
                 navigator.clipboard.writeText(codeText)
                 setIsCopied(true)
                 setTimeout(() => setIsCopied(false), 2000)
              }
-
              return !inline ? (
                <div className="rounded-lg overflow-hidden my-3 bg-[#1e1e1e] border border-white/10 shadow-lg group relative">
                  <div className="bg-white/5 px-3 py-1.5 text-[10px] text-gray-500 border-b border-white/5 flex justify-between items-center uppercase font-mono tracking-wider">
                     <span>{match?.[1] || 'text'}</span>
-                    <button 
-                      onClick={handleCopyCode}
-                      className="flex items-center gap-1.5 hover:text-white text-gray-400 transition-colors bg-white/5 hover:bg-white/10 px-2 py-1 rounded cursor-pointer"
-                    >
+                    <button onClick={handleCopyCode} className="flex items-center gap-1.5 hover:text-white text-gray-400 transition-colors bg-white/5 hover:bg-white/10 px-2 py-1 rounded cursor-pointer">
                       {isCopied ? <Check size={12} className="text-green-400"/> : <Copy size={12}/>}
                       <span>{isCopied ? 'Copied' : 'Copy'}</span>
                     </button>
@@ -166,55 +224,32 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
 // --- STUDENT SETUP MODAL ---
 const StudentModeSetupModal = ({ open, onClose, onSave }: { open: boolean, onClose: () => void, onSave: (files: File[]) => void }) => {
   const [files, setFiles] = useState<File[]>([]);
-  
   if (!open) return null;
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
         const uploaded = Array.from(e.target.files).slice(0, 6);
         setFiles(uploaded);
     }
   };
-
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
       <div className="bg-[#1e1e1e] border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         <h2 className="text-xl font-semibold text-white mb-2">Student Mode Setup</h2>
-        <p className="text-gray-400 text-sm mb-4">
-          To tailor responses to your skill level, please upload your resume or recent project files (max 6).
-        </p>
-
+        <p className="text-gray-400 text-sm mb-4">Upload resume or project files (max 6).</p>
         <div className="border-2 border-dashed border-white/10 rounded-xl p-8 flex flex-col items-center justify-center bg-white/5 hover:bg-white/10 transition-colors relative">
-            <input 
-                type="file" 
-                multiple 
-                accept=".pdf,.txt,.md,.ts,.js,.py" 
-                onChange={handleFileChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
+            <input type="file" multiple accept=".pdf,.txt,.md,.ts,.js,.py" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/>
             <Upload size={32} className="text-blue-400 mb-2"/>
             <span className="text-sm text-gray-300">Click to upload files</span>
-            <span className="text-xs text-gray-500 mt-1">.txt, .md, .pdf, code files</span>
         </div>
-
         {files.length > 0 && (
             <div className="mt-4 space-y-2">
-                {files.map((f, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-gray-300 bg-white/5 p-2 rounded">
-                        <FileText size={12}/>
-                        <span className="truncate">{f.name}</span>
-                    </div>
-                ))}
+                {files.map((f, i) => <div key={i} className="flex items-center gap-2 text-xs text-gray-300 bg-white/5 p-2 rounded"><FileText size={12}/><span className="truncate">{f.name}</span></div>)}
             </div>
         )}
-
         <div className="flex gap-3 mt-6 justify-end">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/10 transition-colors">Skip / Cancel</button>
-          <button 
-            onClick={() => onSave(files)} 
-            className="px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors"
-          >
-            {files.length === 0 ? "Continue without files" : "Save & Enable"}
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/10 transition-colors">Skip</button>
+          <button onClick={() => onSave(files)} className="px-4 py-2 rounded-lg text-sm bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">
+            {files.length === 0 ? "Continue" : "Save & Enable"}
           </button>
         </div>
       </div>
@@ -249,8 +284,6 @@ const Queue: React.FC<any> = ({ setView }) => {
   const [pastMeetings, setPastMeetings] = useState<MeetingSession[]>([])
   
   const [showStudentModal, setShowStudentModal] = useState(false);
-  
-  // NEW: State for tracking finalizing process
   const [isFinalizing, setIsFinalizing] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -258,13 +291,16 @@ const Queue: React.FC<any> = ({ setView }) => {
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null)
   const destinationRef = useRef<MediaStreamAudioDestinationNode | null>(null)
   const meetingStartTimeRef = useRef<number>(0)
-  // NEW: Ref to track transcript length for stability check
   const transcriptLengthRef = useRef(0);
   
   const chatEndRef = useRef<HTMLDivElement>(null)
   const transcriptEndRef = useRef<HTMLDivElement>(null)
   const resizeRef = useRef<{ startX: number, startY: number, startW: number, startH: number } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  
+  // -- SMART SCROLL REFS --
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+  const isAtBottomRef = useRef(true) 
   
   const isExpandedRef = useRef(isExpanded);
   const isRecordingRef = useRef(isRecording);
@@ -273,10 +309,8 @@ const Queue: React.FC<any> = ({ setView }) => {
   useEffect(() => { isExpandedRef.current = isExpanded; }, [isExpanded]);
   useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
-  // Update ref whenever transcript changes
   useEffect(() => { transcriptLengthRef.current = transcriptLogs.length; }, [transcriptLogs]);
 
-  // Init
   useEffect(() => {
     window.electronAPI.setWindowSize({ width: 450, height: 120 })
     setIsExpanded(false) 
@@ -311,9 +345,21 @@ const Queue: React.FC<any> = ({ setView }) => {
     setMessages([{ id: "init", role: "ai", text: "Hi there. I'm Moubely. I'm ready to listen.", timestamp: Date.now() }]);
   }
 
+  // --- SMART SCROLL HANDLER ---
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+      const distanceToBottom = scrollHeight - scrollTop - clientHeight;
+      isAtBottomRef.current = distanceToBottom < 50;
+  };
+
+  // --- SCROLL EFFECT ---
   useEffect(() => {
-    if (activeTab === "Chat") chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
-    if (activeTab === "Transcript") transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    if (activeTab === "Chat" && isAtBottomRef.current && chatContainerRef.current) {
+        chatContainerRef.current.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: 'smooth' });
+    }
+    if (activeTab === "Transcript" && transcriptEndRef.current) {
+        transcriptEndRef.current.scrollIntoView({ behavior: "smooth" })
+    }
   }, [messages, transcriptLogs, activeTab, isExpanded])
 
   useEffect(() => {
@@ -326,18 +372,12 @@ const Queue: React.FC<any> = ({ setView }) => {
 
   const startRecordingLoop = () => {
       if (!isRecordingRef.current || !destinationRef.current) return;
-
       const recorder = new MediaRecorder(destinationRef.current.stream, { mimeType: 'audio/webm;codecs=opus' });
       mediaRecorderRef.current = recorder;
       let chunks: Blob[] = [];
-
-      recorder.ondataavailable = (e) => {
-          if (e.data.size > 0) chunks.push(e.data);
-      };
-
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
       recorder.onstop = async () => {
           if (isPausedRef.current) return;
-
           const blob = new Blob(chunks, { type: 'audio/webm' });
           if (blob.size > 0) {
               const reader = new FileReader();
@@ -354,7 +394,6 @@ const Queue: React.FC<any> = ({ setView }) => {
                           setTranscriptLogs(prev => [...prev, { id: Date.now().toString(), text: result.text, timestamp: Date.now(), displayTime }]);
                       }
                   } catch (e: any) {
-                      console.error("Transcript Error:", e);
                       if (e.message && e.message.includes("API key")) {
                           setTranscriptError("API Key Invalid.");
                           setIsRecording(false); 
@@ -362,49 +401,32 @@ const Queue: React.FC<any> = ({ setView }) => {
                   }
               };
           }
-          
-          if (isRecordingRef.current && !isPausedRef.current) {
-              setTimeout(() => startRecordingLoop(), 100); 
-          }
+          if (isRecordingRef.current && !isPausedRef.current) { setTimeout(() => startRecordingLoop(), 100); }
       };
-
       recorder.start();
-      
-      setTimeout(() => {
-          if (recorder.state === 'recording') {
-              recorder.stop(); 
-          }
-      }, 5000);
+      setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 5000);
   };
 
   const handleStartSession = async () => {
     try {
         setTranscriptError(null);
-        
         const micStream = await navigator.mediaDevices.getUserMedia({ 
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
         });
-        
         let systemStream: MediaStream | null = null;
-        try {
-            systemStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-        } catch (err) { console.log("System audio fallback."); }
+        try { systemStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }); } catch (err) {}
 
         const audioCtx = new AudioContext();
         audioContextRef.current = audioCtx;
         const destination = audioCtx.createMediaStreamDestination();
-
         const micSource = audioCtx.createMediaStreamSource(micStream);
         micSource.connect(destination);
         sourceNodeRef.current = micSource;
-
         if (systemStream) {
             const systemSource = audioCtx.createMediaStreamSource(systemStream);
             systemSource.connect(destination);
         }
-
         destinationRef.current = destination;
-
         resetChat();
         setTranscriptLogs([]);
         setShowPostMeeting(false);
@@ -412,181 +434,78 @@ const Queue: React.FC<any> = ({ setView }) => {
         const startT = Date.now();
         setMeetingStartTime(startT);
         meetingStartTimeRef.current = startT; 
-        
         setIsRecording(true);
         setIsPaused(false);
-        setIsFinalizing(false); // Reset finalizing state
-        
+        setIsFinalizing(false);
         isRecordingRef.current = true;
         isPausedRef.current = false;
-        
         if(!isExpanded) handleExpandToggle();
         setActiveTab("Transcript");
-
         startRecordingLoop();
-
-    } catch (err) { 
-        console.error("Audio setup error:", err) 
-        setTranscriptError("Microphone access denied.")
-    }
+    } catch (err) { setTranscriptError("Microphone access denied."); }
   }
 
   const handlePauseToggle = () => {
       if (isPaused) {
-          setIsPaused(false);
-          isPausedRef.current = false; 
-          startRecordingLoop();
+          setIsPaused(false); isPausedRef.current = false; startRecordingLoop();
       } else {
-          setIsPaused(true);
-          isPausedRef.current = true; 
-          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-              mediaRecorderRef.current.stop();
-          }
+          setIsPaused(true); isPausedRef.current = true; 
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') mediaRecorderRef.current.stop();
       }
   }
 
   const handleStopSession = () => {
-      // 1. Stop Recording logic immediately
-      setIsRecording(false);
-      setIsPaused(false);
-      isRecordingRef.current = false;
-      isPausedRef.current = false;
-      
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-          mediaRecorderRef.current.stop();
-      }
-      
-      if (audioContextRef.current) {
-          audioContextRef.current.close();
-          audioContextRef.current = null;
-      }
-      sourceNodeRef.current = null;
-      destinationRef.current = null;
-      
-      // 2. Start Finalizing Process instead of jumping straight to end
+      setIsRecording(false); setIsPaused(false); isRecordingRef.current = false; isPausedRef.current = false;
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
+      if (audioContextRef.current) { audioContextRef.current.close(); audioContextRef.current = null; }
+      sourceNodeRef.current = null; destinationRef.current = null;
       setIsFinalizing(true);
       handleMeetingEnd(); 
   }
 
   const handleExpandToggle = () => {
-    if (!isExpanded) {
-      window.electronAPI.setWindowSize({ width: 500, height: 700 })
-      setIsExpanded(true)
-    } else {
-      window.electronAPI.setWindowSize({ width: 450, height: 120 })
-      setIsExpanded(false)
-    }
+    if (!isExpanded) { window.electronAPI.setWindowSize({ width: 500, height: 700 }); setIsExpanded(true); } 
+    else { window.electronAPI.setWindowSize({ width: 450, height: 120 }); setIsExpanded(false); }
   }
 
   const handleMeetingEnd = async () => {
-    if (transcriptLogs.length === 0 && !isFinalizing) return; // Allow if finalizing
-
+    if (transcriptLogs.length === 0 && !isFinalizing) return;
     setShowPostMeeting(true);
     if(!isExpanded) handleExpandToggle();
     setActiveTab("Email"); 
-    
     setIsThinking(true);
     setThinkingStep("Finalizing transcript...");
-
-    // --- WAIT FOR QUEUE TO EMPTY (Stability Loop) ---
-    // We check every 1 second. If the transcript length hasn't changed for 2 consecutive checks,
-    // we assume the queue is empty and we have everything.
     let stableCount = 0;
     let lastLength = transcriptLengthRef.current;
-
-    // Only wait if we actually recorded something
     if (lastLength > 0 || isFinalizing) {
-        for (let i = 0; i < 20; i++) { // Max wait 20 seconds
+        for (let i = 0; i < 20; i++) { 
             await new Promise(r => setTimeout(r, 1000));
             const currentLength = transcriptLengthRef.current;
-            
-            if (currentLength === lastLength && currentLength > 0) {
-                stableCount++;
-            } else {
-                stableCount = 0;
-                lastLength = currentLength;
-            }
-
-            if (stableCount >= 2) break; // Stability reached (2 seconds of no changes)
+            if (currentLength === lastLength && currentLength > 0) stableCount++;
+            else { stableCount = 0; lastLength = currentLength; }
+            if (stableCount >= 2) break;
         }
     }
-    
     setThinkingStep("Drafting summary...");
-    setIsFinalizing(false); // Done finalizing
-
-    // --- GENERATE EMAIL ---
-    // Re-fetch clean transcript from state (it might have updated during the wait)
-    // IMPORTANT: We use the ref here or call a state setter callback to ensure we get the latest
-    // But since we are in an async function, `transcriptLogs` might be stale.
-    // However, since we rely on `transcriptLogs` state updates to drive the UI, 
-    // and we waited, we should trust the latest render cycle. 
-    // To be 100% safe, we can't easily access the "latest" state inside this closure without a ref,
-    // but the `transcriptLengthRef` gives us confidence. 
-    // *Correction*: We can't access the updated `transcriptLogs` state directly here if it's a stale closure.
-    // Ideally we would use a ref for the entire log array, but for now we will assume the delays let React catch up
-    // or we can use the functional state update to "peek" but that's for setting.
-    // Instead, let's use a workaround: we know `transcriptLogs` *might* be stale in this specific closure start,
-    // but typically `handleMeetingEnd` is called once. 
-    // ACTUALLY: The best way in React functional components to get current state in async loop is a Ref.
-    // Let's rely on the user seeing the transcript update on screen. The email generation might miss the very last line
-    // if we don't use a ref for the text itself. 
-    // For simplicity in this fix, we will just proceed. If it misses one line, it's acceptable for now compared to crashing.
-    
-    // *Better Fix*: Let's rely on `transcriptLengthRef` implies we should have a `transcriptRef` too.
-    // But to avoid huge code changes, we'll just proceed.
-    
-    const fullTranscript = transcriptLogs.map(t => t.text).join(" "); // This uses the closure's version... 
-    // WAIT! This closure is stale. `transcriptLogs` will be whatever it was when `handleStopSession` was clicked.
-    // If new logs came in *during* the wait loop, `transcriptLogs` variable HERE won't update.
-    // We need to use a Ref for the logs to read the latest value after the wait.
-    
-    // Quick patch: we will likely capture most of it because the lag is upstream. 
-    // But to be proper, let's just proceed with what we have. 
-    // (A full refactor to use `transcriptRef` would be safer but let's stick to the requested fix logic first).
-    
-    let generatedEmail = "";
-    let generatedTitle = `Meeting ${new Date().toLocaleDateString()}`;
-
-    try {
-        if (transcriptLengthRef.current > 0) { // Use ref length to check existence
-             // We need the text. Since `transcriptLogs` is stale, we can't easily get the *new* text without a ref.
-             // However, for the specific request "waits until all transcript is complete", 
-             // the *visual* delay is solved.
-             // Ideally, we should perform the generation in a `useEffect` that watches `isFinalizing`.
-             
-             // **CORRECTION**: Let's move the generation logic to a useEffect to guarantee fresh state!
-             // See below for the implementation strategy change.
-        } 
-    } catch (e) {
-        setEmailDraft("Failed to generate content.");
-    } finally {
-        setIsThinking(false);
-    }
+    setIsFinalizing(false);
   }
   
-  // --- NEW USE EFFECT FOR EMAIL GENERATION ---
-  // This watches `isFinalizing`. When it turns FALSE (after the wait), and we have logs, generate email.
   useEffect(() => {
       const generateEmailAfterFinalize = async () => {
           if (!isFinalizing && showPostMeeting && !emailDraft && transcriptLogs.length > 0) {
               setIsThinking(true);
               setThinkingStep("Drafting summary...");
-              
               const fullTranscript = transcriptLogs.map(t => t.text).join(" ");
               let generatedEmail = "";
               let generatedTitle = `Meeting ${new Date().toLocaleDateString()}`;
-
               try {
                   const [emailResponse, titleResponse] = await Promise.all([
                       window.electronAPI.invoke("gemini-chat", `Based on this transcript, draft a professional follow-up email:\n\n${fullTranscript}`),
                       window.electronAPI.invoke("gemini-chat", `Based on this transcript, generate a very short, concise title (under 6 words) for this meeting:\n\n${fullTranscript}`)
                   ]);
-                  
                   generatedEmail = emailResponse;
                   generatedTitle = titleResponse.replace(/^["']|["']$/g, '');
                   setEmailDraft(emailResponse);
-                  
-                  // Save to History
                   const newMeeting: MeetingSession = {
                       id: Date.now().toString(),
                       date: Date.now(),
@@ -597,60 +516,18 @@ const Queue: React.FC<any> = ({ setView }) => {
                   const updatedHistory = [newMeeting, ...pastMeetings];
                   setPastMeetings(updatedHistory);
                   localStorage.setItem('moubely_meetings', JSON.stringify(updatedHistory));
-
-              } catch (e) {
-                  setEmailDraft("Failed to generate content.");
-              } finally {
-                  setIsThinking(false);
-              }
+              } catch (e) { setEmailDraft("Failed to generate content."); } 
+              finally { setIsThinking(false); }
           }
       };
-      
       generateEmailAfterFinalize();
-  }, [isFinalizing, showPostMeeting]); // Dependencies ensure this runs when finalizing flips to false
+  }, [isFinalizing, showPostMeeting]);
 
-  // --- RE-IMPLEMENT handleMeetingEnd TO JUST TRIGGER THE WAIT ---
-  // This overrides the previous definition
-  const handleMeetingEndSafe = async () => {
-      if (transcriptLogs.length === 0 && !isFinalizing) return;
-
-      setShowPostMeeting(true);
-      if(!isExpanded) handleExpandToggle();
-      setActiveTab("Email"); 
-      
-      // Start the wait
-      setIsThinking(true);
-      setThinkingStep("Finalizing transcript...");
-      
-      let stableCount = 0;
-      let lastLength = transcriptLengthRef.current;
-
-      for (let i = 0; i < 20; i++) { // Wait up to 20s
-          await new Promise(r => setTimeout(r, 1000));
-          const currentLength = transcriptLengthRef.current;
-          
-          if (currentLength === lastLength && currentLength > 0) {
-              stableCount++;
-          } else {
-              stableCount = 0;
-              lastLength = currentLength;
-          }
-          if (stableCount >= 2) break; // Stable!
-      }
-      
-      setIsFinalizing(false); // This triggers the useEffect above
-  };
-
-  // Logic: Handle Mode Switching
   const handleModeSelect = async (selectedMode: string) => {
-      setMode(selectedMode);
-      setShowModeMenu(false);
-
+      setMode(selectedMode); setShowModeMenu(false);
       if (selectedMode === "Student") {
           const exists = await window.electronAPI.checkProfileExists();
-          if (!exists) {
-              setShowStudentModal(true);
-          }
+          if (!exists) setShowStudentModal(true);
       }
   };
 
@@ -660,115 +537,33 @@ const Queue: React.FC<any> = ({ setView }) => {
               const arrayBuffer = await file.arrayBuffer();
               return { name: file.name, data: arrayBuffer };
           }));
-          
           await window.electronAPI.saveStudentFiles(fileDataArray);
           setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "Student profile updated. I've analyzed your files.", timestamp: Date.now() }]);
       }
       setShowStudentModal(false);
   };
 
-  const handleSend = async (overrideText?: string) => {
-    const textToSend = overrideText || input
-    if (!textToSend.trim() && !pendingScreenshot) return
-
-    const currentScreenshot = pendingScreenshot
-    setMessages(prev => [...prev, { id: Date.now().toString(), role: "user", text: textToSend || (currentScreenshot ? "Analyze this screen" : ""), screenshotPath: currentScreenshot?.path, timestamp: Date.now() }])
-    setInput("")
-    setPendingScreenshot(null)
-    setIsThinking(true)
-    setThinkingStep(isSmartMode ? "Thinking deeply..." : "Thinking...")
-
-    try {
-      let response = ""
-      const history = messages.map(m => ({ role: m.role, text: m.text }));
-
-      const args = {
-          message: textToSend,
-          mode: mode,
-          history: history 
-      };
-      
-      const smartPrefix = isSmartMode ? `[Mode: ${mode}] [Expert Level] ` : `[Mode: ${mode}] `
-      let context = "";
-      if (isRecording || showPostMeeting) {
-          const fullTranscript = transcriptLogs.map(t => t.text).join(" ");
-          context = `\nCONTEXT (Meeting Transcript So Far): "${fullTranscript || "No audio detected yet."}"\n\n`;
-      }
-      
-      if (currentScreenshot) {
-        setThinkingStep("Vision processing...")
-        const formatInstruction = "\nPlease format your response using structured lists and text.";
-        const finalPrompt = smartPrefix + context + (textToSend || "Describe this screen") + formatInstruction;
-        response = await window.electronAPI.chatWithImage(finalPrompt, currentScreenshot.path)
-      } else {
-        const formatInstruction = "\nPlease format your response using structured lists and text. Avoid markdown tables.";
-        const finalPrompt = smartPrefix + context + (textToSend || "Describe this screen") + formatInstruction;
+  // --- ERROR LOGGING SCREENSHOT HANDLER ---
+  const handleUseScreen = async () => { 
+    try { 
+        console.log("Attempting screenshot..."); 
+        await window.electronAPI.takeScreenshot(); 
         
-        args.message = finalPrompt;
-        response = await window.electronAPI.invoke("gemini-chat", args)
-      }
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "ai", text: response, timestamp: Date.now() }])
-    } catch (error: any) {
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "Error: " + error.message, timestamp: Date.now() }])
-    } finally { setIsThinking(false) }
+        const s = await window.electronAPI.getScreenshots(); 
+        if(s.length) { 
+            console.log("Screenshot acquired:", s[s.length-1].path); 
+            setPendingScreenshot(s[s.length-1]); 
+            if(!isExpanded) handleExpandToggle(); 
+            setActiveTab("Chat"); 
+        } else {
+            console.warn("Screenshot taken but returned empty list.");
+        }
+    } catch(e) {
+        console.error("Screenshot Failed:", e);
+        alert("Screenshot failed. Check console for details.");
+    } 
   }
 
-  const triggerAssistAction = async (actionType: "Assist" | "WhatToSay" | "FollowUp" | "Recap") => {
-    let transcriptText = transcriptLogs.map(t => t.text).join(" ");
-    
-    if (!transcriptText.trim() && messages.length > 0) {
-        transcriptText = messages.slice(-5).map(m => `${m.role.toUpperCase()}: ${m.text}`).join("\n");
-    }
-
-    if (!transcriptText.trim()) {
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "I haven't heard enough yet, and chat history is empty. Start a meeting or ask a question!", timestamp: Date.now() }]);
-        return;
-    }
-
-    setActiveTab("Chat")
-    setIsThinking(true)
-    
-    let userDisplayMessage = "";
-    let systemPrompt = "";
-    
-    switch (actionType) {
-      case "Assist": 
-          userDisplayMessage = "Assist me based on the current context.";
-          systemPrompt = `Based on the conversation context: "${transcriptText}". \nProvide helpful facts, context, or next steps.`; 
-          break;
-      case "WhatToSay": 
-          userDisplayMessage = "What should I say next?";
-          systemPrompt = `Based on the conversation context: "${transcriptText}". \nSuggest 3 smart responses.`; 
-          break;
-      case "FollowUp": 
-          userDisplayMessage = "Generate follow-up questions.";
-          systemPrompt = `Based on the conversation context: "${transcriptText}". \nGenerate 3 follow-up questions.`; 
-          break;
-      case "Recap": 
-          userDisplayMessage = "Recap the meeting so far.";
-          systemPrompt = `Based on the conversation context: "${transcriptText}". \nProvide a concise summary.`; 
-          break;
-    }
-    
-    setMessages(prev => [...prev, { id: Date.now().toString(), role: "user", text: userDisplayMessage, timestamp: Date.now() }]);
-
-    const history = messages.map(m => ({ role: m.role, text: m.text }));
-    history.push({ role: "user", text: userDisplayMessage });
-
-    const args = {
-        message: systemPrompt,
-        mode: mode,
-        history: history 
-    };
-
-    try {
-        const response = await window.electronAPI.invoke("gemini-chat", args)
-        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "ai", text: response, timestamp: Date.now() }])
-    } catch (e: any) { console.error(e) } finally { setIsThinking(false) }
-  }
-
-  const handleInputFocus = () => { setIsInputFocused(true); if (!isExpanded) handleExpandToggle(); }
-  const handleUseScreen = async () => { try { await window.electronAPI.takeScreenshot(); const s = await window.electronAPI.getScreenshots(); if(s.length) { setPendingScreenshot(s[s.length-1]); if(!isExpanded) handleExpandToggle(); setActiveTab("Chat"); } } catch(e){} }
   const handleCopyUserMessage = (text: string) => { navigator.clipboard.writeText(text); }
   const startResize = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); resizeRef.current = { startX: e.clientX, startY: e.clientY, startW: document.body.offsetWidth, startH: document.body.offsetHeight }; document.addEventListener('mousemove', doResize); document.addEventListener('mouseup', stopResize); }
   const doResize = (e: MouseEvent) => { if (!resizeRef.current) return; const diffX = e.clientX - resizeRef.current.startX; const diffY = e.clientY - resizeRef.current.startY; const newWidth = Math.max(150, resizeRef.current.startW + diffX); const newHeight = Math.max(50, resizeRef.current.startH + diffY); window.electronAPI.setWindowSize({ width: newWidth, height: newHeight }); }
@@ -776,14 +571,104 @@ const Queue: React.FC<any> = ({ setView }) => {
   const loadMeeting = (m: MeetingSession) => { setTranscriptLogs(m.transcript); setEmailDraft(m.emailDraft); setShowPostMeeting(true); setActiveTab("Transcript"); setMessages([{id: Date.now().toString(), role: "ai", text: `Loaded meeting: ${new Date(m.date).toLocaleString()}`, timestamp: Date.now()}]); }
   const deleteMeeting = (id: string, e: React.MouseEvent) => { e.stopPropagation(); const u = pastMeetings.filter(m => m.id !== id); setPastMeetings(u); localStorage.setItem('moubely_meetings', JSON.stringify(u)); }
 
+  // --- HANDLE SEND (UPDATED: Saves preview image) ---
+  const handleSend = async (overrideText?: string) => {
+    const textToSend = overrideText || input
+    if (!textToSend.trim() && !pendingScreenshot) return
+
+    const currentScreenshot = pendingScreenshot
+    setMessages(prev => [...prev, { 
+        id: Date.now().toString(), 
+        role: "user", 
+        text: textToSend || (currentScreenshot ? "Analyze this screen" : ""), 
+        screenshotPath: currentScreenshot?.path,
+        screenshotPreview: currentScreenshot?.preview, // Save preview for display
+        timestamp: Date.now() 
+    }])
+    
+    setInput("")
+    setPendingScreenshot(null)
+    setIsThinking(true)
+    setThinkingStep(currentScreenshot ? "Vision processing..." : "Thinking...")
+    isAtBottomRef.current = true; // Force scroll to bottom on new send
+
+    // 1. Prepare Smart Context
+    const contextData = {
+        isInMeeting: isRecording || showPostMeeting,
+        meetingTranscript: transcriptLogs.map(t => t.text).join("\n"),
+        uploadedFilesContent: "", // Backend handles file reading
+        userImage: currentScreenshot?.preview 
+    };
+
+    const finalPrompt = preparePayload(textToSend, contextData);
+
+    try {
+      let response = ""
+      const history = messages.map(m => ({ role: m.role, text: m.text }));
+      
+      const args = {
+          message: finalPrompt,
+          mode: mode,
+          history: history 
+      };
+
+      if (currentScreenshot) {
+         response = await window.electronAPI.chatWithImage(finalPrompt, currentScreenshot.path)
+      } else {
+         response = await window.electronAPI.invoke("gemini-chat", args)
+      }
+      
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "ai", text: response, timestamp: Date.now() }])
+
+    } catch (error: any) {
+      setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "Error: " + error.message, timestamp: Date.now() }])
+    } finally { 
+      setIsThinking(false) 
+    }
+  }
+
+  const triggerAssistAction = async (actionType: "Assist" | "WhatToSay" | "FollowUp" | "Recap") => {
+    let transcriptText = transcriptLogs.map(t => t.text).join(" ");
+    if (!transcriptText.trim() && messages.length > 0) {
+        transcriptText = messages.slice(-5).map(m => `${m.role.toUpperCase()}: ${m.text}`).join("\n");
+    }
+    if (!transcriptText.trim()) {
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "I haven't heard enough yet.", timestamp: Date.now() }]);
+        return;
+    }
+    setActiveTab("Chat")
+    setIsThinking(true)
+    isAtBottomRef.current = true;
+    
+    let userDisplayMessage = "";
+    let systemPrompt = "";
+    
+    switch (actionType) {
+      case "Assist": userDisplayMessage = "Assist me."; systemPrompt = `Based on: "${transcriptText}". Provide helpful facts.`; break;
+      case "WhatToSay": userDisplayMessage = "What next?"; systemPrompt = `Based on: "${transcriptText}". Suggest 3 responses.`; break;
+      case "FollowUp": userDisplayMessage = "Follow-up Qs."; systemPrompt = `Based on: "${transcriptText}". Generate 3 questions.`; break;
+      case "Recap": userDisplayMessage = "Recap."; systemPrompt = `Based on: "${transcriptText}". Summarize.`; break;
+    }
+    
+    setMessages(prev => [...prev, { id: Date.now().toString(), role: "user", text: userDisplayMessage, timestamp: Date.now() }]);
+    const history = messages.map(m => ({ role: m.role, text: m.text }));
+    const args = { message: systemPrompt, mode: mode, history: history };
+
+    try {
+        const response = await window.electronAPI.invoke("gemini-chat", args)
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "ai", text: response, timestamp: Date.now() }])
+    } catch (e: any) { console.error(e) } finally { setIsThinking(false) }
+  }
+
+  const handleInputFocus = () => { 
+      setIsInputFocused(true); 
+      if (!isExpanded) handleExpandToggle(); 
+  }
+
   return (
-    <div className={`moubely-window ${isExpanded ? 'expanded' : ''} flex flex-col h-full relative`}>
-      <StudentModeSetupModal 
-        open={showStudentModal} 
-        onClose={() => { setShowStudentModal(false); if(mode === "Student") setMode("General"); }} 
-        onSave={handleSaveStudentFiles}
-      />
-      <div className="px-4 pt-3 pb-0 z-50">
+    <div className={`moubely-window ${isExpanded ? 'expanded' : ''} flex flex-col h-full relative overflow-hidden`}>
+      <StudentModeSetupModal open={showStudentModal} onClose={() => { setShowStudentModal(false); if(mode === "Student") setMode("General"); }} onSave={handleSaveStudentFiles} />
+      <div className="px-4 pt-3 pb-0 z-50 shrink-0">
         {!isExpanded && (
           <div className="flex justify-center mb-3 animate-in fade-in slide-in-from-top-2">
              <button onClick={handleStartSession} className={`status-pill interactive hover:scale-105 transition-all no-drag ${isRecording ? 'bg-blue-600' : 'bg-white/10 hover:bg-white/20'}`}>
@@ -793,59 +678,61 @@ const Queue: React.FC<any> = ({ setView }) => {
         )}
         <div className="compact-bar interactive no-drag">
             <div className="flex items-center gap-2">
-               {!isRecording ? (
-                   <button onClick={handleStartSession} className="icon-btn hover:text-green-400 hover:bg-green-400/10" title="Start Session"><Play size={18} fill="currentColor"/></button>
-               ) : (
-                   <>
-                       <button onClick={handlePauseToggle} className={`icon-btn ${isPaused ? 'text-yellow-400' : 'text-blue-400'}`} title={isPaused ? "Resume" : "Pause"}>{isPaused ? <Play size={18} fill="currentColor"/> : <Pause size={18} fill="currentColor"/>}</button>
-                       <button onClick={handleStopSession} className="icon-btn hover:text-red-400 hover:bg-red-400/10" title="Finish Meeting"><Square size={16} fill="currentColor" className="text-red-400"/></button>
-                   </>
+               {!isRecording ? ( <button onClick={handleStartSession} className="icon-btn hover:text-green-400 hover:bg-green-400/10"><Play size={18} fill="currentColor"/></button> ) : (
+                   <> <button onClick={handlePauseToggle} className={`icon-btn ${isPaused ? 'text-yellow-400' : 'text-blue-400'}`}>{isPaused ? <Play size={18} fill="currentColor"/> : <Pause size={18} fill="currentColor"/>}</button>
+                       <button onClick={handleStopSession} className="icon-btn hover:text-red-400 hover:bg-red-400/10"><Square size={16} fill="currentColor" className="text-red-400"/></button> </>
                )}
-               <button onClick={() => { resetChat(); setTranscriptLogs([]); setShowPostMeeting(false); }} className="icon-btn hover:text-red-400" title="Delete Chat / Reset"><Trash2 size={16}/></button>
+               <button onClick={() => { resetChat(); setTranscriptLogs([]); setShowPostMeeting(false); }} className="icon-btn hover:text-red-400"><Trash2 size={16}/></button>
             </div>
-            <div className="flex-1 flex justify-center">
-                <div className="draggable cursor-grab active:cursor-grabbing p-2 rounded hover:bg-white/5 group"><GripHorizontal size={20} className="text-gray-600 group-hover:text-gray-400"/></div>
-            </div>
+            <div className="flex-1 flex justify-center"><div className="draggable cursor-grab active:cursor-grabbing p-2 rounded hover:bg-white/5 group"><GripHorizontal size={20} className="text-gray-600 group-hover:text-gray-400"/></div></div>
             <div className="flex items-center gap-2">
-               <button onClick={handleExpandToggle} className="icon-btn" title="Toggle Expand">{isExpanded ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}</button>
-               <button onClick={() => window.electronAPI.quitApp()} className="icon-btn hover:text-red-400" title="Close"><X size={20}/></button>
+               <button onClick={handleExpandToggle} className="icon-btn">{isExpanded ? <ChevronUp size={20}/> : <ChevronDown size={20}/>}</button>
+               <button onClick={() => window.electronAPI.quitApp()} className="icon-btn hover:text-red-400"><X size={20}/></button>
             </div>
          </div>
       </div>
-
       {isExpanded && (
         <div className="flex-1 flex flex-col min-h-0 interactive animate-in fade-in slide-in-from-top-4 duration-500 delay-75">
-           <div className="tab-nav justify-start overflow-x-auto no-scrollbar">
+           <div className="tab-nav justify-start overflow-x-auto no-scrollbar shrink-0">
               <button onClick={() => setActiveTab("Chat")} className={`tab-btn ${activeTab === 'Chat' ? 'active' : ''}`}>Chat</button>
               <button onClick={() => setActiveTab("Transcript")} className={`tab-btn ${activeTab === 'Transcript' ? 'active' : ''}`}>Transcript</button>
               {showPostMeeting && <button onClick={() => setActiveTab("Email")} className={`tab-btn flex items-center gap-1.5 ${activeTab === 'Email' ? 'active' : ''}`}><Mail size={14}/> Email</button>}
               <button onClick={() => setActiveTab("History")} className={`tab-btn flex items-center gap-1.5 ${activeTab === 'History' ? 'active' : ''}`}><History size={14}/> History</button>
               {!showPostMeeting && (
-                  <>
-                    <div className="w-px h-4 bg-white/10 mx-2 self-center shrink-0"/>
+                  <> <div className="w-px h-4 bg-white/10 mx-2 self-center shrink-0"/>
                     <button onClick={() => triggerAssistAction("Assist")} className="tab-btn flex items-center gap-1.5 hover:text-blue-300 whitespace-nowrap"><Sparkles size={14}/> Assist</button>
                     <button onClick={() => triggerAssistAction("WhatToSay")} className="tab-btn flex items-center gap-1.5 hover:text-green-300 whitespace-nowrap"><MessageCircleQuestion size={14}/> What to say?</button>
                     <button onClick={() => triggerAssistAction("FollowUp")} className="tab-btn flex items-center gap-1.5 hover:text-purple-300 whitespace-nowrap"><HelpCircle size={14}/> Follow-up</button>
-                    <button onClick={() => triggerAssistAction("Recap")} className="tab-btn flex items-center gap-1.5 hover:text-orange-300 whitespace-nowrap"><FileText size={14}/> Recap</button>
-                  </>
+                    <button onClick={() => triggerAssistAction("Recap")} className="tab-btn flex items-center gap-1.5 hover:text-orange-300 whitespace-nowrap"><FileText size={14}/> Recap</button> </>
               )}
            </div>
-
            <div className="content-area flex-1 overflow-hidden flex flex-col">
               {activeTab === "Chat" && (
                 <div className="flex-1 flex flex-col min-h-0">
-                  <div className="flex-1 overflow-y-auto chat-scroll-area space-y-5 pb-4 px-2">
+                  <div 
+                    className="flex-1 overflow-y-auto chat-scroll-area space-y-5 pb-4 px-2"
+                    ref={chatContainerRef}
+                    onScroll={handleScroll}
+                  >
                     {messages.map((msg) => (
                       <div key={msg.id} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                         {msg.role === "user" && (
                             <div className="group relative max-w-[85%]">
+                                {/* NEW: DISPLAY SCREENSHOT IF AVAILABLE */}
+                                {msg.screenshotPreview && (
+                                    <div className="mb-2">
+                                        <img 
+                                            src={msg.screenshotPreview} 
+                                            alt="Screenshot" 
+                                            className="rounded-lg border border-white/10 max-w-full h-auto max-h-[200px] object-contain bg-black/20"
+                                        />
+                                    </div>
+                                )}
                                 <div className="user-bubble text-left">{msg.text}</div>
-                                <button onClick={() => handleCopyUserMessage(msg.text)} className="absolute top-1/2 -left-8 -translate-y-1/2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-white bg-black/40 rounded-full" title="Copy"><Copy size={12}/></button>
+                                <button onClick={() => handleCopyUserMessage(msg.text)} className="absolute top-1/2 -left-8 -translate-y-1/2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-white bg-black/40 rounded-full"><Copy size={12}/></button>
                             </div>
                         )}
-                        {msg.role === "ai" && <div className="ai-message max-w-[95%]">
-                            <MessageContent text={msg.text} />
-                        </div>}
+                        {msg.role === "ai" && <div className="ai-message max-w-[95%]"><MessageContent text={msg.text} /></div>}
                       </div>
                     ))}
                     {isThinking && <div className="flex items-center gap-3 text-sm text-gray-400 pl-1"><Loader2 size={16} className="animate-spin text-blue-400"/><span className="animate-pulse">{thinkingStep}</span></div>}
@@ -853,165 +740,47 @@ const Queue: React.FC<any> = ({ setView }) => {
                   </div>
                 </div>
               )}
-
               {activeTab === "Transcript" && (
                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                   {/* VISUALIZER HEADER */}
                    <div className="flex flex-col items-center justify-center sticky top-0 bg-[#0f0f14]/80 backdrop-blur-md p-4 mb-2 z-10 rounded-xl border border-white/5 shadow-lg">
-                        {isRecording ? (
-                            <>
-                                <AudioVisualizer audioContext={audioContextRef.current} source={sourceNodeRef.current} />
-                                <div className="text-xs text-blue-400 mt-2 font-medium animate-pulse">Listening...</div>
-                            </>
-                        ) : transcriptError ? (
-                            <div className="flex flex-col items-center text-red-400 gap-2 p-2 bg-red-500/10 rounded-lg">
-                                <AlertCircle size={20}/>
-                                <span className="text-xs font-semibold text-center">{transcriptError}</span>
-                            </div>
-                        ) : (
-                            <div className="text-gray-500 text-xs">Microphone inactive</div>
-                        )}
+                        {isRecording ? ( <> <AudioVisualizer audioContext={audioContextRef.current} source={sourceNodeRef.current} /> <div className="text-xs text-blue-400 mt-2 font-medium animate-pulse">Listening...</div> </> ) : transcriptError ? ( <div className="flex flex-col items-center text-red-400 gap-2 p-2 bg-red-500/10 rounded-lg"> <AlertCircle size={20}/> <span className="text-xs font-semibold text-center">{transcriptError}</span> </div> ) : ( <div className="text-gray-500 text-xs">Microphone inactive</div> )}
                    </div>
-
-                   {/* TRANSCRIPT LOGS */}
-                   {transcriptLogs.length === 0 && !transcriptError && (
-                       <div className="text-gray-500 text-center mt-10 text-sm">
-                           Speak clearly to see text appear here.
-                       </div>
-                   )}
-                   {transcriptLogs.map((log) => (
-                       <div key={log.id} className="animate-in fade-in slide-in-from-bottom-1 duration-300">
-                           <div className="text-[11px] text-gray-500 font-mono mb-0.5">{log.displayTime}</div>
-                           <div className="text-gray-200 leading-relaxed text-[15px] pl-2 border-l-2 border-blue-500/30">
-                               {log.text}
-                           </div>
-                       </div>
-                   ))}
+                   {transcriptLogs.length === 0 && !transcriptError && ( <div className="text-gray-500 text-center mt-10 text-sm"> Speak clearly to see text appear here. </div> )}
+                   {transcriptLogs.map((log) => ( <div key={log.id} className="animate-in fade-in slide-in-from-bottom-1 duration-300"> <div className="text-[11px] text-gray-500 font-mono mb-0.5">{log.displayTime}</div> <div className="text-gray-200 leading-relaxed text-[15px] pl-2 border-l-2 border-blue-500/30"> {log.text} </div> </div> ))}
                    <div ref={transcriptEndRef}/>
                 </div>
               )}
-
               {activeTab === "Email" && showPostMeeting && (
                 <div className="flex-1 overflow-y-auto p-2">
-                    {emailDraft ? (
-                        <div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-2xl">
-                             <div className="flex justify-between items-center mb-4 pb-4 border-b border-white/10">
-                                <h3 className="text-white font-medium flex items-center gap-2"><Mail size={16}/> Generated Follow-up</h3>
-                                <button onClick={() => navigator.clipboard.writeText(emailDraft)} className="text-xs flex items-center gap-1 hover:text-white text-gray-400"><Copy size={12}/> Copy Draft</button>
-                             </div>
-                             <MessageContent text={emailDraft} />
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
-                            <Loader2 size={24} className="animate-spin text-blue-400"/>
-                            <span>Drafting email...</span>
-                        </div>
-                    )}
+                    {emailDraft ? ( <div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-2xl"> <div className="flex justify-between items-center mb-4 pb-4 border-b border-white/10"> <h3 className="text-white font-medium flex items-center gap-2"><Mail size={16}/> Generated Follow-up</h3> <button onClick={() => navigator.clipboard.writeText(emailDraft)} className="text-xs flex items-center gap-1 hover:text-white text-gray-400"><Copy size={12}/> Copy Draft</button> </div> <MessageContent text={emailDraft} /> </div> ) : ( <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3"> <Loader2 size={24} className="animate-spin text-blue-400"/> <span>Drafting email...</span> </div> )}
                 </div>
               )}
-
               {activeTab === "History" && (
                   <div className="flex-1 overflow-y-auto p-2 space-y-3">
-                      {pastMeetings.length === 0 ? (
-                          <div className="text-gray-500 text-center mt-10 text-sm">No recorded meetings yet.</div>
-                      ) : (
-                          pastMeetings.map((meeting) => (
-                              <div key={meeting.id} onClick={() => loadMeeting(meeting)} className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-4 cursor-pointer transition-colors group">
-                                  <div className="flex justify-between items-start mb-2">
-                                      <div className="flex items-center gap-2 text-blue-300 font-medium">
-                                          <Calendar size={14}/>
-                                          <span>{meeting.title || new Date(meeting.date).toLocaleDateString()}</span>
-                                          <span className="text-gray-500">•</span>
-                                          <Clock size={14}/>
-                                          <span>{new Date(meeting.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                      </div>
-                                      <button onClick={(e) => deleteMeeting(meeting.id, e)} className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"><Trash2 size={14}/></button>
-                                  </div>
-                                  <div className="text-sm text-gray-400 line-clamp-2 mb-3">
-                                      {meeting.transcript.map(t => t.text).join(' ').slice(0, 150)}...
-                                  </div>
-                                  <div className="flex items-center gap-2 text-xs text-blue-400 font-medium group-hover:text-blue-300">
-                                      <span>View Details</span>
-                                      <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform"/>
-                                  </div>
-                              </div>
-                          ))
-                      )}
+                      {pastMeetings.length === 0 ? ( <div className="text-gray-500 text-center mt-10 text-sm">No recorded meetings yet.</div> ) : ( pastMeetings.map((meeting) => ( <div key={meeting.id} onClick={() => loadMeeting(meeting)} className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-4 cursor-pointer transition-colors group"> <div className="flex justify-between items-start mb-2"> <div className="flex items-center gap-2 text-blue-300 font-medium"> <Calendar size={14}/> <span>{meeting.title || new Date(meeting.date).toLocaleDateString()}</span> <span className="text-gray-500">•</span> <Clock size={14}/> <span>{new Date(meeting.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span> </div> <button onClick={(e) => deleteMeeting(meeting.id, e)} className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"><Trash2 size={14}/></button> </div> <div className="text-sm text-gray-400 line-clamp-2 mb-3"> {meeting.transcript.map(t => t.text).join(' ').slice(0, 150)}... </div> <div className="flex items-center gap-2 text-xs text-blue-400 font-medium group-hover:text-blue-300"> <span>View Details</span> <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform"/> </div> </div> )) )}
                   </div>
               )}
            </div>
-
            {activeTab === "Chat" && (
-             <div className="p-5 bg-gradient-to-t from-black via-black/90 to-transparent">
-                {pendingScreenshot && (
-                  <div className="mb-3 flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 px-4 py-2 rounded-xl w-fit">
-                    <img src={pendingScreenshot.preview} className="w-10 h-8 rounded object-cover border border-white/10"/>
-                    <span className="text-xs text-blue-200 font-medium">Screenshot attached</span>
-                    <button onClick={() => setPendingScreenshot(null)}><X size={14}/></button>
-                  </div>
-                )}
+             <div className="p-5 bg-gradient-to-t from-black via-black/90 to-transparent shrink-0">
+                {pendingScreenshot && ( <div className="mb-3 flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 px-4 py-2 rounded-xl w-fit"> <img src={pendingScreenshot.preview} className="w-10 h-8 rounded object-cover border border-white/10"/> <span className="text-xs text-blue-200 font-medium">Screenshot attached</span> <button onClick={() => setPendingScreenshot(null)}><X size={14}/></button> </div> )}
                 <div className="relative mb-3">
-                   <textarea
-                     ref={textareaRef}
-                     value={input}
-                     onFocus={handleInputFocus}
-                     onChange={(e) => setInput(e.target.value)}
-                     onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); handleSend(); } }}
-                     placeholder={showPostMeeting ? "Ask about the meeting..." : "Ask about your screen..."}
-                     rows={1}
-                     className="w-full bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 focus:border-white/20 rounded-2xl px-5 py-4 text-sm text-gray-100 placeholder-gray-500 outline-none transition-all shadow-lg resize-none overflow-y-auto"
-                     style={{ minHeight: '52px', maxHeight: '150px' }}
-                   />
+                   <textarea ref={textareaRef} value={input} onFocus={handleInputFocus} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); handleSend(); } }} placeholder={showPostMeeting ? "Ask about the meeting..." : "Ask about your screen..."} rows={1} className="w-full bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 focus:border-white/20 rounded-2xl px-5 py-4 text-sm text-gray-100 placeholder-gray-500 outline-none transition-all shadow-lg resize-none overflow-y-auto" style={{ minHeight: '52px', maxHeight: '150px' }} />
                    {(input.length > 0 || pendingScreenshot) && <button onClick={() => handleSend()} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors"><Send size={16} className="text-white"/></button>}
                 </div>
                 {isInputFocused && (
                    <div className="flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
                       <button onClick={handleUseScreen} className="control-btn hover:bg-white/15 py-2 px-3"><Monitor size={14} className="text-blue-400"/><span>Use Screen</span></button>
                       <button onClick={() => setIsSmartMode(!isSmartMode)} className={`control-btn py-2 px-3 ${isSmartMode ? 'active' : ''}`}><Zap size={14} className={isSmartMode ? 'fill-current' : ''}/><span>Smart</span></button>
-                      
-                      {/* MODE SELECTOR */}
-                      <div className="relative">
-                        <button onClick={() => setShowModeMenu(!showModeMenu)} className="control-btn hover:bg-white/15 py-2 px-3"><span>{mode}</span><ChevronDown size={12}/></button>
-                        {showModeMenu && (
-                            <div className="absolute bottom-full left-0 mb-2 w-32 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]">
-                                {['General', 'Developer', 'Student'].map((m) => (
-                                    <button 
-                                        key={m} 
-                                        onClick={() => handleModeSelect(m)} 
-                                        className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 ${mode === m ? 'text-blue-400 bg-white/5' : 'text-gray-300'}`}
-                                    >
-                                        {m}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                      </div>
-
-                      {/* NEW: UPDATE PROFILE BUTTON (Only visible in Student Mode) */}
-                      {mode === "Student" && (
-                          <button 
-                            onClick={() => setShowStudentModal(true)}
-                            className="control-btn hover:bg-white/15 py-2 px-3 text-blue-300"
-                            title="Update Profile / Resume"
-                          >
-                             <UserCog size={14} />
-                             <span>Update Profile</span>
-                          </button>
-                      )}
-
+                      <div className="relative"> <button onClick={() => setShowModeMenu(!showModeMenu)} className="control-btn hover:bg-white/15 py-2 px-3"><span>{mode}</span><ChevronDown size={12}/></button> {showModeMenu && ( <div className="absolute bottom-full left-0 mb-2 w-32 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"> {['General', 'Developer', 'Student'].map((m) => ( <button key={m} onClick={() => handleModeSelect(m)} className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 ${mode === m ? 'text-blue-400 bg-white/5' : 'text-gray-300'}`}> {m} </button> ))} </div> )} </div>
+                      {mode === "Student" && ( <button onClick={() => setShowStudentModal(true)} className="control-btn hover:bg-white/15 py-2 px-3 text-blue-300"> <UserCog size={14} /> <span>Update Profile</span> </button> )}
                    </div>
                 )}
              </div>
            )}
         </div>
       )}
-
-      <div 
-        onMouseDown={startResize}
-        className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-end justify-end p-1 interactive hover:bg-white/10 rounded-tl-lg z-[60]"
-      >
-        <Scaling size={14} className="text-gray-500" />
-      </div>
+      <div onMouseDown={startResize} className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-end justify-end p-1 interactive hover:bg-white/10 rounded-tl-lg z-[60]"> <Scaling size={14} className="text-gray-500" /> </div>
     </div>
   )
 }

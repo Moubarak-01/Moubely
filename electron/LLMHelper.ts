@@ -19,28 +19,31 @@ async function safePdfParse(buffer: Buffer) {
     return parser(buffer);
 }
 
-const GEMINI_STRATEGIES = [
-    'gemini-2.5-flash', 'gemma-2-27b-it', 'gemma-2-9b-it', 'gemini-2.5-flash-lite', 'gemma-2-2b-it'
-];
-
+// --- MODEL CONFIGURATIONS (User Requested Order) ---
 const CHAT_MODELS = [
-    ...GEMINI_STRATEGIES.map(model => ({ type: 'gemini', model: model, name: `Google ${model}` })),
+    // 1. Gemini (Primary)
+    { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
+    { type: 'gemini', model: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+    
+    // 2. DeepSeek (Logic Backup)
     { type: 'github', model: 'DeepSeek-R1', name: 'DeepSeek R1' },
-    { type: 'perplexity', model: 'llama-3.1-sonar-small-128k-online', name: 'Perplexity' },
+    
+    // 3. GPT-4o (Strong Backup)
     { type: 'github', model: 'gpt-4o', name: 'GPT-4o' },
+    
+    // 4. Perplexity (Research)
+    { type: 'perplexity', model: 'llama-3.1-sonar-small-128k-online', name: 'Perplexity' },
+    
+    // 5. Groq (Fast Fallback)
     { type: 'groq', model: 'llama-3.3-70b-versatile', name: 'Groq' }
 ];
 
+// Fallback list for Vision (Screenshots)
 const VISION_MODELS = [
-    { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-    { type: 'perplexity', model: 'r1-1776', name: 'Perplexity Vision' },
-    { type: 'github', model: 'gpt-4o', name: 'GPT-4o' },
-    { type: 'openai', model: 'gpt-4o', name: 'GPT-4o Vision' }
-];
-
-const AUDIO_MODELS = [
-    { type: 'groq', model: 'whisper-large-v3-turbo', name: 'Groq Whisper' },
-    { type: 'gemini', model: 'gemini-2.0-flash-001', name: 'Gemini Flash' }
+    { type: 'gemini', model: 'gemini-2.0-flash' },      // Best
+    { type: 'gemini', model: 'gemini-1.5-flash' },      // Backup
+    { type: 'github', model: 'gpt-4o' },                // Azure/GitHub backup
+    { type: 'openai', model: 'gpt-4o' }                 // Paid OpenAI backup
 ];
 
 export class LLMHelper {
@@ -56,10 +59,18 @@ export class LLMHelper {
   
   private readonly systemPrompt = `
   You are 'Moubely', an intelligent AI assistant.
+  
   CORE RULES:
   1. Use '###' Headers for main topics.
-  2. Use '$$' for block equations. Use '$' for inline math.
+  2. Use **bold** to highlight key variables or terms.
   3. Use provided "STUDENT CONTEXT" or "NOTION CONTEXT" silently. DO NOT mention the source name.
+  
+  MATH FORMULA RULES (STRICT):
+  - ALWAYS use '$$' for block equations (e.g. $$x^2$$).
+  - ALWAYS use '$' for inline math (e.g. $x$).
+  - NEVER use the bracket syntax like \\[ ... \\] or \\( ... \\).
+  - Your response MUST render correctly in a React Markdown component expecting '$' delimiters.
+  
   STRICT TITLE GENERATION RULE: If asking for a title, output ONLY the text.
   `;
 
@@ -117,7 +128,6 @@ export class LLMHelper {
       } catch { return { text: "[Read Error]", isPdf: false }; }
   }
 
-  // --- NOTION CONTEXT ---
   private async getNotionContext(): Promise<string> {
     if (!this.notionClient) return "";
     try {
@@ -169,6 +179,9 @@ export class LLMHelper {
 
       for (const config of CHAT_MODELS) {
           try {
+              // --- LOGGING ---
+              console.log(`[LLMHelper] 💬 Attempting Chat with: ${config.model} (${config.type})`);
+              
               let fullResponse = "";
               if (config.type === 'gemini') {
                   if (!this.genAI) continue;
@@ -185,6 +198,10 @@ export class LLMHelper {
                       fullResponse += text;
                       if (onToken) onToken(text); 
                   }
+                  
+                  // --- LOGGING ---
+                  console.log(`[LLMHelper] ✅ Chat Success using: ${config.model}`);
+                  
                   return fullResponse;
               } else {
                   let client: OpenAI | null = null;
@@ -205,6 +222,10 @@ export class LLMHelper {
                           if (content.includes('</think>')) { content = content.split('</think>')[1] || ""; }
                           if (content) { fullResponse += content; if (onToken) onToken(content); }
                       }
+                      
+                      // --- LOGGING ---
+                      console.log(`[LLMHelper] ✅ Chat Success using: ${config.model}`);
+                      
                       return fullResponse;
                   }
               }
@@ -213,77 +234,115 @@ export class LLMHelper {
       return "⚠️ All AI providers failed.";
   }
 
-  // --- AUDIO ANALYSIS (QUEUE + ENGLISH MODE) ---
+  // --- MULTI-MODEL IMAGE ANALYSIS (FALLBACK SYSTEM) ---
+  public async chatWithImage(message: string, imagePath: string): Promise<string> {
+      console.log(`[LLMHelper] 🖼️ Analyzing image: ${imagePath}`);
+      
+      const imageBuffer = await fs.promises.readFile(imagePath);
+      const base64Image = imageBuffer.toString("base64");
+      const mimeType = imagePath.endsWith(".png") ? "image/png" : "image/jpeg";
+      // Ensure specific math instruction for Vision too
+      const prompt = (message || "Describe this image in detail.") + "\n\nIMPORTANT: Use $$ for block math and $ for inline math. Do NOT use brackets.";
 
+      // Try each model in order. If one fails (Rate Limit 429), try the next.
+      for (const config of VISION_MODELS) {
+          try {
+              console.log(`[LLMHelper] 🔄 Trying Vision Model: ${config.model} (${config.type})`);
+
+              if (config.type === 'gemini') {
+                  if (!this.genAI) continue;
+                  const model = this.genAI.getGenerativeModel({ model: config.model });
+                  const result = await model.generateContent([
+                      prompt, 
+                      { inlineData: { data: base64Image, mimeType: mimeType } }
+                  ]);
+                  // --- LOGGING ---
+                  console.log(`[LLMHelper] ✅ Vision Success using: ${config.model}`);
+                  
+                  return result.response.text();
+              } 
+              else if (config.type === 'github' || config.type === 'openai') {
+                  const client = config.type === 'github' ? this.githubClient : this.openaiClient;
+                  if (!client) continue;
+                  
+                  const response = await client.chat.completions.create({
+                      model: config.model,
+                      messages: [
+                          { role: "user", content: [
+                              { type: "text", text: prompt },
+                              { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } }
+                          ]}
+                      ],
+                      max_tokens: 1000
+                  });
+                  const text = response.choices[0]?.message?.content;
+                  if (text) {
+                      // --- LOGGING ---
+                      console.log(`[LLMHelper] ✅ Vision Success using: ${config.model}`);
+                      return text;
+                  }
+              }
+          } catch (error: any) {
+              console.warn(`[LLMHelper] ⚠️ ${config.model} failed: ${error.message || 'Unknown error'}`);
+              // Continue to next model in loop...
+          }
+      }
+
+      return "❌ Error: All vision models failed or hit rate limits. Please try again later.";
+  }
+
+  // --- AUDIO ANALYSIS ---
   public async analyzeAudioFile(audioPath: string): Promise<{ text: string, timestamp: number }> {
-      console.log(`[LLMHelper] 📤 Sending to queue: ${audioPath}`);
+      // --- LOGGING ---
+      console.log(`[LLMHelper] 🎤 Analyzing Audio File: ${audioPath}`);
       
       try {
           const form = new FormData();
           form.append('file', fs.createReadStream(audioPath));
-
-          // Send to Server (Queue inside Server will handle the wait)
           const response = await axios.post('http://localhost:3000/v1/audio/transcriptions', form, {
-              headers: form.getHeaders(),
-              timeout: 60000, // 60s timeout: We allow waiting in queue!
-              httpAgent: httpAgent // USE KEEP-ALIVE AGENT
+              headers: form.getHeaders(), timeout: 60000, httpAgent: httpAgent
           });
-
           const text = response.data?.text?.trim();
-
           if (text) {
-              console.log(`[LLMHelper] ✅ Local Whisper Success: "${text}"`);
+              // --- LOGGING ---
+              console.log("[LLMHelper] ✅ Audio transcribed via LOCAL Whisper");
               return { text: text, timestamp: Date.now() };
-          } else {
-              console.log(`[LLMHelper] 🔇 Local Whisper heard silence.`);
-              return { text: "", timestamp: Date.now() };
           }
-
-      } catch (localError: any) {
-          console.warn(`[LLMHelper] ⚠️ Local Whisper failed: ${localError.message}`);
+      } catch (e) {
+          // --- LOGGING ---
+          console.log("[LLMHelper] ⚠️ Local Whisper failed/busy. Switching to Cloud...");
       }
-
-      // Fallback to Groq only if Local CRASHES hard (not just busy)
+      
+      // Fallback
       if (this.groqClient) {
-          console.log('[LLMHelper] 🔄 Switching to Groq Cloud API...');
           try {
               const transcription = await this.groqClient.audio.transcriptions.create({
                   file: fs.createReadStream(audioPath),
                   model: 'whisper-large-v3-turbo',
                   response_format: 'json',
-                  temperature: 0.0,
               });
-              const text = transcription.text.trim();
-              if (text) return { text: text, timestamp: Date.now() };
+              // --- LOGGING ---
+              console.log("[LLMHelper] ✅ Audio transcribed via GROQ Cloud");
+              
+              return { text: transcription.text.trim(), timestamp: Date.now() };
           } catch (e) { }
       }
-
       return { text: "", timestamp: Date.now() };
   }
 
   public async analyzeAudioFromBase64(base64Data: string, mimeType: string) {
       if (!base64Data || base64Data.length < 100) return { text: "", timestamp: Date.now() };
-      
       const tempPath = path.join(os.tmpdir(), `temp_audio_${Date.now()}.wav`);
-      
       try {
           const buffer = Buffer.from(base64Data, 'base64');
           await fs.promises.writeFile(tempPath, buffer);
-          
           const result = await this.analyzeAudioFile(tempPath);
-          
           try { fs.unlinkSync(tempPath); } catch (e) {}
-          
           return result;
-      } catch (error) {
-          console.error("Base64 Audio Error:", error);
-          try { fs.unlinkSync(tempPath); } catch (e) {}
-          return { text: "", timestamp: Date.now() };
-      }
+      } catch (error) { return { text: "", timestamp: Date.now() }; }
   }
 
-  // --- END AUDIO ANALYSIS ---
-
+  // --- STUBS & HELPERS ---
   public async generateSolution(problemInfo: any) {
       const solutionText = await this.chatWithGemini(`Solve:\n${JSON.stringify(problemInfo)}`, [], "Developer");
       try { return JSON.parse(solutionText.replace(/^```json/, '').replace(/```$/, '')); } catch { return { solution: { code: solutionText, explanation: "AI Generated" } }; }
@@ -295,11 +354,8 @@ export class LLMHelper {
   }
 
   public async testConnection() { return { success: true }; }
-
-  public async chatWithImage(message: string, imagePath: string): Promise<string> { return "Vision result"; }
   public async extractProblemFromImages(imagePaths: string[]) { return {}; }
   public async analyzeImageFile(imagePath: string) { return { text: "", timestamp: Date.now() }; }
-  
   public async readFileContext(filePath: string): Promise<string> { const { text } = await this.getFileContext(filePath); return text; }
   private async getStudentFiles(): Promise<string> { return ""; }
   private async callOllama(prompt: string): Promise<string> { return ""; }
