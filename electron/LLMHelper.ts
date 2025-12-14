@@ -19,16 +19,24 @@ async function safePdfParse(buffer: Buffer) {
     return parser(buffer);
 }
 
-// --- MODEL CONFIGURATIONS ---
+// --- MODEL CONFIGURATIONS (Updated Priority Order) ---
 const CHAT_MODELS = [
-    // 1. Gemini (Primary)
-    { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
-    { type: 'gemini', model: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+    // 1. Gemini / Gemma (Primary Google Loop)
+    { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+    { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Lite' },
+    { type: 'gemini', model: 'gemma-3-27b', name: 'Gemma 3 27B' },
+    { type: 'gemini', model: 'gemma-3-12b', name: 'Gemma 3 12B' },
+    { type: 'gemini', model: 'gemini-robotics-er-1.5-preview', name: 'Gemini Robotics' },
+    { type: 'gemini', model: 'gemma-3-4b', name: 'Gemma 3 4B' },
+    { type: 'gemini', model: 'gemma-3-2b', name: 'Gemma 3 2B' },
+    { type: 'gemini', model: 'gemma-3-1b', name: 'Gemma 3 1B' },
+    { type: 'gemini', model: 'gemini-2.5-flash-tts', name: 'Gemini 2.5 TTS' },
+    { type: 'gemini', model: 'gemini-2.5-flash-native-audio-dialog', name: 'Gemini 2.5 Audio' },
     
-    // 2. DeepSeek (Logic Backup)
+    // 2. DeepSeek (Logic Backup via GitHub)
     { type: 'github', model: 'DeepSeek-R1', name: 'DeepSeek R1' },
     
-    // 3. GPT-4o (Strong Backup)
+    // 3. GPT-4o (Strong Backup via GitHub)
     { type: 'github', model: 'gpt-4o', name: 'GPT-4o' },
     
     // 4. Perplexity (Research)
@@ -38,14 +46,15 @@ const CHAT_MODELS = [
     { type: 'groq', model: 'llama-3.3-70b-versatile', name: 'Groq' }
 ];
 
-// UPDATED: Vision Fallback Order with CORRECT Perplexity Models
+// UPDATED: Vision Fallback Order
 const VISION_MODELS = [
     // 1. Gemini (Primary) - Best Native Vision
-    { type: 'gemini', model: 'gemini-2.0-flash' },      
-    { type: 'gemini', model: 'gemini-1.5-flash' },      
+    { type: 'gemini', model: 'gemini-2.5-flash' },      
+    { type: 'gemini', model: 'gemini-2.5-flash-lite' },
+    { type: 'gemini', model: 'gemini-robotics-er-1.5-preview' },
+    { type: 'gemini', model: 'gemini-2.0-flash' }, // Old reliable backup
 
     // 2. Perplexity (Secondary) - Automatic retry list
-    // If 'reasoning-pro' fails, it immediately tries 'reasoning', then 'pro', etc.
     { type: 'perplexity', model: 'sonar-reasoning-pro' },
     { type: 'perplexity', model: 'sonar-reasoning' },
     { type: 'perplexity', model: 'sonar-pro' },
@@ -204,6 +213,7 @@ export class LLMHelper {
               let fullResponse = "";
               if (config.type === 'gemini') {
                   if (!this.genAI) continue;
+                  // Gemma models are text-only; Gemini models are multimodal
                   const isTextOnly = config.model.includes('gemma');
                   const geminiModel = this.genAI.getGenerativeModel({ model: config.model });
                   const chat = geminiModel.startChat({ history: validHistory });
