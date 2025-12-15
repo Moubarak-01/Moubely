@@ -16,24 +16,20 @@ export class WindowHelper {
     this.appState = appState
   }
 
-  // --- RESIZE LOGIC ---
   public setWindowDimensions(width: number, height: number): void {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return
-
     const [currentX, currentY] = this.mainWindow.getPosition()
     const primaryDisplay = screen.getPrimaryDisplay()
     const workArea = primaryDisplay.workAreaSize
     const maxAllowedWidth = workArea.width
     const newWidth = Math.max(150, Math.min(Math.round(width), maxAllowedWidth))
     const newHeight = Math.max(50, Math.round(height))
-
     this.mainWindow.setSize(newWidth, newHeight)
     this.mainWindow.setPosition(currentX, currentY)
   }
 
   public createWindow(): void {
     if (this.mainWindow !== null) return
-
     const windowSettings: Electron.BrowserWindowConstructorOptions = {
       width: 450,
       height: 600,
@@ -54,21 +50,16 @@ export class WindowHelper {
       resizable: true,
       movable: true,
     }
-
     this.mainWindow = new BrowserWindow(windowSettings)
-    this.mainWindow.setContentProtection(true) // Default
-
+    this.mainWindow.setContentProtection(true) // Default stealth
     if (process.platform === "darwin") {
       this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
       this.mainWindow.setHiddenInMissionControl(true)
       this.mainWindow.setAlwaysOnTop(true, "floating")
     }
-    
     this.mainWindow.setSkipTaskbar(true)
     this.mainWindow.setAlwaysOnTop(true)
-
     this.mainWindow.loadURL(startUrl).catch(console.error)
-
     this.mainWindow.once('ready-to-show', () => {
       if (this.mainWindow) {
         this.centerWindow()
@@ -76,16 +67,12 @@ export class WindowHelper {
         this.mainWindow.focus()
       }
     })
-
-    this.mainWindow.on("closed", () => {
-      this.mainWindow = null
-    })
+    this.mainWindow.on("closed", () => { this.mainWindow = null })
   }
 
-  // --- STEALTH LOGIC ---
+  // --- STEALTH TOGGLE LOGIC ---
   public setStealthMode(enabled: boolean): void {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return
-    // true = hidden from screenshots
     this.mainWindow.setContentProtection(enabled)
     if (process.platform === "darwin") {
       this.mainWindow.setHiddenInMissionControl(enabled)
@@ -97,38 +84,20 @@ export class WindowHelper {
     const primaryDisplay = screen.getPrimaryDisplay()
     const workArea = primaryDisplay.workAreaSize
     const bounds = this.mainWindow.getBounds()
-    
     const centerX = Math.floor((workArea.width - bounds.width) / 2)
     const centerY = Math.floor((workArea.height - bounds.height) / 2)
-    
     this.mainWindow.setBounds({ x: centerX, y: centerY, width: bounds.width, height: bounds.height })
   }
 
   public getMainWindow() { return this.mainWindow }
   public isVisible() { return this.mainWindow?.isVisible() ?? false }
-  
   public hideMainWindow() { this.mainWindow?.hide() }
   public showMainWindow() { this.mainWindow?.showInactive() }
-  
-  public toggleMainWindow() {
-    if (this.isVisible()) this.hideMainWindow()
-    else this.showMainWindow()
-  }
-
-  public centerAndShowWindow() {
-    this.centerWindow()
-    this.mainWindow?.show()
-    this.mainWindow?.focus()
-  }
-
+  public toggleMainWindow() { if (this.isVisible()) this.hideMainWindow(); else this.showMainWindow(); }
+  public centerAndShowWindow() { this.centerWindow(); this.mainWindow?.show(); this.mainWindow?.focus(); }
   public moveWindowRight() { this.moveWindow(20, 0) }
   public moveWindowLeft() { this.moveWindow(-20, 0) }
   public moveWindowDown() { this.moveWindow(0, 20) }
   public moveWindowUp() { this.moveWindow(0, -20) }
-
-  private moveWindow(dx: number, dy: number) {
-    if (!this.mainWindow) return
-    const pos = this.mainWindow.getPosition()
-    this.mainWindow.setPosition(pos[0] + dx, pos[1] + dy)
-  }
+  private moveWindow(dx: number, dy: number) { if (!this.mainWindow) return; const pos = this.mainWindow.getPosition(); this.mainWindow.setPosition(pos[0] + dx, pos[1] + dy); }
 }

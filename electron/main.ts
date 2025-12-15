@@ -18,7 +18,9 @@ export class AppState {
   private tray: Tray | null = null
 
   private view: "queue" | "solutions" = "queue"
-  private isStealthMode: boolean = true // Stealth State
+  
+  // NEW: Stealth State (Default True)
+  private isStealthMode: boolean = true
 
   private problemInfo: any = null
   private hasDebugged: boolean = false
@@ -66,6 +68,7 @@ export class AppState {
 
   public createWindow(): void {
     this.windowHelper.createWindow()
+    // Apply current stealth state
     this.windowHelper.setStealthMode(this.isStealthMode)
   }
 
@@ -144,9 +147,7 @@ async function initializeApp() {
   initializeIpcHandlers(appState)
   
   app.whenReady().then(() => {
-    // --- THIS LOG WILL NOW APPEAR ---
     console.log("App is ready")
-    
     appState.createWindow()
     appState.createTray()
     appState.shortcutsHelper.registerGlobalShortcuts()

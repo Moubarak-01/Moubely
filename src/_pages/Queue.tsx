@@ -25,6 +25,7 @@ interface Message {
   screenshotPath?: string
   screenshotPreview?: string
   timestamp: number
+  isStreaming?: boolean // <--- FIXED: Added this property
 }
 
 interface TranscriptItem {
@@ -321,6 +322,23 @@ const Queue: React.FC<any> = ({ setView }) => {
         try { setPastMeetings(JSON.parse(saved)) } catch(e) {}
     }
 
+    // --- FIXED: ADDED STREAMING LISTENER ---
+    let cleanupStream = () => {};
+    if (window.electronAPI && window.electronAPI.onTokenReceived) {
+        cleanupStream = window.electronAPI.onTokenReceived((token) => {
+            setMessages(prev => {
+                const lastMsg = prev[prev.length - 1];
+                // Only append if last message is AI and actively streaming
+                if (lastMsg && lastMsg.role === 'ai' && lastMsg.isStreaming) {
+                    return [...prev.slice(0, -1), { ...lastMsg, text: lastMsg.text + token }];
+                }
+                return prev;
+            });
+            setIsThinking(false);
+            isAtBottomRef.current = true;
+        });
+    }
+
     const cleanupFunctions = [
         window.electronAPI.onResetView(() => {
             resetChat();
@@ -339,7 +357,10 @@ const Queue: React.FC<any> = ({ setView }) => {
             setIsInputFocused(true);
         })
     ];
-    return () => cleanupFunctions.forEach(fn => fn());
+    return () => { 
+        cleanupFunctions.forEach(fn => fn());
+        cleanupStream(); // Clean up streaming listener
+    };
   }, [])
 
   const resetChat = () => {
@@ -577,20 +598,35 @@ const Queue: React.FC<any> = ({ setView }) => {
   const loadMeeting = (m: MeetingSession) => { setTranscriptLogs(m.transcript); setEmailDraft(m.emailDraft); setShowPostMeeting(true); setActiveTab("Transcript"); setMessages([{id: Date.now().toString(), role: "ai", text: `Loaded meeting: ${new Date(m.date).toLocaleString()}`, timestamp: Date.now()}]); }
   const deleteMeeting = (id: string, e: React.MouseEvent) => { e.stopPropagation(); const u = pastMeetings.filter(m => m.id !== id); setPastMeetings(u); localStorage.setItem('moubely_meetings', JSON.stringify(u)); }
 
+  // --- FIXED: STREAMING ENABLED HANDLE SEND ---
   const handleSend = async (overrideText?: string) => {
     const textToSend = overrideText || input
     if (!textToSend.trim() && !pendingScreenshot) return
 
     const currentScreenshot = pendingScreenshot
-    setMessages(prev => [...prev, { 
-        id: Date.now().toString(), 
-        role: "user", 
-        text: textToSend || (currentScreenshot ? "Analyze this screen" : ""), 
-        screenshotPath: currentScreenshot?.path,
-        screenshotPreview: currentScreenshot?.preview, 
-        timestamp: Date.now() 
-    }])
-    
+    const aiMsgId = (Date.now() + 1).toString();
+
+    // 1. Add User Message and empty AI placeholder immediately
+    const newMessages: Message[] = [
+        ...messages,
+        { 
+            id: Date.now().toString(), 
+            role: "user", 
+            text: textToSend || (currentScreenshot ? "Analyze this screen" : ""), 
+            screenshotPath: currentScreenshot?.path,
+            screenshotPreview: currentScreenshot?.preview, 
+            timestamp: Date.now() 
+        },
+        { 
+            id: aiMsgId, 
+            role: "ai", 
+            text: "", 
+            timestamp: Date.now(),
+            isStreaming: true // Mark as streaming for the listener
+        }
+    ];
+
+    setMessages(newMessages)
     setInput("")
     setPendingScreenshot(null)
     setIsThinking(true)
@@ -607,25 +643,31 @@ const Queue: React.FC<any> = ({ setView }) => {
     const finalPrompt = preparePayload(textToSend, contextData);
 
     try {
-      let response = ""
-      const history = messages.map(m => ({ role: m.role, text: m.text }));
+      let fullResponse = "";
       
       const args = {
           message: finalPrompt,
           mode: mode,
-          history: history 
+          history: messages.map(m => ({ role: m.role, text: m.text })) 
       };
 
       if (currentScreenshot) {
-         response = await window.electronAPI.chatWithImage(finalPrompt, currentScreenshot.path)
+         // Vision calls don't stream yet, so we await full result
+         fullResponse = await window.electronAPI.chatWithImage(finalPrompt, currentScreenshot.path)
       } else {
-         response = await window.electronAPI.invoke("gemini-chat", args)
+         // Chat streams via listener, but we await the promise to ensure completion
+         fullResponse = await window.electronAPI.invoke("gemini-chat", args)
       }
       
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "ai", text: response, timestamp: Date.now() }])
+      // Finalize the message (ensure streaming flag is off and text matches final result)
+      setMessages(prev => prev.map(m => 
+          m.id === aiMsgId ? { ...m, text: fullResponse, isStreaming: false } : m
+      ));
 
     } catch (error: any) {
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "Error: " + error.message, timestamp: Date.now() }])
+      setMessages(prev => prev.map(m => 
+          m.id === aiMsgId ? { ...m, text: "Error: " + error.message, isStreaming: false } : m
+      ));
     } finally { 
       setIsThinking(false) 
     }
@@ -654,13 +696,21 @@ const Queue: React.FC<any> = ({ setView }) => {
       case "Recap": userDisplayMessage = "Recap."; systemPrompt = `Based on: "${transcriptText}". Summarize.`; break;
     }
     
-    setMessages(prev => [...prev, { id: Date.now().toString(), role: "user", text: userDisplayMessage, timestamp: Date.now() }]);
+    // Add user message + placeholder
+    const aiMsgId = (Date.now() + 1).toString();
+    const newMessages: Message[] = [
+        ...messages,
+        { id: Date.now().toString(), role: "user", text: userDisplayMessage, timestamp: Date.now() },
+        { id: aiMsgId, role: "ai", text: "", timestamp: Date.now(), isStreaming: true }
+    ];
+    setMessages(newMessages);
+
     const history = messages.map(m => ({ role: m.role, text: m.text }));
     const args = { message: systemPrompt, mode: mode, history: history };
 
     try {
         const response = await window.electronAPI.invoke("gemini-chat", args)
-        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "ai", text: response, timestamp: Date.now() }])
+        setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m));
     } catch (e: any) { console.error(e) } finally { setIsThinking(false) }
   }
 
@@ -678,7 +728,6 @@ const Queue: React.FC<any> = ({ setView }) => {
              <button onClick={handleStartSession} className={`status-pill interactive hover:scale-105 transition-all no-drag ${isRecording ? 'bg-blue-600' : 'bg-white/10 hover:bg-white/20'}`}>
                 {!isRecording ? <><Play size={12} fill="currentColor" /><span>Start Moubely</span></> : <><span>Session in progress</span><div className="w-2 h-2 bg-green-400 rounded-full animate-pulse ml-1"/></>}
              </button>
-             {/* REMOVED EXTRA BUTTON HERE */}
           </div>
         )}
         <div className="compact-bar interactive no-drag">
@@ -691,7 +740,7 @@ const Queue: React.FC<any> = ({ setView }) => {
             </div>
             <div className="flex-1 flex justify-center"><div className="draggable cursor-grab active:cursor-grabbing p-2 rounded hover:bg-white/5 group"><GripHorizontal size={20} className="text-gray-600 group-hover:text-gray-400"/></div></div>
             <div className="flex items-center gap-2">
-               {/* KEPT THIS BUTTON */}
+               {/* STEALTH TOGGLE */}
                <button 
                  onClick={handleToggleStealth} 
                  className={`icon-btn ${isStealth ? 'text-gray-500 hover:text-white' : 'text-yellow-500 hover:text-yellow-400'}`}
@@ -748,7 +797,12 @@ const Queue: React.FC<any> = ({ setView }) => {
                         {msg.role === "ai" && <div className="ai-message max-w-[95%]"><MessageContent text={msg.text} /></div>}
                       </div>
                     ))}
-                    {isThinking && <div className="flex items-center gap-3 text-sm text-gray-400 pl-1"><Loader2 size={16} className="animate-spin text-blue-400"/><span className="animate-pulse">{thinkingStep}</span></div>}
+                    {isThinking && messages[messages.length - 1]?.role !== 'ai' && (
+                        <div className="flex items-center gap-3 text-sm text-gray-400 pl-1">
+                            <Loader2 size={16} className="animate-spin text-blue-400"/>
+                            <span className="animate-pulse">{thinkingStep}</span>
+                        </div>
+                    )}
                     <div ref={chatEndRef}/>
                   </div>
                 </div>

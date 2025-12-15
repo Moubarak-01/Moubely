@@ -1,12 +1,11 @@
 import { ipcMain, app, BrowserWindow } from "electron"
-import type { AppState } from "./main" // <--- FIXED: Added 'type' to prevent circular dependency crash
+import type { AppState } from "./main" 
 import fs from "fs"
 import path from "path"
 
 type ChatPayload = string | { message: string; mode?: string; history?: any[] };
 
 export function initializeIpcHandlers(appState: AppState): void {
-  // Window Resizing
   ipcMain.handle("set-window-size", async (event, { width, height }) => {
       const win = BrowserWindow.fromWebContents(event.sender)
       if (win) win.setSize(Math.round(width), Math.round(height))
@@ -16,7 +15,6 @@ export function initializeIpcHandlers(appState: AppState): void {
       if (width && height) appState.setWindowDimensions(width, height)
   })
 
-  // Screenshot Logic
   ipcMain.handle("delete-screenshot", async (event, path: string) => appState.deleteScreenshot(path))
 
   ipcMain.handle("take-screenshot", async () => {
@@ -36,7 +34,6 @@ export function initializeIpcHandlers(appState: AppState): void {
     } catch (error) { throw error }
   })
 
-  // Window Controls
   ipcMain.handle("toggle-window", async () => appState.toggleMainWindow())
 
   ipcMain.handle("reset-queues", async () => {
@@ -53,7 +50,7 @@ export function initializeIpcHandlers(appState: AppState): void {
     return appState.getIsStealthMode();
   });
 
-  // AI & Processing
+  // Processing
   ipcMain.handle("analyze-audio-base64", async (event, data, mimeType) => {
       return await appState.processingHelper.processAudioBase64(data, mimeType)
   })
@@ -66,20 +63,33 @@ export function initializeIpcHandlers(appState: AppState): void {
       return await appState.processingHelper.getLLMHelper().analyzeImageFile(path)
   })
 
+  // --- STREAMING CHAT ---
   ipcMain.handle("gemini-chat", async (event, payload: ChatPayload) => {
       let prompt = typeof payload === 'string' ? payload : payload.message;
       let mode = typeof payload === 'string' ? "General" : (payload.mode || "General");
       let history = typeof payload === 'string' ? [] : (payload.history || []);
-      return await appState.processingHelper.getLLMHelper().chatWithGemini(prompt, history, mode);
+
+      const onToken = (token: string) => {
+          if (!event.sender.isDestroyed()) {
+              event.sender.send('llm-token', token);
+          }
+      };
+
+      return await appState.processingHelper.getLLMHelper().chatWithGemini(prompt, history, mode, "", onToken);
   });
 
+  // --- NEW: STREAMING IMAGE CHAT ---
   ipcMain.handle("chat-with-image", async (event, { message, imagePath }) => {
-      return await appState.processingHelper.getLLMHelper().chatWithImage(message, imagePath)
+      const onToken = (token: string) => {
+          if (!event.sender.isDestroyed()) {
+              event.sender.send('llm-token', token);
+          }
+      };
+      
+      return await appState.processingHelper.getLLMHelper().chatWithImage(message, imagePath, onToken)
   })
 
-  // App Lifecycle & Mouse
   ipcMain.handle("quit-app", () => app.quit())
-
   ipcMain.handle("move-window-left", async () => appState.moveWindowLeft())
   ipcMain.handle("move-window-right", async () => appState.moveWindowRight())
   ipcMain.handle("move-window-up", async () => appState.moveWindowUp())
@@ -91,7 +101,6 @@ export function initializeIpcHandlers(appState: AppState): void {
     if (win) win.setIgnoreMouseEvents(ignore, options)
   })
 
-  // LLM Settings
   ipcMain.handle("get-current-llm-config", async () => {
       const llm = appState.processingHelper.getLLMHelper();
       return { provider: llm.getCurrentProvider(), model: llm.getCurrentModel(), isOllama: llm.isUsingOllama() };
@@ -115,7 +124,6 @@ export function initializeIpcHandlers(appState: AppState): void {
       return await appState.processingHelper.getLLMHelper().testConnection();
   });
 
-  // Student Mode
   ipcMain.handle("check-profile-exists", async () => {
     const saveDir = path.join(app.getPath("userData"), "student_profile");
     try { return fs.existsSync(saveDir) && fs.readdirSync(saveDir).length > 0; } catch { return false; }
