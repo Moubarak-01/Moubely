@@ -262,6 +262,11 @@ const Queue: React.FC<any> = ({ setView }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [isThinking, setIsThinking] = useState(false)
   const [thinkingStep, setThinkingStep] = useState("")
+  
+  // --- NEW: Slow Loader State & Timer Ref ---
+  const [showSlowLoader, setShowSlowLoader] = useState(false)
+  const loadingTimerRef = useRef<any>(null)
+
   const [pendingScreenshot, setPendingScreenshot] = useState<{path: string, preview: string} | null>(null)
   
   const [mode, setMode] = useState("General")
@@ -322,14 +327,16 @@ const Queue: React.FC<any> = ({ setView }) => {
         try { setPastMeetings(JSON.parse(saved)) } catch(e) {}
     }
 
-    // --- NEW: STREAMING LISTENER ---
-    // Check API existence to be safe
+    // --- NEW: STREAMING LISTENER WITH TIMER CANCELLATION ---
     let cleanupStream = () => {};
     if (window.electronAPI && window.electronAPI.onTokenReceived) {
         cleanupStream = window.electronAPI.onTokenReceived((token) => {
+            // 1. First word arrived! Kill timer immediately.
+            if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+            setShowSlowLoader(false);
+
             setMessages(prev => {
                 const lastMsg = prev[prev.length - 1];
-                // Only append if last message is AI and actively streaming
                 if (lastMsg && lastMsg.role === 'ai' && lastMsg.isStreaming) {
                     return [...prev.slice(0, -1), { ...lastMsg, text: lastMsg.text + token }];
                 }
@@ -360,7 +367,8 @@ const Queue: React.FC<any> = ({ setView }) => {
     ];
     return () => { 
         cleanupFunctions.forEach(fn => fn());
-        cleanupStream(); // Clean up streaming listener
+        cleanupStream(); 
+        if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
     };
   }, [])
 
@@ -599,7 +607,7 @@ const Queue: React.FC<any> = ({ setView }) => {
   const loadMeeting = (m: MeetingSession) => { setTranscriptLogs(m.transcript); setEmailDraft(m.emailDraft); setShowPostMeeting(true); setActiveTab("Transcript"); setMessages([{id: Date.now().toString(), role: "ai", text: `Loaded meeting: ${new Date(m.date).toLocaleString()}`, timestamp: Date.now()}]); }
   const deleteMeeting = (id: string, e: React.MouseEvent) => { e.stopPropagation(); const u = pastMeetings.filter(m => m.id !== id); setPastMeetings(u); localStorage.setItem('moubely_meetings', JSON.stringify(u)); }
 
-  // --- HANDLE SEND (Streaming Enabled) ---
+  // --- HANDLE SEND (Streaming Enabled + 2s Timer) ---
   const handleSend = async (overrideText?: string) => {
     const textToSend = overrideText || input
     if (!textToSend.trim() && !pendingScreenshot) return
@@ -607,7 +615,7 @@ const Queue: React.FC<any> = ({ setView }) => {
     const currentScreenshot = pendingScreenshot
     const aiMsgId = (Date.now() + 1).toString();
 
-    // 1. Add User Message and empty AI placeholder immediately
+    // 1. Add User Message and empty AI placeholder
     const newMessages: Message[] = [
         ...messages,
         { 
@@ -623,7 +631,7 @@ const Queue: React.FC<any> = ({ setView }) => {
             role: "ai", 
             text: "", 
             timestamp: Date.now(),
-            isStreaming: true // Mark as streaming
+            isStreaming: true 
         }
     ];
 
@@ -633,6 +641,13 @@ const Queue: React.FC<any> = ({ setView }) => {
     setIsThinking(true)
     setThinkingStep(currentScreenshot ? "Vision processing..." : "Thinking...")
     isAtBottomRef.current = true;
+
+    // --- NEW: Start 2s Timer ---
+    setShowSlowLoader(false);
+    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+    loadingTimerRef.current = setTimeout(() => {
+        setShowSlowLoader(true);
+    }, 2000); 
 
     const contextData = {
         isInMeeting: isRecording || showPostMeeting,
@@ -653,14 +668,14 @@ const Queue: React.FC<any> = ({ setView }) => {
       };
 
       if (currentScreenshot) {
-         // Vision streams now too!
+         // Vision streams
          fullResponse = await window.electronAPI.chatWithImage(finalPrompt, currentScreenshot.path)
       } else {
-         // Chat streams via listener
+         // Chat streams
          fullResponse = await window.electronAPI.invoke("gemini-chat", args)
       }
       
-      // Finalize the message
+      // Finalize
       setMessages(prev => prev.map(m => 
           m.id === aiMsgId ? { ...m, text: fullResponse, isStreaming: false } : m
       ));
@@ -670,11 +685,14 @@ const Queue: React.FC<any> = ({ setView }) => {
           m.id === aiMsgId ? { ...m, text: "Error: " + error.message, isStreaming: false } : m
       ));
     } finally { 
-      setIsThinking(false) 
+      // CLEANUP TIMER
+      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+      setShowSlowLoader(false);
+      setIsThinking(false);
     }
   }
 
-  // --- TRIGGER ASSIST ACTION (Streaming Enabled) ---
+  // --- TRIGGER ASSIST ACTION (Streaming + 2s Timer) ---
   const triggerAssistAction = async (actionType: "Assist" | "WhatToSay" | "FollowUp" | "Recap") => {
     let transcriptText = transcriptLogs.map(t => t.text).join(" ");
     if (!transcriptText.trim() && messages.length > 0) {
@@ -686,8 +704,16 @@ const Queue: React.FC<any> = ({ setView }) => {
     }
     setActiveTab("Chat")
     setIsThinking(true)
+    setThinkingStep("Thinking...");
     isAtBottomRef.current = true;
     
+    // --- NEW: Start 2s Timer ---
+    setShowSlowLoader(false);
+    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+    loadingTimerRef.current = setTimeout(() => {
+        setShowSlowLoader(true);
+    }, 2000);
+
     let userDisplayMessage = "";
     let systemPrompt = "";
     
@@ -698,7 +724,6 @@ const Queue: React.FC<any> = ({ setView }) => {
       case "Recap": userDisplayMessage = "Recap."; systemPrompt = `Based on: "${transcriptText}". Summarize.`; break;
     }
     
-    // Add user message + placeholder immediately
     const aiMsgId = (Date.now() + 1).toString();
     const newMessages: Message[] = [
         ...messages,
@@ -711,10 +736,14 @@ const Queue: React.FC<any> = ({ setView }) => {
     const args = { message: systemPrompt, mode: mode, history: history };
 
     try {
-        // Stream text
         const response = await window.electronAPI.invoke("gemini-chat", args)
         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m));
-    } catch (e: any) { console.error(e) } finally { setIsThinking(false) }
+    } catch (e: any) { console.error(e) } 
+    finally { 
+        if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+        setShowSlowLoader(false);
+        setIsThinking(false);
+    }
   }
 
   const handleInputFocus = () => { 
@@ -804,7 +833,8 @@ const Queue: React.FC<any> = ({ setView }) => {
                         )}
                       </div>
                     ))}
-                    {isThinking && messages[messages.length - 1]?.role !== 'ai' && (
+                    {/* UPDATED CONDITION: Only show if showSlowLoader is true */}
+                    {showSlowLoader && (
                         <div className="flex items-center gap-3 text-sm text-gray-400 pl-1">
                             <Loader2 size={16} className="animate-spin text-blue-400"/>
                             <span className="animate-pulse">{thinkingStep}</span>
