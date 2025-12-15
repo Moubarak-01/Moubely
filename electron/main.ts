@@ -38,10 +38,14 @@ export class AppState {
   } as const
 
   constructor() {
-    this.windowHelper = new WindowHelper(this)
+    if (AppState.instance) return AppState.instance
+
     this.screenshotHelper = new ScreenshotHelper(this.view)
     this.processingHelper = new ProcessingHelper(this)
+    this.windowHelper = new WindowHelper(this)
     this.shortcutsHelper = new ShortcutsHelper(this)
+
+    AppState.instance = this
   }
 
   public static getInstance(): AppState {
@@ -51,77 +55,43 @@ export class AppState {
     return AppState.instance
   }
 
-  public getMainWindow(): BrowserWindow | null { return this.windowHelper.getMainWindow() }
-  public getView(): "queue" | "solutions" { return this.view }
-
-  public setView(view: "queue" | "solutions"): void {
-    this.view = view
-    this.screenshotHelper.setView(view)
+  public getIsStealthMode(): boolean {
+      return this.isStealthMode
   }
 
-  public isVisible(): boolean { return this.windowHelper.isVisible() }
-  public getScreenshotHelper(): ScreenshotHelper { return this.screenshotHelper }
-  public getProblemInfo(): any { return this.problemInfo }
-  public setProblemInfo(problemInfo: any): void { this.problemInfo = problemInfo }
-  public getScreenshotQueue(): string[] { return this.screenshotHelper.getScreenshotQueue() }
-  public getExtraScreenshotQueue(): string[] { return this.screenshotHelper.getExtraScreenshotQueue() }
-
-  public createWindow(): void {
-    this.windowHelper.createWindow()
-    // Apply current stealth state
-    this.windowHelper.setStealthMode(this.isStealthMode)
-  }
-
-  // Toggle Stealth
   public toggleStealthMode(): boolean {
     this.isStealthMode = !this.isStealthMode
     this.windowHelper.setStealthMode(this.isStealthMode)
     return this.isStealthMode
   }
-  
-  public getIsStealthMode(): boolean { return this.isStealthMode }
 
-  public hideMainWindow(): void { this.windowHelper.hideMainWindow() }
-  public showMainWindow(): void { this.windowHelper.showMainWindow() }
-  
-  public toggleMainWindow(): void {
-    console.log("Screenshots: ", this.screenshotHelper.getScreenshotQueue().length)
-    this.windowHelper.toggleMainWindow()
-  }
+  public getMainWindow() { return this.windowHelper.getMainWindow() }
+  public createWindow() { this.windowHelper.createWindow() }
+  public toggleMainWindow() { this.windowHelper.toggleMainWindow() }
+  public centerAndShowWindow() { this.windowHelper.centerAndShowWindow() }
+  public setWindowDimensions(width: number, height: number) { this.windowHelper.setWindowDimensions(width, height) }
+  public deleteScreenshot(path: string) { return this.screenshotHelper.deleteScreenshot(path) }
+  public takeScreenshot() { return this.screenshotHelper.takeScreenshot(this.windowHelper.hideMainWindow.bind(this.windowHelper), this.windowHelper.showMainWindow.bind(this.windowHelper)) }
+  public getImagePreview(path: string) { return this.screenshotHelper.getImagePreview(path) }
+  public getScreenshotQueue() { return this.screenshotHelper.getScreenshotQueue() }
+  public getExtraScreenshotQueue() { return this.screenshotHelper.getExtraScreenshotQueue() }
+  public clearQueues() { this.screenshotHelper.clearQueues() }
+  public getView() { return this.view }
+  public setView(view: "queue" | "solutions") { this.view = view; this.screenshotHelper.setView(view); }
+  public setProblemInfo(info: any) { this.problemInfo = info }
+  public getProblemInfo() { return this.problemInfo }
 
-  public setWindowDimensions(width: number, height: number): void {
-    this.windowHelper.setWindowDimensions(width, height)
-  }
+  // --- FIX: Add methods for Window Movement (Used by ipcHandlers and shortcuts) ---
+  public moveWindowLeft() { return this.windowHelper.moveWindowLeft() }
+  public moveWindowRight() { return this.windowHelper.moveWindowRight() }
+  public moveWindowUp() { return this.windowHelper.moveWindowUp() }
+  public moveWindowDown() { return this.windowHelper.moveWindowDown() }
 
-  public clearQueues(): void {
-    this.screenshotHelper.clearQueues()
-    this.problemInfo = null
-    this.setView("queue")
-  }
+  // --- FIX: Add getter for ScreenshotHelper (Used by ProcessingHelper) ---
+  public getScreenshotHelper() { return this.screenshotHelper }
 
-  public async takeScreenshot(): Promise<string> {
-    if (!this.getMainWindow()) throw new Error("No main window available")
-    return await this.screenshotHelper.takeScreenshot(
-      () => this.hideMainWindow(),
-      () => this.showMainWindow()
-    )
-  }
-
-  public async getImagePreview(filepath: string): Promise<string> {
-    return this.screenshotHelper.getImagePreview(filepath)
-  }
-
-  public async deleteScreenshot(path: string): Promise<{ success: boolean; error?: string }> {
-    return this.screenshotHelper.deleteScreenshot(path)
-  }
-
-  public moveWindowLeft(): void { this.windowHelper.moveWindowLeft() }
-  public moveWindowRight(): void { this.windowHelper.moveWindowRight() }
-  public moveWindowDown(): void { this.windowHelper.moveWindowDown() }
-  public moveWindowUp(): void { this.windowHelper.moveWindowUp() }
-  public centerAndShowWindow(): void { this.windowHelper.centerAndShowWindow() }
-
-  public createTray(): void {
+  public createTray() {
+    if (this.tray !== null) return
     const image = nativeImage.createEmpty()
     let trayImage = image
     try { trayImage = nativeImage.createFromBuffer(Buffer.alloc(0)) } catch (e) {}
@@ -153,10 +123,13 @@ async function initializeApp() {
     appState.shortcutsHelper.registerGlobalShortcuts()
   })
   
-  app.on("activate", () => { if (appState.getMainWindow() === null) appState.createWindow() })
-  app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit() })
-  app.dock?.hide() 
-  app.commandLine.appendSwitch("disable-background-timer-throttling")
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) appState.createWindow()
+  })
+  
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") app.quit()
+  })
 }
 
-initializeApp().catch(console.error)
+initializeApp();

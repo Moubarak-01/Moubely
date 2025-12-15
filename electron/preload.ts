@@ -1,13 +1,21 @@
 import { contextBridge, ipcRenderer } from "electron"
 
+interface ScreenshotActionData {
+    action: "take-and-send" | "take-and-queue";
+}
+
 interface ElectronAPI {
   updateContentDimensions: (dimensions: { width: number; height: number }) => Promise<void>
   setWindowSize: (dimensions: { width: number, height: number }) => Promise<void>
+  
+  // FIX: Added new screenshot action listener
+  onScreenshotAction: (callback: (data: ScreenshotActionData) => void) => () => void
 
   getScreenshots: () => Promise<Array<{ path: string; preview: string }>>
   deleteScreenshot: (path: string) => Promise<{ success: boolean; error?: string }>
   
-  onScreenshotTaken: (callback: (data: { path: string; preview: string }) => void) => () => void
+  // onScreenshotTaken is now obsolete/replaced by onScreenshotAction
+
   onSolutionsReady: (callback: (solutions: string) => void) => () => void
   onResetView: (callback: () => void) => () => void
   onSolutionStart: (callback: () => void) => () => void
@@ -22,6 +30,9 @@ interface ElectronAPI {
   
   // --- NEW: Streaming Listener ---
   onTokenReceived: (callback: (token: string) => void) => () => void
+
+  // FIX: Corrected signature for chatWithImage to accept an array of paths
+  chatWithImage: (message: string, imagePaths: string[]) => Promise<string>
 
   takeScreenshot: () => Promise<void>
   moveWindowLeft: () => Promise<void>
@@ -43,7 +54,7 @@ interface ElectronAPI {
   
   invoke: (channel: string, ...args: any[]) => Promise<any>
   setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => Promise<void>
-  chatWithImage: (message: string, imagePath: string) => Promise<string>
+  
   checkProfileExists: () => Promise<boolean>
   saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => Promise<boolean>
 
@@ -68,11 +79,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
   updateContentDimensions: (d) => ipcRenderer.invoke("update-content-dimensions", d),
   setWindowSize: (d) => ipcRenderer.invoke("set-window-size", d),
 
+  // FIX: Added the new action listener (used by shortcuts.ts)
+  onScreenshotAction: (cb) => {
+    const s = (_: any, d: any) => cb(d);
+    ipcRenderer.on("screenshot-action-triggered", s);
+    return () => ipcRenderer.removeListener("screenshot-action-triggered", s);
+  },
+  
   takeScreenshot: () => ipcRenderer.invoke("take-screenshot"),
   getScreenshots: () => ipcRenderer.invoke("get-screenshots"),
   deleteScreenshot: (p) => ipcRenderer.invoke("delete-screenshot", p),
 
-  onScreenshotTaken: (cb) => { const s = (_:any, d:any) => cb(d); ipcRenderer.on("screenshot-taken", s); return () => ipcRenderer.removeListener("screenshot-taken", s) },
+  // onScreenshotTaken removed from implementation as it's replaced by onScreenshotAction
+  
   onSolutionsReady: (cb) => { const s = (_:any, d:any) => cb(d); ipcRenderer.on("solutions-ready", s); return () => ipcRenderer.removeListener("solutions-ready", s) },
   onResetView: (cb) => { const s = () => cb(); ipcRenderer.on("reset-view", s); return () => ipcRenderer.removeListener("reset-view", s) },
   
@@ -110,7 +129,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   
   invoke: (c, ...a) => ipcRenderer.invoke(c, ...a),
   setIgnoreMouseEvents: (i, o) => ipcRenderer.invoke("set-ignore-mouse-events", i, o),
-  chatWithImage: (m, i) => ipcRenderer.invoke("chat-with-image", { message: m, imagePath: i }),
+  
+  // FIX: Corrected chatWithImage to accept and pass an array of paths
+  chatWithImage: (m, i) => ipcRenderer.invoke("chat-with-image", { message: m, imagePaths: i }),
   checkProfileExists: () => ipcRenderer.invoke("check-profile-exists"),
   saveStudentFiles: (f) => ipcRenderer.invoke("save-student-files", f),
 

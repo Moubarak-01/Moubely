@@ -14,24 +14,19 @@ export class ShortcutsHelper {
       this.appState.centerAndShowWindow()
     })
 
-    // Take Screenshot (Ctrl+H)
+    // FIX: Take Screenshot (Ctrl+H) - NOW UNIFIED TO ALWAYS QUEUE (TAKE & QUEUE)
+    // Repeated presses now queue multiple images (up to the limit of 6).
     globalShortcut.register("CommandOrControl+H", async () => {
       const mainWindow = this.appState.getMainWindow()
-      if (mainWindow) {
-        try {
-          const screenshotPath = await this.appState.takeScreenshot()
-          const preview = await this.appState.getImagePreview(screenshotPath)
-          mainWindow.webContents.send("screenshot-taken", {
-            path: screenshotPath,
-            preview
-          })
-          // Force window show if hidden
-          this.appState.centerAndShowWindow()
-        } catch (error) {
-          console.error("Error capturing screenshot:", error)
-        }
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        console.log("[Shortcut] 📸 Take & Queue (Ctrl+H) triggered.")
+        // Send the queue action signal
+        mainWindow.webContents.send("screenshot-action-triggered", { action: "take-and-queue" });
+        this.appState.centerAndShowWindow() // Force window show
       }
     })
+
+    // REMOVED: The old Ctrl+Shift+H shortcut is now retired/removed.
 
     // Process Screenshots
     globalShortcut.register("CommandOrControl+Enter", async () => {

@@ -7,9 +7,10 @@ import { v4 as uuidv4 } from "uuid"
 import screenshot from "screenshot-desktop"
 
 export class ScreenshotHelper {
-  private screenshotQueue: string[] = []
-  private extraScreenshotQueue: string[] = []
-  private readonly MAX_SCREENSHOTS = 5
+  private screenshotQueue: string[] = [] // Main Queue (used for chat/multi-shot)
+  private extraScreenshotQueue: string[] = [] // Debugging Queue
+  private readonly MAX_MAIN_SCREENSHOTS = 6 // <-- Max 6 screenshots for conversation context
+  private readonly MAX_EXTRA_SCREENSHOTS = 2 // Keeping debugging shots low
 
   private readonly screenshotDir: string
   private readonly extraScreenshotDir: string
@@ -50,8 +51,45 @@ export class ScreenshotHelper {
   public getExtraScreenshotQueue(): string[] {
     return this.extraScreenshotQueue
   }
+  
+  // --- NEW: Queue Management Methods ---
+
+  public addPathToMainQueue(screenshotPath: string): void {
+      this.screenshotQueue.push(screenshotPath)
+      // Enforce the 6-shot limit
+      if (this.screenshotQueue.length > this.MAX_MAIN_SCREENSHOTS) {
+          const removedPath = this.screenshotQueue.shift()
+          if (removedPath) {
+              try {
+                  fs.promises.unlink(removedPath)
+              } catch (error) {
+                  console.error("Error removing old screenshot:", error)
+              }
+          }
+      }
+      console.log(`[ScreenshotHelper] Added to Main Queue. Count: ${this.screenshotQueue.length}/${this.MAX_MAIN_SCREENSHOTS}`)
+  }
+
+  public addPathToExtraQueue(screenshotPath: string): void {
+      this.extraScreenshotQueue.push(screenshotPath)
+      // Enforce the extra queue limit
+      if (this.extraScreenshotQueue.length > this.MAX_EXTRA_SCREENSHOTS) {
+          const removedPath = this.extraScreenshotQueue.shift()
+          if (removedPath) {
+              try {
+                  fs.promises.unlink(removedPath)
+              } catch (error) {
+                  console.error("Error removing old extra screenshot:", error)
+              }
+          }
+      }
+      console.log(`[ScreenshotHelper] Added to Extra Queue. Count: ${this.extraScreenshotQueue.length}/${this.MAX_EXTRA_SCREENSHOTS}`)
+  }
+  
+  // --- END Queue Management Methods ---
 
   public clearQueues(): void {
+    console.log("[ScreenshotHelper] Clearing all queues and deleting files.")
     // Clear screenshotQueue
     this.screenshotQueue.forEach((screenshotPath) => {
       fs.unlink(screenshotPath, (err) => {
@@ -74,7 +112,9 @@ export class ScreenshotHelper {
     this.extraScreenshotQueue = []
   }
 
-  public async takeScreenshot(
+  // NEW: Captures the image and saves it to the appropriate directory based on `this.view`.
+  // It does NOT push to any internal queue.
+  public async captureAndSaveScreenshot(
     hideMainWindow: () => void,
     showMainWindow: () => void
   ): Promise<string> {
@@ -84,77 +124,60 @@ export class ScreenshotHelper {
       // Add a small delay to ensure window is hidden
       await new Promise(resolve => setTimeout(resolve, 100))
       
-      let screenshotPath = ""
-
-      if (this.view === "queue") {
-        screenshotPath = path.join(this.screenshotDir, `${uuidv4()}.png`)
-        await screenshot({ filename: screenshotPath })
-
-        this.screenshotQueue.push(screenshotPath)
-        if (this.screenshotQueue.length > this.MAX_SCREENSHOTS) {
-          const removedPath = this.screenshotQueue.shift()
-          if (removedPath) {
-            try {
-              await fs.promises.unlink(removedPath)
-            } catch (error) {
-              console.error("Error removing old screenshot:", error)
-            }
-          }
-        }
-      } else {
-        screenshotPath = path.join(this.extraScreenshotDir, `${uuidv4()}.png`)
-        await screenshot({ filename: screenshotPath })
-
-        this.extraScreenshotQueue.push(screenshotPath)
-        if (this.extraScreenshotQueue.length > this.MAX_SCREENSHOTS) {
-          const removedPath = this.extraScreenshotQueue.shift()
-          if (removedPath) {
-            try {
-              await fs.promises.unlink(removedPath)
-            } catch (error) {
-              console.error("Error removing old screenshot:", error)
-            }
-          }
-        }
-      }
+      // Determine directory based on current view mode
+      const targetDir = this.view === "queue" ? this.screenshotDir : this.extraScreenshotDir;
+      const screenshotPath = path.join(targetDir, `${uuidv4()}.png`)
+      
+      await screenshot({ filename: screenshotPath })
+      
+      console.log(`[ScreenshotHelper] Captured: ${path.basename(screenshotPath)}`);
 
       return screenshotPath
-    } catch (error) {
-      console.error("Error taking screenshot:", error)
+    } catch (error: any) {
+      console.error("[ScreenshotHelper] ❌ Error taking screenshot:", error)
       throw new Error(`Failed to take screenshot: ${error.message}`)
     } finally {
       // Ensure window is always shown again
       showMainWindow()
     }
   }
+  
+  // Retained for existing AppState compatibility, calls the new capture method.
+  public async takeScreenshot(
+    hideMainWindow: () => void,
+    showMainWindow: () => void
+  ): Promise<string> {
+      return this.captureAndSaveScreenshot(hideMainWindow, showMainWindow);
+  }
+
 
   public async getImagePreview(filepath: string): Promise<string> {
     try {
       const data = await fs.promises.readFile(filepath)
       return `data:image/png;base64,${data.toString("base64")}`
     } catch (error) {
-      console.error("Error reading image:", error)
+      console.error("[ScreenshotHelper] Error reading image:", error)
       throw error
     }
   }
 
   public async deleteScreenshot(
-    path: string
+    filePath: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      await fs.promises.unlink(path)
-      if (this.view === "queue") {
-        this.screenshotQueue = this.screenshotQueue.filter(
-          (filePath) => filePath !== path
-        )
-      } else {
-        this.extraScreenshotQueue = this.extraScreenshotQueue.filter(
-          (filePath) => filePath !== path
-        )
-      }
+      await fs.promises.unlink(filePath)
+      
+      // Update: Use filter to remove from both queues, ensuring cleanup regardless of which one it was in.
+      this.screenshotQueue = this.screenshotQueue.filter(
+        (path) => path !== filePath
+      )
+      this.extraScreenshotQueue = this.extraScreenshotQueue.filter(
+        (path) => path !== filePath
+      )
+      console.log(`[ScreenshotHelper] Deleted screenshot: ${path.basename(filePath)}`);
       return { success: true }
-    } catch (error) {
-      console.error("Error deleting file:", error)
+    } catch (error: any) {
+      console.error("[ScreenshotHelper] Error deleting file:", error)
       return { success: false, error: error.message }
     }
   }

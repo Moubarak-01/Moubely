@@ -23,12 +23,13 @@ We have just deployed major engineering improvements to stability and visibility
 ## 🚀 Core Features
 
 -   **👻 Stealth & Visibility Control**: Toggle instantly between **Stealth Mode** (invisible to screen sharing/recording) and **Visible Mode** (standard window for debugging or presentations) directly from the UI.
--   **📸 Contextual Vision**: Instantly snap screenshots (`Ctrl + H`) of code errors, complex charts, or emails. Moubely "sees" your screen using a multi-model approach (Gemini, Perplexity, or GPT-4o) depending on the content.
+-   **📸 Contextual Vision (Multi-Shot)**: Instantly snap screenshots (`Ctrl + H`). Repeated presses **queue up to 6 screenshots** for multi-context analysis. Moubely "sees" your screen using a multi-model approach (Gemini, Perplexity, or GPT-4o) depending on the content.
 -   **🧠 Robust AI Waterfall**: We have expanded our AI engine to support a wide range of models. If one model hits a rate limit, Moubely automatically switches to the next available one to ensure reliability.
 -   **🎙️ Hybrid Meeting Copilot**:
-    -   **Local-First Transcription**: Powered by a custom **Local Whisper Server** (Tiny.en) running directly on your machine. It features a smart **Queue System** to handle fast speakers without overwhelming your laptop.
-    -   **Cloud Fallback**: Automatically switches to **Groq** if the local server gets too busy.
-    -   **Smart Assists**: One-click buttons to generate suggestions, follow-up questions, or instant recaps.
+    * **Local-First Transcription**: Powered by a custom **Local Whisper Server** (Tiny.en) running directly on your machine. It features a smart **Queue System** to handle fast speakers without overwhelming your laptop.
+    * **Cloud Fallback**: Automatically switches to **Groq** if the local server gets too busy.
+    * **Smart Assists**: One-click buttons to generate suggestions, follow-up questions, or instant recaps.
+    * **Post-Meeting Reliability**: The email generation now waits a **minimum of 15 seconds** after the session ends to ensure all final audio chunks have been processed before summarizing.
 -   **⚡ Smart Modes**: Switch between **Developer** (DeepSeek Logic), **Student** (Explanatory), and **General** modes to tailor the AI's personality.
 
 ---
@@ -65,19 +66,35 @@ The app tries these models in order until one succeeds:
 
 ## 🐛 Solved Engineering Challenges
 
-### 1. The "2-Second Delay" Loader
+### 1. The "Ghost Window" (Critical Visibility Crash)
+* **The Problem:** The app would start with no window visible at all (not even the frame) due to the combination of `show: false` and transparency in Electron, a known rendering bug on certain Windows/Linux systems.
+* **The Fix:** In `electron/WindowHelper.ts`, we implemented an aggressive `ready-to-show` callback with an explicit `win.focus()`. This forces the OS compositor to render the window, solving the total invisibility issue.
+
+### 2. The Inconsistent UI Crash (Race Condition)
+* **The Problem:** In Dev mode, React crashed immediately (`TypeError: Cannot read properties of undefined`) because the UI tried to access `window.electronAPI` before the `preload.ts` script finished loading.
+* **The Fix:** We implemented **critical safety checks** (`if (window.electronAPI)`) around all API calls in both `App.tsx` and `Queue.tsx`, preventing the race condition and ensuring stable app startup.
+
+### 3. Multi-Shot & Failed Instant Send
+* **The Problem:** The original flow had an instant-send shortcut that often failed to serialize the image paths correctly to the backend API. Additionally, the chat history only showed a preview of the *first* image, confusing the user.
+* **The Fix:** We unified the shortcut: **`Ctrl + H`** is now the sole shortcut and **always** performs the "Take & Queue" action. The message object in `Queue.tsx` was updated to hold and correctly render a **gallery** of *all* queued screenshots in the chat history, ensuring the analysis API receives the full, verified array.
+
+### 4. Meeting Summary Delay (Reliability)
+* **The Problem:** The post-meeting email summary could sometimes be incomplete if the local transcription server was slow, as the system only waited a minimal time for stability before drafting the email.
+* **The Fix:** We modified the logic in `Queue.tsx` to enforce a **minimum 15-second waiting period** after the user clicks stop. The app then verifies 2 seconds of silence/stability, maximizing the chance that all transcribed audio chunks are included in the final summary.
+
+### 5. The "2-Second Delay" Loader
 * **The Problem:** Showing a "Thinking..." spinner instantly caused flickering for fast models, but hiding it made slow models look broken.
 * **The Fix:** We implemented a `setTimeout` logic in the UI. The spinner *only* appears if the request takes longer than 2 seconds. The moment the first streaming token arrives, the timer is killed and the spinner vanishes.
 
-### 2. The "Silent Crash" (Circular Dependency)
+### 6. The "Silent Crash" (Circular Dependency)
 * **The Problem:** The app would hang on startup because `Main` and `IPC Handlers` were importing each other.
 * **The Fix:** We refactored the architecture to use **Type-Only Imports** (`import type`). This broke the dependency loop, allowing the backend to initialize instantly.
 
-### 3. "Thinking" Process Clean-Up
+### 7. "Thinking" Process Clean-Up
 * **The Problem:** Reasoning models (like DeepSeek) output their internal monologue (`<think>...`), cluttering the chat.
 * **The Fix:** We implemented a **Universal Response Cleaner** in the backend. It intercepts the AI's raw stream, filters out thought tags and citation numbers (`[1]`) in real-time, delivering only the final answer.
 
-### 4. Strict Formula Standardization
+### 8. Strict Formula Standardization
 * **The Problem:** Different AI models use different syntax for math (brackets `[...]` vs. dollar signs `$`), causing equations to break.
 * **The Fix:** We enforced a **Strict System Prompt** that overrides individual model defaults. We now force every AI to use standard LaTeX formatting (`$$`), guaranteeing that equations render correctly.
 
@@ -144,18 +161,18 @@ npm run dist
 📂 Project Structure
 / (root)
 ├── package.json
-├── .env                        <-- Contains API Keys
-├── local-whisper-server.mjs    <-- Local AI Audio Engine
+├── .env                        <-- Contains API Keys
+├── local-whisper-server.mjs    <-- Local AI Audio Engine
 ├── electron/
-│   ├── main.ts                 <-- App Entry Point
-│   ├── LLMHelper.ts            <-- The "Waterfall" Logic & Smart Router
-│   ├── ProcessingHelper.ts     <-- Automation Workflow
-│   └── ipcHandlers.ts          <-- Logs & Communication
+│   ├── main.ts                 <-- App Entry Point
+│   ├── LLMHelper.ts            <-- The "Waterfall" Logic & Smart Router
+│   ├── ProcessingHelper.ts     <-- Automation Workflow
+│   └── ipcHandlers.ts          <-- Logs & Communication
 ├── src/
-│   ├── App.tsx                 <-- Main UI Entry
-│   ├── _pages/
-│   │   └── Queue.tsx           <-- Main Chat Interface (Streaming Logic)
-│   ├── components/
-│   │   └── AIResponse.tsx      <-- Markdown & LaTeX Rendering Logic
-│   └── index.css               <-- Glassmorphism Styles
+│   ├── App.tsx                 <-- Main UI Entry
+│   ├── _pages/
+│   │   └── Queue.tsx           <-- Main Chat Interface (Streaming Logic)
+│   ├── components/
+│   │   └── AIResponse.tsx      <-- Markdown & LaTeX Rendering Logic
+│   └── index.css               <-- Glassmorphism Styles
 └── index.html

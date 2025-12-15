@@ -40,7 +40,7 @@ export class WindowHelper {
         contextIsolation: true,
         preload: path.join(__dirname, "preload.js")
       },
-      show: false,
+      show: false, // Window starts hidden to prevent flash of white
       alwaysOnTop: true,
       frame: false,
       transparent: true,
@@ -51,20 +51,30 @@ export class WindowHelper {
       movable: true,
     }
     this.mainWindow = new BrowserWindow(windowSettings)
-    this.mainWindow.setContentProtection(true) // Default stealth
+
+    // Use current stealth state for content protection
+    this.setStealthMode(this.appState.getIsStealthMode()) 
+
     if (process.platform === "darwin") {
       this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-      this.mainWindow.setHiddenInMissionControl(true)
+      this.mainWindow.setHiddenInMissionControl(this.appState.getIsStealthMode())
       this.mainWindow.setAlwaysOnTop(true, "floating")
     }
     this.mainWindow.setSkipTaskbar(true)
     this.mainWindow.setAlwaysOnTop(true)
     this.mainWindow.loadURL(startUrl).catch(console.error)
+    
+    // FIX: Show/Focus unconditionally on ready-to-show to defeat the ghost window bug.
     this.mainWindow.once('ready-to-show', () => {
       if (this.mainWindow) {
         this.centerWindow()
-        this.mainWindow.show()
-        this.mainWindow.focus()
+        
+        // This forces the window to render on launch. 
+        // If the app is supposed to be stealthy, the user can use Ctrl+B to hide it immediately.
+        setTimeout(() => {
+            this.mainWindow?.show()
+            this.mainWindow?.focus()
+        }, 100);
       }
     })
     this.mainWindow.on("closed", () => { this.mainWindow = null })
@@ -93,8 +103,12 @@ export class WindowHelper {
   public isVisible() { return this.mainWindow?.isVisible() ?? false }
   public hideMainWindow() { this.mainWindow?.hide() }
   public showMainWindow() { this.mainWindow?.showInactive() }
-  public toggleMainWindow() { if (this.isVisible()) this.hideMainWindow(); else this.showMainWindow(); }
-  public centerAndShowWindow() { this.centerWindow(); this.mainWindow?.show(); this.mainWindow?.focus(); }
+  public toggleMainWindow() { if (this.isVisible()) this.hideMainWindow(); else this.centerAndShowWindow(); }
+  public centerAndShowWindow() { 
+      this.centerWindow(); 
+      this.mainWindow?.show(); 
+      this.mainWindow?.focus(); // Focus ensures it's not a ghost window (Fixes Blank Window Bug)
+  }
   public moveWindowRight() { this.moveWindow(20, 0) }
   public moveWindowLeft() { this.moveWindow(-20, 0) }
   public moveWindowDown() { this.moveWindow(0, 20) }

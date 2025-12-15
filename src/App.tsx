@@ -6,14 +6,19 @@ import Solutions from "./_pages/Solutions"
 import { QueryClient, QueryClientProvider } from "react-query"
 import Debug from "./_pages/Debug"
 
+// Note: The global type definitions are included for context but should be in a .d.ts file.
 declare global {
   interface Window {
     electronAPI: {
       updateContentDimensions: (dimensions: { width: number; height: number }) => Promise<void>
-      setWindowSize: (dimensions: { width: number; height: number }) => Promise<void> // NEW
+      setWindowSize: (dimensions: { width: number; height: number }) => Promise<void>
       getScreenshots: () => Promise<Array<{ path: string; preview: string }>>
       deleteScreenshot: (path: string) => Promise<{ success: boolean; error?: string }>
-      onScreenshotTaken: (callback: (data: { path: string; preview: string }) => void) => () => void
+      
+      // Note: onScreenshotTaken is generally replaced by onScreenshotAction for multi-shot flow
+      onScreenshotTaken: (callback: (data: { path: string; preview: string }) => void) => () => void 
+      onScreenshotAction: (callback: (data: { action: "take-and-send" | "take-and-queue" }) => void) => () => void
+      
       onSolutionsReady: (callback: (solutions: string) => void) => () => void
       onResetView: (callback: () => void) => () => void
       onSolutionStart: (callback: () => void) => () => void
@@ -41,7 +46,12 @@ declare global {
       testLlmConnection: () => Promise<{ success: boolean; error?: string }>
       invoke: (channel: string, ...args: any[]) => Promise<any>
       setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => Promise<void>
-      chatWithImage: (message: string, imagePath: string) => Promise<string>
+      chatWithImage: (message: string, imagePath: string[]) => Promise<string> // NOTE: Array path fix
+      checkProfileExists: () => Promise<boolean>
+      saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => Promise<boolean>
+      toggleStealthMode: () => Promise<boolean>
+      getStealthMode: () => Promise<boolean>
+      onTokenReceived: (callback: (token: string) => void) => () => void
     }
   }
 }
@@ -60,16 +70,22 @@ const App: React.FC = () => {
 
   // Click-Through Logic
   useEffect(() => {
+    // FIX: CRITICAL SAFETY CHECK
+    if (!window.electronAPI) return; 
+
     window.electronAPI.setIgnoreMouseEvents(true, { forward: true })
 
     const handleMouseMove = (e: MouseEvent) => {
       const element = document.elementFromPoint(e.clientX, e.clientY)
       const isInteractive = element?.closest('button, input, textarea, a, .interactive, .react-syntax-highlighter-line-number')
       
-      if (isInteractive) {
-        window.electronAPI.setIgnoreMouseEvents(false)
-      } else {
-        window.electronAPI.setIgnoreMouseEvents(true, { forward: true })
+      // FIX: CRITICAL SAFETY CHECK inside mouse event listener
+      if (window.electronAPI) {
+          if (isInteractive) {
+            window.electronAPI.setIgnoreMouseEvents(false)
+          } else {
+            window.electronAPI.setIgnoreMouseEvents(true, { forward: true })
+          }
       }
     }
 
@@ -79,6 +95,9 @@ const App: React.FC = () => {
 
   // Listeners
   useEffect(() => {
+    // FIX: CRITICAL SAFETY CHECK
+    if (!window.electronAPI) return; 
+
     const cleanupFunctions = [
       window.electronAPI.onSolutionStart(() => setView("solutions")),
       window.electronAPI.onResetView(() => {

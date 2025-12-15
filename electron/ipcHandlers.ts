@@ -97,9 +97,9 @@ export function initializeIpcHandlers(appState: AppState): void {
       return await appState.processingHelper.getLLMHelper().chatWithGemini(prompt, history, mode, "", onToken);
   });
 
-  // --- STREAMING IMAGE CHAT ---
-  ipcMain.handle("chat-with-image", async (event, { message, imagePath }) => {
-      console.log(`[IPC] 🖼️ Received Image Analysis Request for: ${imagePath}`);
+  // --- FIX: STREAMING MULTI-IMAGE CHAT (Expects imagePaths array) ---
+  ipcMain.handle("chat-with-image", async (event, { message, imagePaths }: { message: string, imagePaths: string[] }) => {
+      console.log(`[IPC] 🖼️ Received Multi-Image Analysis Request for: ${imagePaths.length} images`);
       
       const onToken = (token: string) => {
           if (!event.sender.isDestroyed()) {
@@ -107,7 +107,8 @@ export function initializeIpcHandlers(appState: AppState): void {
           }
       };
       
-      return await appState.processingHelper.getLLMHelper().chatWithImage(message, imagePath, onToken)
+      // Pass the array of paths to LLMHelper
+      return await appState.processingHelper.getLLMHelper().chatWithImage(message, imagePaths, onToken)
   })
 
   // --- App Lifecycle ---
@@ -120,6 +121,7 @@ export function initializeIpcHandlers(appState: AppState): void {
   ipcMain.handle("move-window-right", async () => appState.moveWindowRight())
   ipcMain.handle("move-window-up", async () => appState.moveWindowUp())
   ipcMain.handle("move-window-down", async () => appState.moveWindowDown())
+  
   ipcMain.handle("center-and-show-window", async () => appState.centerAndShowWindow())
 
   ipcMain.handle("set-ignore-mouse-events", (event, ignore, options) => {

@@ -32,6 +32,7 @@ export class ProcessingHelper {
     const view = this.appState.getView()
 
     if (view === "queue") {
+      // FIX: Use the new getter method
       const screenshotQueue = this.appState.getScreenshotHelper().getScreenshotQueue()
       if (screenshotQueue.length === 0) {
         console.log("[Processing] ⚠️ Screenshot queue is empty");
@@ -71,6 +72,7 @@ export class ProcessingHelper {
       }
     } else {
       // --- DEBUGGING / EXTRA SCREENSHOTS MODE ---
+      // FIX: Use the new getter method
       const extraScreenshotQueue = this.appState.getScreenshotHelper().getExtraScreenshotQueue()
       if (extraScreenshotQueue.length === 0) {
         console.log("[Processing] ⚠️ Extra screenshot queue is empty");

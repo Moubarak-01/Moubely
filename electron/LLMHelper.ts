@@ -307,14 +307,34 @@ export class LLMHelper {
       return "⚠️ All AI providers failed.";
   }
 
-  // --- STREAMING ENABLED IMAGE CHAT ---
-  public async chatWithImage(message: string, imagePath: string, onToken?: (token: string) => void): Promise<string> {
-      console.log(`[LLM] 🖼️ Analyzing image: ${path.basename(imagePath)}`);
+  // --- UPDATED: STREAMING ENABLED MULTI-IMAGE CHAT ---
+  public async chatWithImage(message: string, imagePaths: string[], onToken?: (token: string) => void): Promise<string> {
+      console.log(`[LLM] 🖼️ Starting analysis of ${imagePaths.length} images...`);
       
-      const imageBuffer = await fs.promises.readFile(imagePath);
-      const base64Image = imageBuffer.toString("base64");
-      const mimeType = imagePath.endsWith(".png") ? "image/png" : "image/jpeg";
-      const prompt = (message || "Describe this image.") + "\n\nIMPORTANT: Use $$ for block math and $ for inline math.";
+      const imageParts: { inlineData: { data: string; mimeType: string } }[] = [];
+
+      for (const imagePath of imagePaths) {
+          try {
+              const imageBuffer = await fs.promises.readFile(imagePath);
+              const base64Image = imageBuffer.toString("base64");
+              const mimeType = imagePath.endsWith(".png") ? "image/png" : "image/jpeg";
+              imageParts.push({ inlineData: { data: base64Image, mimeType: mimeType } });
+          } catch (e: any) {
+              console.error(`[LLM] ❌ Failed to read image file (${path.basename(imagePath)}): ${e.message}`);
+              continue; // Skip this image if reading fails
+          }
+      }
+      
+      // FIX: Check if images were successfully prepared
+      if (imageParts.length === 0) {
+          console.error("[LLM] ❌ Error: Successfully prepared 0 image files.");
+          return "❌ Error: Could not read any image files for analysis.";
+      }
+
+      console.log(`[LLM] ✅ Successfully prepared ${imageParts.length} images for API call.`);
+      
+      // The first part of the prompt is the text message
+      const textPart = { type: "text", text: (message || "Analyze these images sequentially and provide a single, comprehensive solution or explanation.") + "\n\nIMPORTANT: Use $$ for block math and $ for inline math." };
 
       for (const config of VISION_MODELS) {
           try {
@@ -324,10 +344,10 @@ export class LLMHelper {
               if (config.type === 'gemini') {
                   if (!this.genAI) continue;
                   const model = this.genAI.getGenerativeModel({ model: config.model });
-                  const result = await model.generateContentStream([
-                      prompt, 
-                      { inlineData: { data: base64Image, mimeType: mimeType } }
-                  ]);
+                  
+                  // Combine text part and all image parts
+                  const parts = [{ text: textPart.text }, ...imageParts];
+                  const result = await model.generateContentStream(parts);
                   
                   for await (const chunk of result.stream) {
                       const text = chunk.text();
@@ -345,10 +365,16 @@ export class LLMHelper {
 
                   if (!client) continue;
                   
+                  // Combine text part and all image parts for OpenAI-style API
+                  const openAIParts: any[] = [textPart, ...imageParts.map(p => ({ 
+                      type: "image_url", 
+                      image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` } 
+                  }))];
+
                   const stream = await client.chat.completions.create({
                       model: config.model,
-                      messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } }] }],
-                      max_tokens: 1000,
+                      messages: [{ role: "user", content: openAIParts }],
+                      max_tokens: 2000, // Increased max tokens for multi-image tasks
                       stream: true 
                   });
 
@@ -364,7 +390,9 @@ export class LLMHelper {
                   console.log(`[LLM] ✅ VISION SUCCESS: ${config.model}`);
                   return this.cleanResponse(fullResponse);
               }
-          } catch (error) {}
+          } catch (error: any) {
+              console.warn(`[LLM] ❌ Vision Model ${config.model} failed: ${error.message}`);
+          }
       }
       return "❌ Error: All vision models failed.";
   }
@@ -424,7 +452,8 @@ export class LLMHelper {
 
   public async debugSolutionWithImages(problemInfo: any, currentCode: string, debugImagePaths: string[]) {
       console.log(`[LLM] 🐞 Debugging with ${debugImagePaths.length} screenshots...`);
-      const response = await this.chatWithImage(`Debug:\n${JSON.stringify(problemInfo)}\nCode: ${currentCode}`, debugImagePaths[0]);
+      // FIX: Debugging now uses ALL images for full context, not just the first one.
+      const response = await this.chatWithImage(`Debug:\n${JSON.stringify(problemInfo)}\nCode: ${currentCode}`, debugImagePaths);
       try { return JSON.parse(this.cleanResponse(response).replace(/^```json/, '').replace(/```$/, '')); } catch { return { solution: { code: currentCode, explanation: response } }; }
   }
 
