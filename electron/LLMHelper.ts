@@ -19,18 +19,35 @@ async function safePdfParse(buffer: Buffer) {
     return parser(buffer);
 }
 
-// --- MODEL CONFIGURATIONS (Updated Priority Order) ---
+// --- MODEL CONFIGURATIONS ---
 const CHAT_MODELS = [
+    // --- 1. NEW: Gemini 2.5 Series (Priority) ---
+    { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+    { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
+
+    // --- 2. Gemini 2.0 Series (Standard) ---
     { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
     { type: 'gemini', model: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Lite' },
-    { type: 'gemini', model: 'gemma-2-27b-it', name: 'Gemma 2 27B' },
-    { type: 'github', model: 'DeepSeek-R1', name: 'DeepSeek R1' },
-    { type: 'github', model: 'gpt-4o', name: 'GPT-4o' },
+
+    // --- 3. NEW: Gemma 3 Series (Open Models) ---
+    { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B' },
+    { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B' },
+    { type: 'gemini', model: 'gemma-3-4b-it', name: 'Gemma 3 4B' },
+    
+    // --- 4. Perplexity (Research/Reasoning) ---
     { type: 'perplexity', model: 'sonar-reasoning-pro', name: 'Perplexity Pro' },
+
+    // --- 5. GPT-4o (Reliable Backup) ---
+    { type: 'github', model: 'gpt-4o', name: 'GPT-4o' },
+
+    // --- 6. DeepSeek (Deep Logic - Slower) ---
+    { type: 'github', model: 'DeepSeek-R1', name: 'DeepSeek R1' },
+
+    // --- 7. Groq (Fast Fallback) ---
     { type: 'groq', model: 'llama-3.3-70b-versatile', name: 'Groq' }
 ];
 
-// UPDATED: Vision Fallback Order
+// Vision Fallback Order
 const VISION_MODELS = [
     { type: 'gemini', model: 'gemini-2.0-flash' },      
     { type: 'perplexity', model: 'sonar-reasoning-pro' },
@@ -85,16 +102,64 @@ export class LLMHelper {
       if (process.env.OPENAI_API_KEY) this.openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, dangerouslyAllowBrowser: true });
   }
 
+  // --- CLEANER: Removes <think> tags AND citations like [1], [5] ---
   private cleanResponse(text: string): string {
-      return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+      let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, ""); // Remove DeepSeek thinking
+      cleaned = cleaned.replace(/\[\d+\]/g, ""); // Remove Perplexity citations like [1]
+      return cleaned.trim();
   }
 
+  // --- PDF PARSER WITH OCR BACKUP ---
   private async extractTextFromPdf(buffer: Buffer): Promise<string> {
+      // 1. Try Local Parsing (Fast/Free)
       try {
           const data = await safePdfParse(buffer);
-          if (data && data.text && data.text.trim().length > 50) return data.text.trim();
-      } catch (e) { console.warn("Local PDF parse failed."); }
-      return "[Error extracting PDF text]";
+          if (data && data.text && data.text.trim().length > 50) {
+              // Valid text found locally
+              return data.text.trim();
+          }
+          console.warn("[LLMHelper] ⚠️ Local PDF parse returned empty/short text. Trying OCR...");
+      } catch (e) { 
+          console.warn("[LLMHelper] ❌ Local PDF parse failed completely. Trying OCR..."); 
+      }
+
+      // 2. Try OCR Space API (Backup for Scanned PDFs)
+      const ocrKey = process.env.OCR_SPACE_API_KEY;
+      if (ocrKey) {
+          try {
+              console.log("[LLMHelper] 👁️ Attempting OCR via OCR Space...");
+              
+              const formData = new FormData();
+              // OCR Space expects base64 data uri
+              formData.append('base64Image', `data:application/pdf;base64,${buffer.toString('base64')}`);
+              formData.append('isOverlayRequired', 'false');
+              formData.append('scale', 'true'); // Improves accuracy
+              formData.append('OCREngine', '2'); // Better for text
+              
+              const response = await axios.post('https://api.ocr.space/parse/image', formData, { 
+                  headers: { 
+                      ...formData.getHeaders(), 
+                      'apikey': ocrKey 
+                  },
+                  timeout: 30000 // 30s timeout for OCR
+              });
+
+              if (response.data && response.data.ParsedResults) {
+                  const ocrText = response.data.ParsedResults.map((r: any) => r.ParsedText).join('\n');
+                  if (ocrText.trim().length > 0) {
+                      console.log("[LLMHelper] ✅ OCR Success! Text extracted.");
+                      return ocrText;
+                  }
+              }
+              console.warn("[LLMHelper] ⚠️ OCR returned no text.");
+          } catch (e: any) {
+              console.error(`[LLMHelper] ❌ OCR Failed: ${e.message}`);
+          }
+      } else {
+          console.warn("[LLMHelper] ℹ️ No OCR_SPACE_API_KEY found. Skipping OCR.");
+      }
+
+      return "[Error: Could not extract text from PDF via Parse or OCR]";
   }
 
   public async getFileContext(filePath: string): Promise<{ text: string, isPdf: boolean, base64?: string, mimeType?: string }> {
@@ -132,6 +197,7 @@ export class LLMHelper {
       try { const list = await this.notionClient.users.list({}); return JSON.stringify(list); } catch (error: any) { return `Error: ${error.message}`; }
   }
 
+  // --- STREAMING ENABLED CHAT ---
   public async chatWithGemini(message: string, history: any[], mode: string = "General", fileContext: string = "", onToken?: (token: string) => void): Promise<string> {
       if (this.useOllama) return this.callOllama(message);
       
@@ -162,7 +228,8 @@ export class LLMHelper {
 
       for (const config of CHAT_MODELS) {
           try {
-              console.log(`[LLMHelper] 💬 Attempting Chat with: ${config.model} (${config.type})`);
+              // LOG: Show which model is attempting to answer
+              console.log(`[LLMHelper] 💬 Chatting with: ${config.model} (${config.type})`);
               
               let fullResponse = "";
               if (config.type === 'gemini') {
@@ -184,7 +251,9 @@ export class LLMHelper {
                       if (onToken) onToken(text); 
                   }
                   
-                  return fullResponse;
+                  // LOG: Success
+                  console.log(`[LLMHelper] ✅ SUCCESS: Answer generated by ${config.model}`);
+                  return this.cleanResponse(fullResponse);
               } else {
                   let client: OpenAI | null = null;
                   if (config.type === 'github') client = this.githubClient;
@@ -205,9 +274,11 @@ export class LLMHelper {
                           let content = chunk.choices[0]?.delta?.content || "";
                           if (!content) continue;
 
+                          // --- FILTER LOGIC ---
                           if (content.includes('<think>')) { isThinking = true; continue; }
                           if (content.includes('</think>')) { isThinking = false; continue; }
-                          if (isThinking) continue;
+                          if (isThinking) continue; 
+                          if (/\[\d+\]/.test(content)) continue; // Filter citation nums
 
                           if (content) { 
                               fullResponse += content; 
@@ -215,15 +286,20 @@ export class LLMHelper {
                           }
                       }
                       
+                      // LOG: Success
+                      console.log(`[LLMHelper] ✅ SUCCESS: Answer generated by ${config.model}`);
                       return this.cleanResponse(fullResponse);
                   }
               }
-          } catch (error) { continue; }
+          } catch (error) { 
+              console.warn(`[LLMHelper] ⚠️ Failed: ${config.model}. Trying next...`);
+              continue; 
+          }
       }
       return "⚠️ All AI providers failed.";
   }
 
-  // --- NEW: VISION STREAMING SUPPORT ---
+  // --- STREAMING ENABLED IMAGE CHAT ---
   public async chatWithImage(message: string, imagePath: string, onToken?: (token: string) => void): Promise<string> {
       console.log(`[LLMHelper] 🖼️ Analyzing image: ${imagePath}`);
       
@@ -248,9 +324,9 @@ export class LLMHelper {
                   for await (const chunk of result.stream) {
                       const text = chunk.text();
                       fullResponse += text;
-                      if (onToken) onToken(text); // Streaming Image Response
+                      if (onToken) onToken(text);
                   }
-                  
+                  console.log(`[LLMHelper] ✅ VISION SUCCESS: ${config.model}`);
                   return this.cleanResponse(fullResponse);
               } 
               else if (['github', 'openai', 'perplexity'].includes(config.type)) {
@@ -263,33 +339,29 @@ export class LLMHelper {
                   
                   const stream = await client.chat.completions.create({
                       model: config.model,
-                      messages: [
-                          { role: "user", content: [
-                              { type: "text", text: prompt },
-                              { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } }
-                          ]}
-                      ],
+                      messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } }] }],
                       max_tokens: 1000,
-                      stream: true // Enable streaming
+                      stream: true 
                   });
 
                   for await (const chunk of stream) {
                       const content = chunk.choices[0]?.delta?.content || "";
+                      if (/\[\d+\]/.test(content)) continue; 
+
                       if (content) {
                           fullResponse += content;
-                          if (onToken) onToken(content); // Streaming Image Response
+                          if (onToken) onToken(content);
                       }
                   }
+                  console.log(`[LLMHelper] ✅ VISION SUCCESS: ${config.model}`);
                   return this.cleanResponse(fullResponse);
               }
-          } catch (error: any) {
-              console.warn(`[LLMHelper] ⚠️ ${config.model} failed: ${error.message || 'Unknown error'}`);
-          }
+          } catch (error) {}
       }
-
-      return "❌ Error: All vision models failed or hit rate limits. Please try again later.";
+      return "❌ Error: All vision models failed.";
   }
 
+  // --- AUDIO & MISC ---
   public async analyzeAudioFile(audioPath: string): Promise<{ text: string, timestamp: number }> {
       try {
           const form = new FormData();

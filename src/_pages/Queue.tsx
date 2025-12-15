@@ -25,7 +25,7 @@ interface Message {
   screenshotPath?: string
   screenshotPreview?: string
   timestamp: number
-  isStreaming?: boolean // <--- FIXED: Added this property
+  isStreaming?: boolean // Tracks if this message is currently being typed
 }
 
 interface TranscriptItem {
@@ -322,7 +322,8 @@ const Queue: React.FC<any> = ({ setView }) => {
         try { setPastMeetings(JSON.parse(saved)) } catch(e) {}
     }
 
-    // --- FIXED: ADDED STREAMING LISTENER ---
+    // --- NEW: STREAMING LISTENER ---
+    // Check API existence to be safe
     let cleanupStream = () => {};
     if (window.electronAPI && window.electronAPI.onTokenReceived) {
         cleanupStream = window.electronAPI.onTokenReceived((token) => {
@@ -598,7 +599,7 @@ const Queue: React.FC<any> = ({ setView }) => {
   const loadMeeting = (m: MeetingSession) => { setTranscriptLogs(m.transcript); setEmailDraft(m.emailDraft); setShowPostMeeting(true); setActiveTab("Transcript"); setMessages([{id: Date.now().toString(), role: "ai", text: `Loaded meeting: ${new Date(m.date).toLocaleString()}`, timestamp: Date.now()}]); }
   const deleteMeeting = (id: string, e: React.MouseEvent) => { e.stopPropagation(); const u = pastMeetings.filter(m => m.id !== id); setPastMeetings(u); localStorage.setItem('moubely_meetings', JSON.stringify(u)); }
 
-  // --- FIXED: STREAMING ENABLED HANDLE SEND ---
+  // --- HANDLE SEND (Streaming Enabled) ---
   const handleSend = async (overrideText?: string) => {
     const textToSend = overrideText || input
     if (!textToSend.trim() && !pendingScreenshot) return
@@ -622,7 +623,7 @@ const Queue: React.FC<any> = ({ setView }) => {
             role: "ai", 
             text: "", 
             timestamp: Date.now(),
-            isStreaming: true // Mark as streaming for the listener
+            isStreaming: true // Mark as streaming
         }
     ];
 
@@ -652,14 +653,14 @@ const Queue: React.FC<any> = ({ setView }) => {
       };
 
       if (currentScreenshot) {
-         // Vision calls don't stream yet, so we await full result
+         // Vision streams now too!
          fullResponse = await window.electronAPI.chatWithImage(finalPrompt, currentScreenshot.path)
       } else {
-         // Chat streams via listener, but we await the promise to ensure completion
+         // Chat streams via listener
          fullResponse = await window.electronAPI.invoke("gemini-chat", args)
       }
       
-      // Finalize the message (ensure streaming flag is off and text matches final result)
+      // Finalize the message
       setMessages(prev => prev.map(m => 
           m.id === aiMsgId ? { ...m, text: fullResponse, isStreaming: false } : m
       ));
@@ -673,6 +674,7 @@ const Queue: React.FC<any> = ({ setView }) => {
     }
   }
 
+  // --- TRIGGER ASSIST ACTION (Streaming Enabled) ---
   const triggerAssistAction = async (actionType: "Assist" | "WhatToSay" | "FollowUp" | "Recap") => {
     let transcriptText = transcriptLogs.map(t => t.text).join(" ");
     if (!transcriptText.trim() && messages.length > 0) {
@@ -696,7 +698,7 @@ const Queue: React.FC<any> = ({ setView }) => {
       case "Recap": userDisplayMessage = "Recap."; systemPrompt = `Based on: "${transcriptText}". Summarize.`; break;
     }
     
-    // Add user message + placeholder
+    // Add user message + placeholder immediately
     const aiMsgId = (Date.now() + 1).toString();
     const newMessages: Message[] = [
         ...messages,
@@ -709,6 +711,7 @@ const Queue: React.FC<any> = ({ setView }) => {
     const args = { message: systemPrompt, mode: mode, history: history };
 
     try {
+        // Stream text
         const response = await window.electronAPI.invoke("gemini-chat", args)
         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m));
     } catch (e: any) { console.error(e) } finally { setIsThinking(false) }
@@ -794,7 +797,11 @@ const Queue: React.FC<any> = ({ setView }) => {
                                 <button onClick={() => handleCopyUserMessage(msg.text)} className="absolute top-1/2 -left-8 -translate-y-1/2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-white bg-black/40 rounded-full"><Copy size={12}/></button>
                             </div>
                         )}
-                        {msg.role === "ai" && <div className="ai-message max-w-[95%]"><MessageContent text={msg.text} /></div>}
+                        {msg.role === "ai" && (
+                            <div className="ai-message max-w-[95%]">
+                                <MessageContent text={msg.text} />
+                            </div>
+                        )}
                       </div>
                     ))}
                     {isThinking && messages[messages.length - 1]?.role !== 'ai' && (
@@ -830,7 +837,7 @@ const Queue: React.FC<any> = ({ setView }) => {
            </div>
            {activeTab === "Chat" && (
              <div className="p-5 bg-gradient-to-t from-black via-black/90 to-transparent shrink-0">
-                {pendingScreenshot && ( <div className="mb-3 flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 px-4 py-2 rounded-xl w-fit"> <img src={pendingScreenshot.preview} className="w-10 h-8 rounded object-cover border border-white/10"/> <span className="text-xs text-blue-200 font-medium">Screenshot attached</span> <button onClick={() => setPendingScreenshot(null)}><X size={14}/></button> </div> )}
+                {pendingScreenshot && ( <div className="mb-3 flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 px-4 py-2 rounded-xl w-fit"> <img src={pendingScreenshot.preview} className="w-10 h-8 rounded object-cover border border-white/10"/> <span className="text-xs text-blue-200 font-medium">Image attached</span> <button onClick={() => setPendingScreenshot(null)}><X size={14}/></button> </div> )}
                 <div className="relative mb-3">
                    <textarea ref={textareaRef} value={input} onFocus={handleInputFocus} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); handleSend(); } }} placeholder={showPostMeeting ? "Ask about the meeting..." : "Ask about your screen..."} rows={1} className="w-full bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 focus:border-white/20 rounded-2xl px-5 py-4 text-sm text-gray-100 placeholder-gray-500 outline-none transition-all shadow-lg resize-none overflow-y-auto" style={{ minHeight: '52px', maxHeight: '150px' }} />
                    {(input.length > 0 || pendingScreenshot) && <button onClick={() => handleSend()} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors"><Send size={16} className="text-white"/></button>}
