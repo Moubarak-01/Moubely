@@ -1,10 +1,12 @@
 import { ToastProvider } from "./components/ui/toast"
 import Queue from "./_pages/Queue"
 import { ToastViewport } from "@radix-ui/react-toast"
-import { useEffect, useState } from "react"
+import React, { useEffect, useState, useRef } from "react"
 import Solutions from "./_pages/Solutions"
 import { QueryClient, QueryClientProvider } from "react-query"
 import Debug from "./_pages/Debug"
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import Header from './components/Header'
 
 // Note: The global type definitions are included for context but should be in a .d.ts file.
 declare global {
@@ -23,7 +25,7 @@ declare global {
       onResetView: (callback: () => void) => () => void
       onSolutionStart: (callback: () => void) => () => void
       onDebugStart: (callback: () => void) => () => void
-      onDebugSuccess: (callback: (data: any) => void) => () => void
+      onDebugSuccess: (callback: (data: any) => void) => void
       onSolutionError: (callback: (error: string) => void) => () => void
       onProcessingNoScreenshots: (callback: () => void) => () => void
       onProblemExtracted: (callback: (data: any) => void) => () => void
@@ -45,6 +47,8 @@ declare global {
       switchToGemini: (apiKey?: string) => Promise<{ success: boolean; error?: string }>
       testLlmConnection: () => Promise<{ success: boolean; error?: string }>
       invoke: (channel: string, ...args: any[]) => Promise<any>
+      // FIX: New IPC channel for the mouse event handling
+      toggleMouseIgnore: (ignore: boolean) => Promise<void>
       setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => Promise<void>
       chatWithImage: (message: string, imagePath: string[]) => Promise<string> // NOTE: Array path fix
       checkProfileExists: () => Promise<boolean>
@@ -67,33 +71,95 @@ const queryClient = new QueryClient({
 
 const App: React.FC = () => {
   const [view, setView] = useState<"queue" | "solutions" | "debug">("queue")
+  
+  // NEW STATE: Tracks current stealth mode state
+  const [isStealth, setIsStealth] = useState(false)
+  
+  // NEW STATE: Tracks if the window is currently set to ignore mouse events (synced with Electron)
+  const [isMouseIgnored, setIsMouseIgnored] = useState(false);
+  
+  // Ref to the main container for applying the cursor-hiding class
+  const appRef = useRef<HTMLDivElement>(null);
 
-  // Click-Through Logic
+
+  // --- INITIAL SETUP (Stealth mode and size) ---
   useEffect(() => {
-    // FIX: CRITICAL SAFETY CHECK
-    if (!window.electronAPI) return; 
+    if (window.electronAPI) {
+      // 1. Get initial stealth mode state
+      window.electronAPI.getStealthMode().then(setIsStealth)
 
-    window.electronAPI.setIgnoreMouseEvents(true, { forward: true })
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const element = document.elementFromPoint(e.clientX, e.clientY)
-      const isInteractive = element?.closest('button, input, textarea, a, .interactive, .react-syntax-highlighter-line-number')
+      // 2. Initial window size setting
+      const initialSize = { width: 450, height: 120 };
+      window.electronAPI.setWindowSize(initialSize);
+    }
+  }, [])
+  
+  // --- NEW: IPC Call to Toggle Mouse Ignore ---
+  const toggleMouseIgnore = (ignore: boolean) => {
+      // Only apply this logic if Stealth Mode is currently active
+      if (!isStealth) {
+          // If stealth is off, ensure we resume interaction just in case
+          if (isMouseIgnored) {
+             window.electronAPI && window.electronAPI.toggleMouseIgnore(false);
+             setIsMouseIgnored(false);
+             appRef.current && appRef.current.classList.remove('cursor-deep-stealth');
+          }
+          return;
+      }
       
-      // FIX: CRITICAL SAFETY CHECK inside mouse event listener
       if (window.electronAPI) {
-          if (isInteractive) {
-            window.electronAPI.setIgnoreMouseEvents(false)
-          } else {
-            window.electronAPI.setIgnoreMouseEvents(true, { forward: true })
+          if (ignore !== isMouseIgnored) {
+              // Use the new simplified IPC channel
+              window.electronAPI.toggleMouseIgnore(ignore);
+              setIsMouseIgnored(ignore);
+              
+              // Toggle the CSS class to hide/show the local cursor icon
+              if (appRef.current) {
+                appRef.current.classList.toggle('cursor-deep-stealth', ignore);
+              }
           }
       }
+  };
+
+  // --- NEW: Handler to manage cursor state ---
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!isStealth) return; // Only execute the deep stealth logic if stealth is on
+      
+      const target = e.target as HTMLElement;
+      
+      // CRITICAL LOGIC: Check if the cursor is over an element that should be interactive.
+      // We look for the 'interactive' class or any input/button tag.
+      const isOverInteractive = target.closest('.interactive') || 
+                                target.tagName === 'BUTTON' ||
+                                target.tagName === 'TEXTAREA' ||
+                                target.tagName === 'INPUT';
+
+      if (isOverInteractive) {
+          // Mouse is over a clickable element: RESUME MOUSE EVENTS and SHOW CURSOR
+          toggleMouseIgnore(false);
+      } else {
+          // Mouse is over the background/non-clickable glass: IGNORE MOUSE EVENTS and HIDE CURSOR
+          toggleMouseIgnore(true);
+      }
+  };
+
+  const handleMouseLeave = () => {
+    // When the mouse leaves the window, reset state to interactive for safety
+    toggleMouseIgnore(false);
+    if (appRef.current) {
+        appRef.current.classList.remove('cursor-deep-stealth');
     }
-
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [])
-
-  // Listeners
+  };
+  
+  // Watch for changes in isStealth state (e.g., if user clicks the Eye icon)
+  useEffect(() => {
+      if (!isStealth) {
+          // Force interaction mode if stealth is turned off
+          toggleMouseIgnore(false);
+      }
+  }, [isStealth]);
+  
+  // Listeners (Keeping the original listeners)
   useEffect(() => {
     // FIX: CRITICAL SAFETY CHECK
     if (!window.electronAPI) return; 
@@ -109,14 +175,25 @@ const App: React.FC = () => {
   }, [])
 
   return (
-    <div className="min-h-0 h-screen flex flex-col">
+    <div 
+      ref={appRef}
+      className={`min-h-0 h-screen w-screen flex flex-col transition-all duration-300`}
+      // Attach the mouse handlers to the main app container
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          {view === "queue" ? (
-            <Queue setView={setView} />
-          ) : view === "solutions" ? (
-            <Solutions setView={setView} />
-          ) : null}
+          {/* Header must be outside the Router if it uses Router context, but here it is fine */}
+          <Header view={view} setView={setView} isStealth={isStealth} setIsStealth={setIsStealth} /> 
+          <Router>
+            <Routes>
+              <Route path="/" element={<Navigate replace to="/queue" />} />
+              <Route path="/queue" element={<Queue setView={setView} />} />
+              <Route path="/solutions" element={<Solutions setView={setView} />} />
+              <Route path="/debug" element={<Debug setView={setView} />} />
+            </Routes>
+          </Router>
           <ToastViewport />
         </ToastProvider>
       </QueryClientProvider>

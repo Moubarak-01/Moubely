@@ -11,6 +11,13 @@ html, body {
   color: #e5e7eb;
 }
 
+/* --- NEW: Deep Stealth Cursor Class --- */
+/* This class is applied by React when the window is ignoring mouse events */
+.cursor-deep-stealth {
+  cursor: none !important; 
+}
+/* ------------------------------------- */
+
 /* --- MAIN WINDOW --- */
 /* CHANGED: cluely-window to moubely-window */
 .moubely-window {

@@ -62,6 +62,25 @@ export function initializeIpcHandlers(appState: AppState): void {
   ipcMain.handle("get-stealth-mode", async () => {
     return appState.getIsStealthMode();
   });
+  
+  // --- NEW: MOUSE/STEALTH HANDLERS ---
+  /**
+   * Toggles the main window's ability to receive mouse events.
+   * When 'ignore' is true, the window becomes click-through.
+   * We use { forward: true } to ensure that events go to the application beneath Moubely.
+   */
+  ipcMain.on('toggle-mouse-ignore', (event, ignore: boolean) => {
+    const mainWindow = BrowserWindow.fromWebContents(event.sender); 
+    if (mainWindow) {
+      // We don't check for isIgnoreMouseEvents() != ignore here because the frontend
+      // manages the synchronization via its state (isMouseIgnored) to prevent IPC spam.
+      console.log(`[IPC] 🖱️ Setting mouse ignore to: ${ignore}`);
+      // NOTE: { forward: true } is critical here. It makes the window click-through, 
+      // but still allows us to use it for non-interactive areas.
+      mainWindow.setIgnoreMouseEvents(ignore, { forward: true }); 
+    }
+  });
+
 
   // --- Processing ---
   ipcMain.handle("analyze-audio-base64", async (event, data, mimeType) => {
@@ -72,7 +91,7 @@ export function initializeIpcHandlers(appState: AppState): void {
 
   ipcMain.handle("analyze-audio-file", async (event, path) => {
       console.log(`[IPC] 📁 Analyze Audio File: ${path}`);
-      return await appState.processingHelper.processAudioFile(path)
+      return await appState.processingHelper.getLLMHelper().analyzeAudioFile(path)
   })
 
   ipcMain.handle("analyze-image-file", async (event, path) => {
@@ -124,6 +143,8 @@ export function initializeIpcHandlers(appState: AppState): void {
   
   ipcMain.handle("center-and-show-window", async () => appState.centerAndShowWindow())
 
+  // NOTE: Keeping the old set-ignore-mouse-events handler for compatibility,
+  // but the new feature will rely on the custom 'toggle-mouse-ignore' event.
   ipcMain.handle("set-ignore-mouse-events", (event, ignore, options) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (win) win.setIgnoreMouseEvents(ignore, options)
