@@ -64,37 +64,60 @@ The app tries these models in order until one succeeds:
 
 ---
 
+## ⚡ Tech Stack
+
+Moubely is built using a modern, performant, and resilient full-stack JavaScript architecture.
+
+| Category | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Desktop Framework** | **Electron** | Cross-platform desktop application shell and operating system integration. |
+| **Frontend** | **React & TypeScript** | User Interface and application logic. |
+| **Styling** | **Tailwind CSS** | Utility-first CSS framework for rapid, consistent styling. |
+| **Bundling/Dev** | **Vite** | Fast development server and build tool. |
+| **AI/Logic Core** | **Gemini, GPT-4o, Perplexity, Groq** | Multi-Model AI Waterfall for chat, vision, and reasoning. |
+| **Local Services** | **Local Whisper Server** | Fast, local audio transcription for meetings. |
+| **Display** | **KaTeX, Highlight.js** | Rendering complex LaTeX formulas and providing syntax highlighting for code blocks. |
+
+---
+
 ## 🐛 Solved Engineering Challenges
 
-### 1. The "Ghost Window" (Critical Visibility Crash)
+### 1. Deep Stealth Mouse Control (The Final Step in Invisibility)
+* **The Problem:** Even with `setContentProtection` enabled, the user's mouse pointer was visible to screen recorders when interacting with the Moubely window, breaking the illusion of stealth.
+* **The Fix:** We implemented synchronized, time-gated control:
+    * The frontend (`App.tsx`) uses `onMouseMove` to detect if the cursor is **not** over an interactive button or input field (`.interactive`).
+    * If non-interactive, it immediately sends an IPC call (`toggle-mouse-ignore`) to the main process.
+    * The main process sets the window to **click-through** (`win.setIgnoreMouseEvents(true, { forward: true })`), while the frontend simultaneously applies a CSS class (`cursor: none !important`) to hide the pointer, making the window completely invisible and non-interactive to shared screens until the cursor moves over a button.
+
+### 2. The Ghost Window (Critical Visibility Crash)
 * **The Problem:** The app would start with no window visible at all (not even the frame) due to the combination of `show: false` and transparency in Electron, a known rendering bug on certain Windows/Linux systems.
 * **The Fix:** In `electron/WindowHelper.ts`, we implemented an aggressive `ready-to-show` callback with an explicit `win.focus()`. This forces the OS compositor to render the window, solving the total invisibility issue.
 
-### 2. The Inconsistent UI Crash (Race Condition)
+### 3. The Inconsistent UI Crash (Race Condition)
 * **The Problem:** In Dev mode, React crashed immediately (`TypeError: Cannot read properties of undefined`) because the UI tried to access `window.electronAPI` before the `preload.ts` script finished loading.
 * **The Fix:** We implemented **critical safety checks** (`if (window.electronAPI)`) around all API calls in both `App.tsx` and `Queue.tsx`, preventing the race condition and ensuring stable app startup.
 
-### 3. Multi-Shot & Failed Instant Send
+### 4. Multi-Shot & Failed Instant Send
 * **The Problem:** The original flow had an instant-send shortcut that often failed to serialize the image paths correctly to the backend API. Additionally, the chat history only showed a preview of the *first* image, confusing the user.
 * **The Fix:** We unified the shortcut: **`Ctrl + H`** is now the sole shortcut and **always** performs the "Take & Queue" action. The message object in `Queue.tsx` was updated to hold and correctly render a **gallery** of *all* queued screenshots in the chat history, ensuring the analysis API receives the full, verified array.
 
-### 4. Meeting Summary Delay (Reliability)
+### 5. Meeting Summary Delay (Reliability)
 * **The Problem:** The post-meeting email summary could sometimes be incomplete if the local transcription server was slow, as the system only waited a minimal time for stability before drafting the email.
 * **The Fix:** We modified the logic in `Queue.tsx` to enforce a **minimum 15-second waiting period** after the user clicks stop. The app then verifies 2 seconds of silence/stability, maximizing the chance that all transcribed audio chunks are included in the final summary.
 
-### 5. The "2-Second Delay" Loader
+### 6. The "2-Second Delay" Loader
 * **The Problem:** Showing a "Thinking..." spinner instantly caused flickering for fast models, but hiding it made slow models look broken.
 * **The Fix:** We implemented a `setTimeout` logic in the UI. The spinner *only* appears if the request takes longer than 2 seconds. The moment the first streaming token arrives, the timer is killed and the spinner vanishes.
 
-### 6. The "Silent Crash" (Circular Dependency)
+### 7. The "Silent Crash" (Circular Dependency)
 * **The Problem:** The app would hang on startup because `Main` and `IPC Handlers` were importing each other.
 * **The Fix:** We refactored the architecture to use **Type-Only Imports** (`import type`). This broke the dependency loop, allowing the backend to initialize instantly.
 
-### 7. "Thinking" Process Clean-Up
+### 8. "Thinking" Process Clean-Up
 * **The Problem:** Reasoning models (like DeepSeek) output their internal monologue (`<think>...`), cluttering the chat.
 * **The Fix:** We implemented a **Universal Response Cleaner** in the backend. It intercepts the AI's raw stream, filters out thought tags and citation numbers (`[1]`) in real-time, delivering only the final answer.
 
-### 8. Strict Formula Standardization
+### 9. Strict Formula Standardization
 * **The Problem:** Different AI models use different syntax for math (brackets `[...]` vs. dollar signs `$`), causing equations to break.
 * **The Fix:** We enforced a **Strict System Prompt** that overrides individual model defaults. We now force every AI to use standard LaTeX formatting (`$$`), guaranteeing that equations render correctly.
 
