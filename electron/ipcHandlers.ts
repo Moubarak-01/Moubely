@@ -63,6 +63,17 @@ export function initializeIpcHandlers(appState: AppState): void {
     return appState.getIsStealthMode();
   });
   
+  // --- LIVE ASSIST MODE ---
+  ipcMain.handle("start-live-mode", async () => {
+    console.log("[IPC] 🔴 Start Live Mode Request");
+    return appState.startLiveMode();
+  });
+
+  ipcMain.handle("stop-live-mode", async () => {
+    console.log("[IPC] ⚪ Stop Live Mode Request");
+    return appState.stopLiveMode();
+  });
+
   // --- NEW: MOUSE/STEALTH HANDLERS ---
   /**
    * Toggles the main window's ability to receive mouse events.

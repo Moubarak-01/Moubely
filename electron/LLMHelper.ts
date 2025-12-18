@@ -65,6 +65,9 @@ export class LLMHelper {
   private useOllama: boolean = false
   private ollamaModel: string = "llama3.2"
   private ollamaUrl: string = "http://localhost:11434"
+
+  // --- NEW: Session Memory ---
+  private sessionTranscript: string = "";
   
   private readonly systemPrompt = `
   You are 'Moubely', an intelligent AI assistant.
@@ -227,8 +230,15 @@ export class LLMHelper {
       }
 
       let notionContext = (mode === "General" || mode === "Student") ? await this.getNotionContext() : "";
+      
       let systemInstruction = this.systemPrompt;
       if (mode === "Student") systemInstruction += "\nCONTEXT: Mentor mode. Use attached files.";
+      
+      // --- NEW: Inject Session Transcript (Memory) ---
+      if (this.sessionTranscript.length > 0) {
+          systemInstruction += `\n\n=== LIVE SESSION TRANSCRIPT (MEMORY) ===\n${this.sessionTranscript}\n`;
+      }
+
       if (fileContext) systemInstruction += `\n\n=== UPLOADED FILE ===\n${fileContext}\n`;
       if (textContext) systemInstruction += `\n\n=== STUDENT FILES ===\n${textContext}\n`;
       if (notionContext) systemInstruction += `\n\n${notionContext}`; 
@@ -334,7 +344,14 @@ export class LLMHelper {
       console.log(`[LLM] ✅ Successfully prepared ${imageParts.length} images for API call.`);
       
       // The first part of the prompt is the text message
-      const textPart = { type: "text", text: (message || "Analyze these images sequentially and provide a single, comprehensive solution or explanation.") + "\n\nIMPORTANT: Use $$ for block math and $ for inline math." };
+      // --- NEW: Inject Memory into Vision Prompt too ---
+      let visionPrompt = (message || "Analyze these images sequentially and provide a single, comprehensive solution or explanation.");
+      if (this.sessionTranscript.length > 0) {
+          visionPrompt += `\n\n=== RECENT AUDIO CONTEXT (MEMORY) ===\n${this.sessionTranscript}\n`;
+      }
+      visionPrompt += "\n\nIMPORTANT: Use $$ for block math and $ for inline math.";
+
+      const textPart = { type: "text", text: visionPrompt };
 
       for (const config of VISION_MODELS) {
           try {
@@ -412,6 +429,12 @@ export class LLMHelper {
           const text = response.data?.text?.trim();
           if (text) {
               console.log("[LLM] ✅ Audio Transcription Success (Local)");
+              
+              // --- NEW: Add to Session Memory ---
+              const time = new Date().toLocaleTimeString();
+              this.sessionTranscript += `\n[${time}] ${text}`;
+              console.log(`[LLM] 🧠 Added to Memory (${text.length} chars)`);
+              
               return { text: text, timestamp: Date.now() };
           }
       } catch (e) {
@@ -426,8 +449,17 @@ export class LLMHelper {
                   model: 'whisper-large-v3-turbo',
                   response_format: 'json',
               });
+              
+              // --- NEW: Add to Session Memory ---
+              const text = transcription.text.trim();
+              if (text) {
+                const time = new Date().toLocaleTimeString();
+                this.sessionTranscript += `\n[${time}] ${text}`;
+                console.log(`[LLM] 🧠 Added to Memory (${text.length} chars)`);
+              }
+              
               console.log("[LLM] ✅ Audio Transcription Success (Groq)");
-              return { text: transcription.text.trim(), timestamp: Date.now() };
+              return { text: text, timestamp: Date.now() };
           } catch (e) { 
               console.error("[LLM] ❌ Audio Transcription Failed (All providers)");
           }
@@ -458,6 +490,12 @@ export class LLMHelper {
       // FIX: Debugging now uses ALL images for full context, not just the first one.
       const response = await this.chatWithImage(`Debug:\n${JSON.stringify(problemInfo)}\nCode: ${currentCode}`, debugImagePaths);
       try { return JSON.parse(this.cleanResponse(response).replace(/^```json/, '').replace(/```$/, '')); } catch { return { solution: { code: currentCode, explanation: response } }; }
+  }
+  
+  // --- NEW: Helper to clear memory manually if needed ---
+  public clearTranscript() {
+      this.sessionTranscript = "";
+      console.log("[LLM] 🧹 Session Memory Cleared");
   }
 
   public async analyzeImageFile(imagePath: string) { 

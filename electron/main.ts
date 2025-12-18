@@ -5,7 +5,6 @@ import { ScreenshotHelper } from "./ScreenshotHelper"
 import { ShortcutsHelper } from "./shortcuts"
 import { ProcessingHelper } from "./ProcessingHelper"
 
-// Debug log to confirm file load
 console.log("Main process loading...");
 
 export class AppState {
@@ -18,10 +17,8 @@ export class AppState {
   private tray: Tray | null = null
 
   private view: "queue" | "solutions" = "queue"
-  
-  // NEW: Stealth State (Default True)
   private isStealthMode: boolean = true
-
+  private liveModeInterval: NodeJS.Timeout | null = null;
   private problemInfo: any = null
   private hasDebugged: boolean = false
 
@@ -55,15 +52,75 @@ export class AppState {
     return AppState.instance
   }
 
-  public getIsStealthMode(): boolean {
-      return this.isStealthMode
-  }
+  public getIsStealthMode(): boolean { return this.isStealthMode }
 
   public toggleStealthMode(): boolean {
     this.isStealthMode = !this.isStealthMode
     this.windowHelper.setStealthMode(this.isStealthMode)
     return this.isStealthMode
   }
+
+  // --- Live Mode Logic ---
+  
+  public startLiveMode() {
+    if (this.liveModeInterval) return { success: true };
+
+    console.log("[AppState] 🚀 Starting Live Assist Loop (8s Interval)");
+    
+    this.runLiveAssistCycle();
+
+    // Loop set to 8 seconds
+    this.liveModeInterval = setInterval(() => {
+      this.runLiveAssistCycle();
+    }, 8000); 
+    
+    return { success: true };
+  }
+
+  public stopLiveMode() {
+    if (this.liveModeInterval) {
+      clearInterval(this.liveModeInterval);
+      this.liveModeInterval = null;
+      console.log("[AppState] 🛑 Live Assist Loop Stopped");
+    }
+    return { success: true };
+  }
+
+  private async runLiveAssistCycle() {
+    try {
+      console.log("[LiveLoop] 🔄 Cycle Start...");
+
+      // 1. Capture & Diff Check
+      const screenshotPath = await this.screenshotHelper.captureAndCheckDiff(
+        this.windowHelper.hideMainWindow.bind(this.windowHelper),
+        this.windowHelper.showMainWindow.bind(this.windowHelper)
+      );
+
+      // If null, it was a duplicate (Thumbnail Test passed)
+      if (!screenshotPath) {
+        // Log is handled inside ScreenshotHelper now
+        return; 
+      }
+      
+      // 2. Routing
+      if (this.view === "solutions") {
+        console.log("[LiveLoop] ℹ️ View is 'Solutions' -> Adding to Debug Queue");
+        this.screenshotHelper.addPathToExtraQueue(screenshotPath);
+      } else {
+        console.log("[LiveLoop] ℹ️ View is 'Queue' -> Adding to Main Queue");
+        this.screenshotHelper.addPathToMainQueue(screenshotPath);
+      }
+
+      // 3. Process
+      await this.processingHelper.processScreenshots();
+      console.log("[LiveLoop] 🎙️ (Audio analysis hook ready)");
+
+    } catch (error) {
+      console.error("[LiveLoop] ⚠️ Cycle Error:", error);
+    }
+  }
+
+  // --- End Live Mode Logic ---
 
   public getMainWindow() { return this.windowHelper.getMainWindow() }
   public createWindow() { this.windowHelper.createWindow() }
@@ -80,14 +137,10 @@ export class AppState {
   public setView(view: "queue" | "solutions") { this.view = view; this.screenshotHelper.setView(view); }
   public setProblemInfo(info: any) { this.problemInfo = info }
   public getProblemInfo() { return this.problemInfo }
-
-  // --- FIX: Add methods for Window Movement (Used by ipcHandlers and shortcuts) ---
   public moveWindowLeft() { return this.windowHelper.moveWindowLeft() }
   public moveWindowRight() { return this.windowHelper.moveWindowRight() }
   public moveWindowUp() { return this.windowHelper.moveWindowUp() }
   public moveWindowDown() { return this.windowHelper.moveWindowDown() }
-
-  // --- FIX: Add getter for ScreenshotHelper (Used by ProcessingHelper) ---
   public getScreenshotHelper() { return this.screenshotHelper }
 
   public createTray() {

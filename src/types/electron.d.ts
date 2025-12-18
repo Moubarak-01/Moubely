@@ -29,6 +29,10 @@ export interface ElectronAPI {
   toggleStealthMode: () => Promise<boolean>
   getStealthMode: () => Promise<boolean>
   
+  // --- NEW: Live Assist ---
+  startLiveMode: () => Promise<void>
+  stopLiveMode: () => Promise<void>
+
   checkProfileExists: () => Promise<boolean>
   saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => Promise<boolean>
 }
