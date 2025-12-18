@@ -32,7 +32,7 @@ export class WindowHelper {
     if (this.mainWindow !== null) return
     const windowSettings: Electron.BrowserWindowConstructorOptions = {
       width: 450,
-      height: 600,
+      height: 120,
       minWidth: 150,
       minHeight: 50,
       webPreferences: {
@@ -47,7 +47,7 @@ export class WindowHelper {
       hasShadow: false,
       backgroundColor: "#00000000",
       focusable: true,
-      resizable: true,
+      resizable: false,
       movable: true,
     }
     this.mainWindow = new BrowserWindow(windowSettings)

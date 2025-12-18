@@ -8,9 +8,17 @@ type ChatPayload = string | { message: string; mode?: string; history?: any[] };
 export function initializeIpcHandlers(appState: AppState): void {
   // --- Window Resizing ---
   ipcMain.handle("set-window-size", async (event, { width, height }) => {
-      // console.log(`[IPC] 📏 Resize Window: ${width}x${height}`); // Optional: Uncomment if too noisy
       const win = BrowserWindow.fromWebContents(event.sender)
-      if (win) win.setSize(Math.round(width), Math.round(height))
+      if (win) {
+        // We get current position so the window stays pinned where you moved it
+        const [x, y] = win.getPosition(); 
+        win.setBounds({ 
+          x, 
+          y, 
+          width: Math.round(width), 
+          height: Math.round(height) 
+        });
+      }
   })
 
   ipcMain.handle("update-content-dimensions", async (event, { width, height }) => {

@@ -39,6 +39,14 @@ html, body {
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
 }
 
+.app-collapsed {
+  opacity: 0.25;
+  transform: scale(0.99);
+  height: 60px; /* Match the new small physical height */
+  overflow: hidden;
+}
+
+
 .status-pill {
   background: #2563eb;
   color: white;
