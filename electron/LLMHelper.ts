@@ -403,8 +403,11 @@ export class LLMHelper {
           console.log(`[LLM] 🎙️ Transcribing Audio via Local Service...`);
           const form = new FormData();
           form.append('file', fs.createReadStream(audioPath));
+          // --- UPDATED: 0 Timeout (Infinite) for Long Meetings ---
           const response = await axios.post('http://localhost:3000/v1/audio/transcriptions', form, {
-              headers: form.getHeaders(), timeout: 60000, httpAgent: httpAgent
+              headers: form.getHeaders(), 
+              timeout: 0, // <--- 0 = No timeout (Wait as long as needed)
+              httpAgent: httpAgent
           });
           const text = response.data?.text?.trim();
           if (text) {

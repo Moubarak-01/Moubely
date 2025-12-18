@@ -6,6 +6,8 @@ import wavefile from 'wavefile';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
 import fs from 'fs';
+import os from 'os';   // <--- NEW IMPORT
+import path from 'path'; // <--- NEW IMPORT
 
 const { WaveFile } = wavefile;
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -102,8 +104,10 @@ app.post('/v1/audio/transcriptions', upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file." });
 
     const requestId = Date.now() + Math.random();
-    const tempInput = `temp_input_${requestId}`;
-    const tempOutput = `temp_output_${requestId}.wav`;
+    
+    // --- UPDATED: Use System Temp Folder to avoid Permission Errors ---
+    const tempInput = path.join(os.tmpdir(), `temp_input_${requestId}`);
+    const tempOutput = path.join(os.tmpdir(), `temp_output_${requestId}.wav`);
 
     // Add to Queue instead of processing immediately
     processingQueue.push({ req, res, tempInput, tempOutput });
