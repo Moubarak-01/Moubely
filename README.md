@@ -79,7 +79,7 @@ Moubely is built using a modern, performant, and resilient full-stack JavaScript
 | **Frontend** | **React & TypeScript** | User Interface and application logic. |
 | **Styling** | **Tailwind CSS** | Utility-first CSS framework for rapid, consistent styling. |
 | **Bundling/Dev** | **Vite** | Fast development server and build tool. |
-| **AI/Logic Core** | **Gemini, GPT-4o, Perplexity, Groq** | Multi-Model AI Waterfall for chat, vision, and reasoning. |
+| **AI/Logic Core** | **Gemini, GPT-4o, Perplexity, DeepSeek, Groq** | Multi-Model AI Waterfall for chat, vision, and reasoning. |
 | **Local Services** | **Local Whisper Server** | Fast, local audio transcription for meetings. |
 | **Display** | **KaTeX, Highlight.js** | Rendering complex LaTeX formulas and providing syntax highlighting for code blocks. |
 
