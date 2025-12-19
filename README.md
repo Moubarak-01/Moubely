@@ -10,7 +10,7 @@
 
 We have just deployed major engineering improvements to intelligence, stability, and visibility:
 
-* **Expanded 18-Model "Brain"**: Integrated a massive waterfall of models including **Gemini 3.0 Flash**, **Gemini Robotics**, **Gemma 3 Open Models**, and the full **Perplexity Sonar Suite**.
+* **Expanded 14-Model "Brain"**: Integrated a massive waterfall of models including **Gemini 3.0 Flash**, **Gemini Robotics**, **Gemma 3 Open Models**, and the full **Perplexity Sonar Suite**.
 * **"Read Once" Smart Caching**: The app now reads and OCRs your student profile/resume only **once** on startup and caches it in RAM. Subsequent chat responses are instant, saving massive amounts of CPU and API quota.
 * **Context Distillation**: For search-based models like **Perplexity**, the app automatically generates a **condensed summary** of your profile to prevent context overload, while sending the full deep-dive context to Gemini/GPT-4o.
 * **Universal Context**: The Notion Workspace bridge now works in **all modes** (Student, Developer, General), ensuring the AI always knows your current project context.
@@ -38,14 +38,13 @@ We have just deployed major engineering improvements to intelligence, stability,
 Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioritizes free, local resources before falling back to cloud APIs.
 
 ### 1. The "Brains" (Chat & Logic) 🧠
-The app utilizes a massive **18-Model Waterfall** to ensure you always get an answer:
+The app utilizes a massive **14-Model Waterfall** to ensure you always get an answer:
 1.  **Gemini 2.5 Family** (Flash & Lite) - Primary High-Speed.
 2.  **Gemini 3.0 Series** (Flash & Robotics) - Next-Gen Preview Models.
-3.  **Gemini 2.0 Family** (Flash & Lite) - Standard Fallback.
-4.  **Gemma 3** (Open Models: 27B, 12B, 4B) - Local-style logic.
-5.  **Perplexity Sonar** (Reasoning Pro, Deep Research, Pro) - Live Web Search (Uses Distilled Context).
-6.  **GPT-4o & DeepSeek R1** (via GitHub Models) - Reliable Backups.
-7.  **Groq Llama 3.3** - Ultimate Speed Fallback.
+3.  **Gemma 3** (Open Models: 27B, 12B, 4B) - Local-style logic.
+4.  **Perplexity Sonar** (Reasoning Pro, Deep Research, Pro) - Live Web Search (Uses Distilled Context).
+5.  **GPT-4o & DeepSeek R1** (via GitHub Models) - Reliable Backups.
+6.  **Groq Llama 3.3** - Ultimate Speed Fallback.
 
 ### 2. The "Eyes" (Vision) 👁️
 1.  **Gemini 2.5 Flash**: The primary vision model.
