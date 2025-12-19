@@ -21,44 +21,41 @@ async function safePdfParse(buffer: Buffer) {
 
 // --- 1. THE EXPANDED WATERFALL BRAINS (Chat & Logic) ---
 const CHAT_MODELS = [
-    // --- TIER 1: HIGH PERFORMANCE (Gemini 2.5) ---
+    // --- TIER 1: NEXT GEN (Gemini 3.0) ---
+    // Best overall performance and speed as of late 2025
+    { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3.0 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
 
-    // --- TIER 2: NEXT GEN PREVIEW (Gemini 3.0 & Robotics) ---
-    { type: 'gemini', model: 'gemini-3-flash', name: 'Gemini 3.0 Flash' },
+    // --- TIER 2: SPECIALIZED & PREVIEW ---
     { type: 'gemini', model: 'gemini-robotics-er-1.5-preview', name: 'Gemini Robotics' },
 
-    // --- TIER 3: STANDARD STABLE (Gemini 2.0) ---
-    { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
-    { type: 'gemini', model: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Lite' },
+    // --- TIER 3: OPEN MULTIMODAL (Gemma 3 Family) ---
+    // Now fully multimodal (Text + Vision)
+    { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B (Vision)' },
+    { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B (Vision)' },
+    { type: 'gemini', model: 'gemma-3-4b-it', name: 'Gemma 3 4B (Vision)' },
 
-    // --- TIER 4: OPEN MODELS (Gemma 3 Family) ---
-    { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B' },
-    { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B' },
-    { type: 'gemini', model: 'gemma-3-4b-it', name: 'Gemma 3 4B' },
-    // Skipped 2b/1b to prefer higher intelligence, but can be added if needed
-
-    // --- TIER 5: RESEARCH SPECIALISTS (Perplexity Sonar) ---
-    // Uses "Distilled Context" to prevent overload
+    // --- TIER 4: RESEARCH & SEARCH (Perplexity Sonar) ---
     { type: 'perplexity', model: 'sonar-reasoning-pro', name: 'Sonar Reasoning Pro' },
     { type: 'perplexity', model: 'sonar-deep-research', name: 'Sonar Deep Research' },
     { type: 'perplexity', model: 'sonar-pro', name: 'Sonar Pro' },
     { type: 'perplexity', model: 'sonar', name: 'Sonar' },
 
-    // --- TIER 6: RELIABLE BACKUPS (GitHub Models) ---
+    // --- TIER 5: RELIABLE BACKUPS ---
     { type: 'github', model: 'gpt-4o', name: 'GPT-4o' },
     { type: 'github', model: 'DeepSeek-R1', name: 'DeepSeek R1' },
-
-    // --- TIER 7: ULTIMATE FALLBACK (Groq) ---
     { type: 'groq', model: 'llama-3.3-70b-versatile', name: 'Groq Llama 3.3' }
 ];
 
 // --- 2. THE EYES (Vision Waterfall) ---
 const VISION_MODELS = [
+    { type: 'gemini', model: 'gemini-3-flash-preview' },      // NEW PRIMARY: 15% better image accuracy
     { type: 'gemini', model: 'gemini-2.5-flash' },      // Primary Fast Vision
-    { type: 'gemini', model: 'gemini-2.0-flash' },      // Stable Vision
+    { type: 'gemini', model: 'gemma-3-27b-it' },      // Powerful open-weight vision alternative
     { type: 'perplexity', model: 'sonar-reasoning-pro' }, // Reasoning Vision
+    { type: 'perplexity', model: 'sonar' },           // Basic search-based vision
+    { type: 'gemini', model: 'gemini-2.5-flash-lite' }, // Fast, low-cost fallback
     { type: 'github', model: 'gpt-4o' },                // Backup
     { type: 'openai', model: 'gpt-4o' }                 
 ];
