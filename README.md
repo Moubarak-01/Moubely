@@ -6,17 +6,16 @@
 
 ---
 
-## ✨ Latest Updates (v2.0)
+## ✨ Latest Updates (v2.1)
 
-We have just deployed major engineering improvements to stability and visibility:
+We have just deployed major engineering improvements to intelligence, stability, and visibility:
 
-* **Smart "Thinking" UI**: A new adaptive loader that only appears if the AI takes longer than **2 seconds**. This prevents UI flickering on fast responses (like Groq) while reassuring you during complex tasks (like DeepSeek reasoning).
-* **Live Terminal Telemetry**: We've added a comprehensive logging system. Watch your terminal to see the app's brain in action:
-    * `[IPC]`: User actions (Clicks, Inputs).
-    * `[Processing]`: Internal logic and data movement.
-    * `[LLM]`: External API calls, model switching, and fallback decisions.
-* **OCR Auto-Recovery**: If a PDF is scanned (image-only) and local parsing fails, Moubely now automatically detects the error and switches to **OCR Space API** to read the document visually.
-* **Expanded Model Support**: Added support for **Gemini 2.5 Flash**, **Gemma 3 (Open Models)**, and **DeepSeek R1**.
+* **Expanded 18-Model "Brain"**: Integrated a massive waterfall of models including **Gemini 3.0 Flash**, **Gemini Robotics**, **Gemma 3 Open Models**, and the full **Perplexity Sonar Suite**.
+* **"Read Once" Smart Caching**: The app now reads and OCRs your student profile/resume only **once** on startup and caches it in RAM. Subsequent chat responses are instant, saving massive amounts of CPU and API quota.
+* **Context Distillation**: For search-based models like **Perplexity**, the app automatically generates a **condensed summary** of your profile to prevent context overload, while sending the full deep-dive context to Gemini/GPT-4o.
+* **Universal Context**: The Notion Workspace bridge now works in **all modes** (Student, Developer, General), ensuring the AI always knows your current project context.
+* **Smart "Thinking" UI**: A new adaptive loader that only appears if the AI takes longer than **2 seconds**. This prevents UI flickering on fast responses.
+* **Live Terminal Telemetry**: Comprehensive logging system (`[IPC]`, `[LLM]`, `[Processing]`) lets you watch the app's decision-making in real-time.
 
 ---
 
@@ -24,12 +23,12 @@ We have just deployed major engineering improvements to stability and visibility
 
 -   **👻 Stealth & Visibility Control**: Toggle instantly between **Stealth Mode** (invisible to screen sharing/recording) and **Visible Mode** (standard window for debugging or presentations) directly from the UI.
 -   **📸 Contextual Vision (Multi-Shot)**: Instantly snap screenshots (`Ctrl + H`). Repeated presses **queue up to 6 screenshots** for multi-context analysis. Moubely "sees" your screen using a multi-model approach (Gemini, Perplexity, or GPT-4o) depending on the content.
--   **🧠 Robust AI Waterfall**: We have expanded our AI engine to support a wide range of models. If one model hits a rate limit, Moubely automatically switches to the next available one to ensure reliability.
+-   **🧠 Robust AI Waterfall**: Our Expanded AI engine supports a wide range of models. If one model hits a rate limit, Moubely automatically switches to the next available one to ensure reliability.
 -   **🎙️ Hybrid Meeting Copilot**:
-    * **Local-First Transcription**: Powered by a custom **Local Whisper Server** (Tiny.en) running directly on your machine. It features a smart **Queue System** to handle fast speakers without overwhelming your laptop.
+    * **Local-First Transcription**: Powered by a custom **Local Whisper Server** (Tiny.en) running directly on your machine.
     * **Cloud Fallback**: Automatically switches to **Groq** if the local server gets too busy.
     * **Smart Assists**: One-click buttons to generate suggestions, follow-up questions, or instant recaps.
-    * **Post-Meeting Reliability**: The email generation now waits a **minimum of 15 seconds** after the session ends to ensure all final audio chunks have been processed before summarizing.
+    * **Post-Meeting Reliability**: The email generation waits a **minimum of 15 seconds** after the session ends to ensure all final audio chunks have been processed.
 -   **⚡ Smart Modes**: Switch between **Developer** (DeepSeek Logic), **Student** (Explanatory), and **General** modes to tailor the AI's personality.
 
 ---
@@ -39,19 +38,20 @@ We have just deployed major engineering improvements to stability and visibility
 Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioritizes free, local resources before falling back to cloud APIs.
 
 ### 1. The "Brains" (Chat & Logic) 🧠
-The app tries these models in order until one succeeds:
-1.  **Gemini 2.5 Family** (Flash & Lite - Primary High-Speed)
-2.  **Gemini 2.0 Family** (Standard Fallback)
-3.  **Gemma 3** (Open Models: 27B, 12B, 4B)
-4.  **Perplexity Pro** (Research & Real-time Web Search)
-5.  **GPT-4o** (Reliable Backup via GitHub Models)
-6.  **DeepSeek R1** (Logic Specialist)
-7.  **Groq Llama 3.3** (Ultimate Speed Fallback)
+The app utilizes a massive **18-Model Waterfall** to ensure you always get an answer:
+1.  **Gemini 2.5 Family** (Flash & Lite) - Primary High-Speed.
+2.  **Gemini 3.0 Series** (Flash & Robotics) - Next-Gen Preview Models.
+3.  **Gemini 2.0 Family** (Flash & Lite) - Standard Fallback.
+4.  **Gemma 3** (Open Models: 27B, 12B, 4B) - Local-style logic.
+5.  **Perplexity Sonar** (Reasoning Pro, Deep Research, Pro) - Live Web Search (Uses Distilled Context).
+6.  **GPT-4o & DeepSeek R1** (via GitHub Models) - Reliable Backups.
+7.  **Groq Llama 3.3** - Ultimate Speed Fallback.
 
 ### 2. The "Eyes" (Vision) 👁️
 1.  **Gemini 2.5 Flash**: The primary vision model.
-2.  **Perplexity Vision**: Automatically used for research-heavy images.
-3.  **GPT-4o Vision**: The fallback for critical coding screenshots.
+2.  **Gemini 2.0 Flash**: Standard stable vision.
+3.  **Perplexity Vision**: Automatically used for research-heavy images.
+4.  **GPT-4o Vision**: The fallback for critical coding screenshots.
 
 ### 3. The "Ears" (Audio) 👂
 1.  **Local Whisper (Queue-Optimized)**: Primary. Uses `Xenova/whisper-tiny.en` running locally on port 3000.
@@ -61,6 +61,11 @@ The app tries these models in order until one succeeds:
 -   **Primary:** Sends PDFs natively to Gemini for perfect chart/text understanding.
 -   **Fallback:** Uses a local `pdf-parse` library to extract text on your CPU if Gemini is down.
 -   **OCR Backup:** Uses `OCR Space` API if the PDF is an image scan.
+
+### 5. Context Intelligence ⚡
+-   **"Read Once" Memory:** The app reads and OCRs your student profile/resume only **once** on startup and caches it in RAM. Subsequent chat responses are instant.
+-   **Context Distillation:** For search-based models like **Perplexity**, the app automatically generates a **condensed summary** of your profile (using Gemini Flash) to prevent context overload, while sending the full deep-dive context to Gemini/GPT-4o.
+-   **Universal Notion:** Connects to your workspace to fetch recent project context in **all modes**.
 
 ---
 
@@ -184,18 +189,18 @@ npm run dist
 📂 Project Structure
 / (root)
 ├── package.json
-├── .env                        <-- Contains API Keys
-├── local-whisper-server.mjs    <-- Local AI Audio Engine
+├── .env                        <-- Contains API Keys
+├── local-whisper-server.mjs    <-- Local AI Audio Engine
 ├── electron/
-│   ├── main.ts                 <-- App Entry Point
-│   ├── LLMHelper.ts            <-- The "Waterfall" Logic & Smart Router
-│   ├── ProcessingHelper.ts     <-- Automation Workflow
-│   └── ipcHandlers.ts          <-- Logs & Communication
+│   ├── main.ts                 <-- App Entry Point
+│   ├── LLMHelper.ts            <-- The "Waterfall" Logic & Smart Router
+│   ├── ProcessingHelper.ts     <-- Automation Workflow
+│   └── ipcHandlers.ts          <-- Logs & Communication
 ├── src/
-│   ├── App.tsx                 <-- Main UI Entry
-│   ├── _pages/
-│   │   └── Queue.tsx           <-- Main Chat Interface (Streaming Logic)
-│   ├── components/
-│   │   └── AIResponse.tsx      <-- Markdown & LaTeX Rendering Logic
-│   └── index.css               <-- Glassmorphism Styles
+│   ├── App.tsx                 <-- Main UI Entry
+│   ├── _pages/
+│   │   └── Queue.tsx           <-- Main Chat Interface (Streaming Logic)
+│   ├── components/
+│   │   └── AIResponse.tsx      <-- Markdown & LaTeX Rendering Logic
+│   └── index.css               <-- Glassmorphism Styles
 └── index.html

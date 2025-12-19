@@ -58,7 +58,7 @@ interface ChatContext {
 const cleanMeetingTitle = (rawTitle: string): string => {
   if (!rawTitle) return "Untitled Meeting";
   return rawTitle
-    .replace(/[#*`"']/g, '') // Remove Markdown chars (#, *, `) and quotes
+    .replace(/[#*`"']/g, '') // Remove Markdown chars (#, *, `, ", ')
     .replace(/^Title:\s*/i, '') // Remove "Title:" prefix if present
     .replace(/Meeting Title:\s*/i, '')
     .trim();
@@ -278,7 +278,7 @@ const Queue: React.FC<any> = ({ setView }) => {
   const [isThinking, setIsThinking] = useState(false)
   const [thinkingStep, setThinkingStep] = useState("")
   
-  // --- NEW: Multi-Screenshot State ---
+  // --- Multi-Screenshot State ---
   const [queuedScreenshots, setQueuedScreenshots] = useState<ScreenshotData[]>([]);
 
   // --- Slow Loader State & Timer Ref ---
@@ -305,7 +305,7 @@ const Queue: React.FC<any> = ({ setView }) => {
   // --- STEALTH MODE STATE ---
   const [isStealth, setIsStealth] = useState(true);
 
-  // --- AUDIO REFS (CRITICAL for meeting functionality) ---
+  // --- AUDIO REFS ---
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null)
@@ -798,56 +798,68 @@ const Queue: React.FC<any> = ({ setView }) => {
     }
   }
 
+  // --- UPDATED: TRIGGER ASSIST ACTION (New Logic) ---
   const triggerAssistAction = async (actionType: "Assist" | "WhatToSay" | "FollowUp" | "Recap") => {
     if (!window.electronAPI) return;
       
+    // 1. Get Context
     let transcriptText = transcriptLogs.map(t => t.text).join(" ");
+    // Fallback to chat history if transcript is empty
     if (!transcriptText.trim() && messages.length > 0) {
         transcriptText = messages.slice(-5).map(m => `${m.role.toUpperCase()}: ${m.text}`).join("\n");
     }
+    
     if (!transcriptText.trim()) {
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "I haven't heard enough yet.", timestamp: Date.now() }]);
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "I haven't heard enough yet to assist.", timestamp: Date.now() }]);
         return;
     }
+
+    // 2. Set UI State
     setActiveTab("Chat")
     setIsThinking(true)
     setThinkingStep("Thinking...");
-    isAtBottomRef.current = true;
     
-    setShowSlowLoader(false);
-    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
-    loadingTimerRef.current = setTimeout(() => {
-        setShowSlowLoader(true);
-    }, 2000);
-
+    // 3. Add User Message
     let userDisplayMessage = "";
     let systemPrompt = "";
     
     switch (actionType) {
-      case "Assist": userDisplayMessage = "Assist me."; systemPrompt = `Based on: "${transcriptText}". Provide helpful facts.`; break;
-      case "WhatToSay": userDisplayMessage = "What next?"; systemPrompt = `Based on: "${transcriptText}". Suggest 3 responses.`; break;
-      case "FollowUp": userDisplayMessage = "Follow-up Qs."; systemPrompt = `Based on: "${transcriptText}". Generate 3 questions.`; break;
-      case "Recap": userDisplayMessage = "Recap."; systemPrompt = `Based on: "${transcriptText}". Summarize.`; break;
+      case "Assist": 
+          userDisplayMessage = "Assist me."; 
+          systemPrompt = `Based on this transcript: "${transcriptText}". Provide helpful facts, context, or technical details relevant to the current topic. Be concise.`; 
+          break;
+      case "WhatToSay": 
+          userDisplayMessage = "What next?"; 
+          systemPrompt = `Based on this transcript: "${transcriptText}". Suggest 3 distinct, professional, and smart responses I could say right now.`; 
+          break;
+      case "FollowUp": 
+          userDisplayMessage = "Follow-up Qs."; 
+          systemPrompt = `Based on this transcript: "${transcriptText}". Generate 3 insightful follow-up questions I should ask the speaker.`; 
+          break;
+      case "Recap": 
+          userDisplayMessage = "Recap."; 
+          systemPrompt = `Based on this transcript: "${transcriptText}". Provide a quick bullet-point summary of what has been discussed so far.`; 
+          break;
     }
     
     const aiMsgId = (Date.now() + 1).toString();
-    const newMessages: Message[] = [
-        ...messages,
+    setMessages(prev => [
+        ...prev,
         { id: Date.now().toString(), role: "user", text: userDisplayMessage, timestamp: Date.now() },
         { id: aiMsgId, role: "ai", text: "", timestamp: Date.now(), isStreaming: true }
-    ];
-    setMessages(newMessages);
+    ]);
 
-    const history = messages.map(m => ({ role: m.role, text: m.text }));
-    const args = { message: systemPrompt, mode: mode, history: history };
-
+    // 4. Call AI
     try {
-        const response = await window.electronAPI.invoke("gemini-chat", args)
+        const history = messages.map(m => ({ role: m.role, text: m.text }));
+        // Use "General" mode to allow universal context
+        const response = await window.electronAPI.invoke("gemini-chat", { message: systemPrompt, mode: "General", history: history });
+        
         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m));
-    } catch (e: any) { console.error(e) } 
-    finally { 
-        if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
-        setShowSlowLoader(false);
+    } catch (e: any) { 
+        console.error(e);
+        setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: "Error: " + e.message, isStreaming: false } : m));
+    } finally { 
         setIsThinking(false);
     }
   }
@@ -899,15 +911,33 @@ const Queue: React.FC<any> = ({ setView }) => {
            <div className="tab-nav justify-start overflow-x-auto no-scrollbar shrink-0">
               <button onClick={() => setActiveTab("Chat")} className={`tab-btn ${activeTab === 'Chat' ? 'active' : ''}`}>Chat</button>
               <button onClick={() => setActiveTab("Transcript")} className={`tab-btn ${activeTab === 'Transcript' ? 'active' : ''}`}>Transcript</button>
+              
               {showPostMeeting && <button onClick={() => setActiveTab("Email")} className={`tab-btn flex items-center gap-1.5 ${activeTab === 'Email' ? 'active' : ''}`}><Mail size={14}/> Email</button>}
               <button onClick={() => setActiveTab("History")} className={`tab-btn flex items-center gap-1.5 ${activeTab === 'History' ? 'active' : ''}`}><History size={14}/> History</button>
+              
+              {/* --- UPDATED: ASSIST BUTTONS --- */}
               {!showPostMeeting && (
-                  <> <div className="w-px h-4 bg-white/10 mx-2 self-center shrink-0"/>
-                    <button onClick={() => triggerAssistAction("Assist")} className="tab-btn flex items-center gap-1.5 hover:text-blue-300 whitespace-nowrap"><Sparkles size={14}/> Assist</button>
-                    <button onClick={() => triggerAssistAction("WhatToSay")} className="tab-btn flex items-center gap-1.5 hover:text-green-300 whitespace-nowrap"><MessageCircleQuestion size={14}/> What to say?</button>
-                    <button onClick={() => triggerAssistAction("FollowUp")} className="tab-btn flex items-center gap-1.5 hover:text-purple-300 whitespace-nowrap"><HelpCircle size={14}/> Follow-up</button>
-                    <button onClick={() => triggerAssistAction("Recap")} className="tab-btn flex items-center gap-1.5 hover:text-orange-300 whitespace-nowrap"><FileText size={14}/> Recap</button> </>
+                  <> 
+                    <div className="w-px h-4 bg-white/10 mx-2 self-center shrink-0"/>
+                    
+                    <button onClick={() => triggerAssistAction("Assist")} className="tab-btn flex items-center gap-1.5 hover:text-blue-300 whitespace-nowrap">
+                        <Sparkles size={14}/> Assist
+                    </button>
+                    
+                    <button onClick={() => triggerAssistAction("WhatToSay")} className="tab-btn flex items-center gap-1.5 hover:text-green-300 whitespace-nowrap">
+                        <MessageCircleQuestion size={14}/> What to say?
+                    </button>
+                    
+                    <button onClick={() => triggerAssistAction("FollowUp")} className="tab-btn flex items-center gap-1.5 hover:text-purple-300 whitespace-nowrap">
+                        <HelpCircle size={14}/> Follow-up
+                    </button>
+                    
+                    <button onClick={() => triggerAssistAction("Recap")} className="tab-btn flex items-center gap-1.5 hover:text-orange-300 whitespace-nowrap">
+                        <FileText size={14}/> Recap
+                    </button> 
+                  </>
               )}
+              {/* --------------------------- */}
            </div>
            <div className="content-area flex-1 overflow-hidden flex flex-col">
               {activeTab === "Chat" && (

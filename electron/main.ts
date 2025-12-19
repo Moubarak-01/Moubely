@@ -96,11 +96,7 @@ export class AppState {
         this.windowHelper.showMainWindow.bind(this.windowHelper)
       );
 
-      // If null, it was a duplicate (Thumbnail Test passed)
-      if (!screenshotPath) {
-        // Log is handled inside ScreenshotHelper now
-        return; 
-      }
+      if (!screenshotPath) return; 
       
       // 2. Routing
       if (this.view === "solutions") {
@@ -113,14 +109,11 @@ export class AppState {
 
       // 3. Process
       await this.processingHelper.processScreenshots();
-      console.log("[LiveLoop] 🎙️ (Audio analysis hook ready)");
 
     } catch (error) {
       console.error("[LiveLoop] ⚠️ Cycle Error:", error);
     }
   }
-
-  // --- End Live Mode Logic ---
 
   public getMainWindow() { return this.windowHelper.getMainWindow() }
   public createWindow() { this.windowHelper.createWindow() }

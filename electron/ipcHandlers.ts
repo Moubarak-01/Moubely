@@ -6,11 +6,10 @@ import path from "path"
 type ChatPayload = string | { message: string; mode?: string; history?: any[] };
 
 export function initializeIpcHandlers(appState: AppState): void {
-  // --- 1. WINDOW RESIZING (Unlocked) ---
+  // --- 1. WINDOW RESIZING ---
   ipcMain.handle("set-window-size", async (event, { width, height }) => {
       const win = BrowserWindow.fromWebContents(event.sender)
       if (win) {
-        // UNLOCKED: Respect the frontend's requested size
         const [x, y] = win.getPosition(); 
         win.setSize(Math.round(width), Math.round(height));
       }
@@ -33,8 +32,6 @@ export function initializeIpcHandlers(appState: AppState): void {
   ipcMain.on('toggle-mouse-ignore', (event, ignore: boolean) => {
     const win = BrowserWindow.fromWebContents(event.sender); 
     if (win) {
-      // Only log if changing state to avoid spam on mouse move
-      // console.log(`[IPC] 🖱️ Mouse Ignore: ${ignore}`);
       win.setIgnoreMouseEvents(ignore, { forward: true }); 
     }
   });
@@ -49,7 +46,7 @@ export function initializeIpcHandlers(appState: AppState): void {
     return appState.stopLiveMode();
   });
 
-  // --- 3. CHAT & VISION (With GitHub Token Support) ---
+  // --- 3. CHAT & VISION ---
   ipcMain.handle("gemini-chat", async (event, payload: ChatPayload) => {
       console.log("[IPC] 💬 Chat Request Received");
       let prompt = typeof payload === 'string' ? payload : payload.message;
@@ -85,7 +82,7 @@ export function initializeIpcHandlers(appState: AppState): void {
       return await appState.processingHelper.getLLMHelper().analyzeImageFile(path)
   })
 
-  // --- 5. UTILITIES (Screenshots, Lifecycle) ---
+  // --- 5. UTILITIES ---
   ipcMain.handle("take-screenshot", async () => {
     console.log("[IPC] 📸 Take Screenshot");
     const screenshotPath = await appState.takeScreenshot()
@@ -103,14 +100,21 @@ export function initializeIpcHandlers(appState: AppState): void {
     return await Promise.all(queue.map(async (path) => ({ path, preview: await appState.getImagePreview(path) })))
   })
 
-  // Movement & Window Controls
   ipcMain.handle("move-window-left", async () => appState.moveWindowLeft())
   ipcMain.handle("move-window-right", async () => appState.moveWindowRight())
   ipcMain.handle("move-window-up", async () => appState.moveWindowUp())
   ipcMain.handle("move-window-down", async () => appState.moveWindowDown())
+  
   ipcMain.handle("center-and-show-window", async () => appState.centerAndShowWindow())
   ipcMain.handle("toggle-window", async () => appState.toggleMainWindow())
-  ipcMain.handle("reset-queues", async () => { appState.clearQueues(); return { success: true }; })
+  
+  ipcMain.handle("reset-queues", async () => { 
+      console.log("[IPC] 🧹 Reset Queues & Cache");
+      appState.clearQueues(); 
+      appState.processingHelper.getLLMHelper().clearStudentCache();
+      return { success: true }; 
+  })
+  
   ipcMain.handle("quit-app", () => app.quit())
 
   // --- 6. STUDENT & CONFIG ---
@@ -127,6 +131,8 @@ export function initializeIpcHandlers(appState: AppState): void {
       const existing = fs.readdirSync(saveDir);
       existing.forEach(f => fs.unlinkSync(path.join(saveDir, f)));
       for (const f of files) fs.writeFileSync(path.join(saveDir, f.name), Buffer.from(f.data));
+      
+      appState.processingHelper.getLLMHelper().clearStudentCache();
       return true;
     } catch (e) { 
       console.error("[IPC] ❌ Failed to save student files", e); 
@@ -134,7 +140,7 @@ export function initializeIpcHandlers(appState: AppState): void {
     }
   });
 
-  // Stubs (Ollama removed)
+  // Stubs
   ipcMain.handle("get-current-llm-config", async () => ({ provider: "Cloud Waterfall", model: "auto", isOllama: false }));
   ipcMain.handle("get-available-ollama-models", async () => []);
   ipcMain.handle("switch-to-ollama", async () => ({ success: false, error: "Ollama removed" }));
