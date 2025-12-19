@@ -57,9 +57,8 @@ The app utilizes a massive **14-Model Waterfall** to ensure you always get an an
 2.  **Groq (Whisper-Large-V3)**: Instant cloud fallback if the local queue times out or fails.
 
 ### 4. Smart PDF Handling 📄
--   **Primary:** Sends PDFs natively to Gemini for perfect chart/text understanding.
--   **Fallback:** Uses a local `pdf-parse` library to extract text on your CPU if Gemini is down.
--   **OCR Backup:** Uses `OCR Space` API if the PDF is an image scan.
+-   **Primary:** Uses a local `pdf-parse` library to extract text on your CPU if Gemini is down.
+-   **Fallback (OCR Backup):** Uses `OCR Space` API if the PDF is an image scan.
 
 ### 5. Context Intelligence ⚡
 -   **"Read Once" Memory:** The app reads and OCRs your student profile/resume only **once** on startup and caches it in RAM. Subsequent chat responses are instant.
