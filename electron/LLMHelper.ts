@@ -21,29 +21,13 @@ async function safePdfParse(buffer: Buffer) {
 
 // --- MODEL CONFIGURATIONS ---
 const CHAT_MODELS = [
-    // --- 1. NEW: Gemini 2.5 Series (Priority) ---
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
-
-    // --- 2. Gemini 2.0 Series (Standard) ---
     { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
-    { type: 'gemini', model: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Lite' },
-
-    // --- 3. NEW: Gemma 3 Series (Open Models) ---
     { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B' },
-    { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B' },
-    { type: 'gemini', model: 'gemma-3-4b-it', name: 'Gemma 3 4B' },
-    
-    // --- 4. Perplexity (Research/Reasoning) ---
     { type: 'perplexity', model: 'sonar-reasoning-pro', name: 'Perplexity Pro' },
-
-    // --- 5. GPT-4o (Reliable Backup) ---
     { type: 'github', model: 'gpt-4o', name: 'GPT-4o' },
-
-    // --- 6. DeepSeek (Deep Logic - Slower) ---
     { type: 'github', model: 'DeepSeek-R1', name: 'DeepSeek R1' },
-
-    // --- 7. Groq (Fast Fallback) ---
     { type: 'groq', model: 'llama-3.3-70b-versatile', name: 'Groq' }
 ];
 
@@ -62,11 +46,8 @@ export class LLMHelper {
   private perplexityClient: OpenAI | null = null
   private openaiClient: OpenAI | null = null
   private notionClient: NotionClient | null = null
-  private useOllama: boolean = false
-  private ollamaModel: string = "llama3.2"
-  private ollamaUrl: string = "http://localhost:11434"
-
-  // --- NEW: Session Memory ---
+  
+  // Session Memory
   private sessionTranscript: string = "";
   
   private readonly systemPrompt = `
@@ -80,22 +61,11 @@ export class LLMHelper {
   MATH FORMULA RULES (STRICT):
   - ALWAYS use '$$' for block equations (e.g. $$x^2$$).
   - ALWAYS use '$' for inline math (e.g. $x$).
-  - NEVER use the bracket syntax like \\[ ... \\].
-  
-  STRICT TITLE RULE: If asking for a title, output ONLY the title text string. No quotes.
   `;
 
-  constructor(apiKey?: string, useOllama: boolean = false, ollamaModel?: string, ollamaUrl?: string) {
-    this.useOllama = useOllama;
-    if (useOllama) {
-      console.log(`[LLM] 🔧 Initializing Local Ollama (${ollamaModel})...`);
-      this.ollamaUrl = ollamaUrl || "http://localhost:11434";
-      this.ollamaModel = ollamaModel || "gemma:latest";
-      this.initializeOllamaModel();
-    } else {
-      console.log("[LLM] ☁️ Initializing Cloud Providers...");
-      this.initializeProviders(apiKey);
-    }
+  constructor(apiKey?: string, _u?: boolean, _m?: string, _url?: string) {
+    console.log("[LLM] ☁️ Initializing Cloud Providers (Waterfall System)...");
+    this.initializeProviders(apiKey);
   }
 
   private initializeProviders(geminiKey?: string) {
@@ -107,18 +77,13 @@ export class LLMHelper {
       if (process.env.OPENAI_API_KEY) this.openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, dangerouslyAllowBrowser: true });
   }
 
-  // --- CLEANER: Removes <think> tags AND citations like [1], [5] ---
   private cleanResponse(text: string): string {
-      let cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, ""); // Remove DeepSeek thinking
-      cleaned = cleaned.replace(/\[\d+\]/g, ""); // Remove Perplexity citations like [1]
-      return cleaned.trim();
+      return text.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/\[\d+\]/g, "").trim();
   }
 
-  // --- PDF PARSER WITH OCR BACKUP ---
+  // --- PDF PARSER ---
   private async extractTextFromPdf(buffer: Buffer): Promise<string> {
       console.log("[LLM] 📄 Parsing PDF content...");
-      
-      // 1. Try Local Parsing (Fast/Free)
       try {
           const data = await safePdfParse(buffer);
           if (data && data.text && data.text.trim().length > 50) {
@@ -130,43 +95,30 @@ export class LLMHelper {
           console.warn("[LLM] ❌ Local PDF parse failed completely. Switching to OCR..."); 
       }
 
-      // 2. Try OCR Space API (Backup for Scanned PDFs)
+      // OCR Fallback
       const ocrKey = process.env.OCR_SPACE_API_KEY;
       if (ocrKey) {
           try {
               console.log("[LLM] 👁️ Attempting OCR via OCR Space API...");
-              
               const formData = new FormData();
-              // OCR Space expects base64 data uri
               formData.append('base64Image', `data:application/pdf;base64,${buffer.toString('base64')}`);
               formData.append('isOverlayRequired', 'false');
-              formData.append('scale', 'true'); // Improves accuracy
-              formData.append('OCREngine', '2'); // Better for text
+              formData.append('OCREngine', '2');
               
               const response = await axios.post('https://api.ocr.space/parse/image', formData, { 
-                  headers: { 
-                      ...formData.getHeaders(), 
-                      'apikey': ocrKey 
-                  },
-                  timeout: 30000 // 30s timeout for OCR
+                  headers: { ...formData.getHeaders(), 'apikey': ocrKey }, timeout: 30000 
               });
 
               if (response.data && response.data.ParsedResults) {
                   const ocrText = response.data.ParsedResults.map((r: any) => r.ParsedText).join('\n');
                   if (ocrText.trim().length > 0) {
-                      console.log("[LLM] ✅ OCR Success! Text extracted from image PDF.");
+                      console.log("[LLM] ✅ OCR Success! Text extracted.");
                       return ocrText;
                   }
               }
-              console.warn("[LLM] ⚠️ OCR returned no text.");
-          } catch (e: any) {
-              console.error(`[LLM] ❌ OCR Failed: ${e.message}`);
-          }
-      } else {
-          console.warn("[LLM] ℹ️ No OCR_SPACE_API_KEY found. Skipping OCR fallback.");
+          } catch (e: any) { console.error(`[LLM] ❌ OCR Failed: ${e.message}`); }
       }
-
-      return "[Error: Could not extract text from PDF via Parse or OCR]";
+      return "";
   }
 
   public async getFileContext(filePath: string): Promise<{ text: string, isPdf: boolean, base64?: string, mimeType?: string }> {
@@ -189,30 +141,20 @@ export class LLMHelper {
     try {
       console.log("[LLM] 📝 Fetching Notion Context...");
       const response = await this.notionClient.search({ query: "", page_size: 5, sort: { direction: 'descending', timestamp: 'last_edited_time' }});
-      let context = "=== RECENT NOTION ACTIVITY (CONTEXT) ===\n";
+      let context = "=== RECENT NOTION ACTIVITY ===\n";
       for (const result of response.results) {
         const item = result as any;
         if (item.properties) {
-            const titleProp = item.properties.Name?.title?.[0]?.plain_text || item.properties.Title?.title?.[0]?.plain_text || "Untitled";
-            context += `- Page: "${titleProp}" (Link: ${item.url || ""})\n`;
+            const title = item.properties.Name?.title?.[0]?.plain_text || item.properties.Title?.title?.[0]?.plain_text || "Untitled";
+            context += `- ${title} (${item.url})\n`;
         }
       }
       return context + "\n";
-    } catch (error) { 
-        console.warn("[LLM] ⚠️ Notion fetch failed (ignoring)");
-        return ""; 
-    }
+    } catch { return ""; }
   }
 
-  public async getNotionUsers() {
-      if (!this.notionClient) return "Notion not configured.";
-      try { const list = await this.notionClient.users.list({}); return JSON.stringify(list); } catch (error: any) { return `Error: ${error.message}`; }
-  }
-
-  // --- STREAMING ENABLED CHAT ---
+  // --- MAIN CHAT LOGIC ---
   public async chatWithGemini(message: string, history: any[], mode: string = "General", fileContext: string = "", onToken?: (token: string) => void): Promise<string> {
-      if (this.useOllama) return this.callOllama(message);
-      
       const studentDir = path.join(app.getPath("userData"), "student_profile");
       let pdfPartForGemini: any = null;
       let textContext = "";
@@ -222,29 +164,21 @@ export class LLMHelper {
             const files = fs.readdirSync(studentDir);
             if(files.length > 0) console.log(`[LLM] 🎓 Student Mode: Reading ${files.length} profile files...`);
             for (const file of files) {
-                const { text, isPdf, base64, mimeType } = await this.getFileContext(path.join(studentDir, file));
+                const { text, isPdf, base64 } = await this.getFileContext(path.join(studentDir, file));
                 if (text) textContext += `\n\n=== PDF TEXT (${file}) ===\n${text}`;
-                if (isPdf && base64) pdfPartForGemini = { inlineData: { data: base64, mimeType: mimeType || "application/pdf" } };
+                if (isPdf && base64) pdfPartForGemini = { inlineData: { data: base64, mimeType: "application/pdf" } };
             }
           } catch(e) {}
       }
 
-      let notionContext = (mode === "General" || mode === "Student") ? await this.getNotionContext() : "";
+      let notionContext = (mode === "General") ? await this.getNotionContext() : "";
       
       let systemInstruction = this.systemPrompt;
-      if (mode === "Student") systemInstruction += "\nCONTEXT: Mentor mode. Use attached files.";
-      
-      // --- NEW: Inject Session Transcript (Memory) ---
-      if (this.sessionTranscript.length > 0) {
-          systemInstruction += `\n\n=== LIVE SESSION TRANSCRIPT (MEMORY) ===\n${this.sessionTranscript}\n`;
-      }
-
-      if (fileContext) systemInstruction += `\n\n=== UPLOADED FILE ===\n${fileContext}\n`;
+      if (this.sessionTranscript) systemInstruction += `\n\n=== LIVE MEMORY ===\n${this.sessionTranscript}\n`;
       if (textContext) systemInstruction += `\n\n=== STUDENT FILES ===\n${textContext}\n`;
       if (notionContext) systemInstruction += `\n\n${notionContext}`; 
 
       let validHistory = history.map(h => ({ role: h.role === 'ai' ? 'model' : 'user', parts: [{ text: h.text }] }));
-      while (validHistory.length > 0 && validHistory[0].role === 'model') validHistory.shift(); 
 
       for (const config of CHAT_MODELS) {
           try {
@@ -253,23 +187,17 @@ export class LLMHelper {
               let fullResponse = "";
               if (config.type === 'gemini') {
                   if (!this.genAI) continue;
-                  const isTextOnly = config.model.includes('gemma');
                   const geminiModel = this.genAI.getGenerativeModel({ model: config.model });
                   const chat = geminiModel.startChat({ history: validHistory });
-                  let prompt = systemInstruction + "\n\n" + message;
-                  if (isTextOnly && textContext) prompt += `\n\n${textContext}`;
-                  
-                  let parts: any[] = [{ text: prompt }];
-                  if (!isTextOnly && pdfPartForGemini) parts.push(pdfPartForGemini);
+                  let parts: any[] = [{ text: systemInstruction + "\n\n" + message }];
+                  if (pdfPartForGemini) parts.push(pdfPartForGemini);
                   
                   const result = await chat.sendMessageStream(parts);
-                  
                   for await (const chunk of result.stream) {
                       const text = chunk.text();
                       fullResponse += text;
                       if (onToken) onToken(text); 
                   }
-                  
                   console.log(`[LLM] ✅ SUCCESS: Answer generated by ${config.model}`);
                   return this.cleanResponse(fullResponse);
               } else {
@@ -277,47 +205,32 @@ export class LLMHelper {
                   if (config.type === 'github') client = this.githubClient;
                   else if (config.type === 'groq') client = this.groqClient;
                   else if (config.type === 'perplexity') client = this.perplexityClient;
-                  else if (config.type === 'openai') client = this.openaiClient;
                   
                   if (client) {
                       const stream = await client.chat.completions.create({
-                          messages: [{ role: "system", content: systemInstruction + (textContext ? `\n\n${textContext}` : "") }, ...history.map(h => ({ role: h.role === 'ai' ? 'assistant' : 'user', content: h.text })), { role: "user", content: message }] as any,
+                          messages: [{ role: "system", content: systemInstruction }, ...history.map(h => ({ role: h.role === 'ai' ? 'assistant' : 'user', content: h.text })), { role: "user", content: message }] as any,
                           model: config.model,
-                          temperature: 0.7,
                           stream: true 
                       });
                       
-                      let isThinking = false;
                       for await (const chunk of stream) {
-                          let content = chunk.choices[0]?.delta?.content || "";
-                          if (!content) continue;
-
-                          // --- FILTER LOGIC ---
-                          if (content.includes('<think>')) { isThinking = true; continue; }
-                          if (content.includes('</think>')) { isThinking = false; continue; }
-                          if (isThinking) continue; 
-                          if (/\[\d+\]/.test(content)) continue; // Filter citation nums
-
-                          if (content) { 
+                          const content = chunk.choices[0]?.delta?.content || "";
+                          if (content && !content.includes('<think>')) { 
                               fullResponse += content; 
                               if (onToken) onToken(content); 
                           }
                       }
-                      
                       console.log(`[LLM] ✅ SUCCESS: Answer generated by ${config.model}`);
                       return this.cleanResponse(fullResponse);
                   }
               }
-          } catch (error) { 
-              console.warn(`[LLM] ❌ Failed: ${config.model}. Trying next provider...`);
-              continue; 
-          }
+          } catch (error) { console.warn(`[LLM] ❌ Failed: ${config.model}. Trying next provider...`); }
       }
       console.error("[LLM] ☠️ All AI providers failed.");
       return "⚠️ All AI providers failed.";
   }
 
-  // --- UPDATED: STREAMING ENABLED MULTI-IMAGE CHAT ---
+  // --- VISION WATERFALL (Correctly Implemented with Fallbacks) ---
   public async chatWithImage(message: string, imagePaths: string[], onToken?: (token: string) => void): Promise<string> {
       console.log(`[LLM] 🖼️ Starting analysis of ${imagePaths.length} images...`);
       
@@ -325,32 +238,18 @@ export class LLMHelper {
 
       for (const imagePath of imagePaths) {
           try {
-              const imageBuffer = await fs.promises.readFile(imagePath);
-              const base64Image = imageBuffer.toString("base64");
-              const mimeType = imagePath.endsWith(".png") ? "image/png" : "image/jpeg";
-              imageParts.push({ inlineData: { data: base64Image, mimeType: mimeType } });
+              const buffer = await fs.promises.readFile(imagePath);
+              imageParts.push({ inlineData: { data: buffer.toString("base64"), mimeType: imagePath.endsWith(".png") ? "image/png" : "image/jpeg" } });
           } catch (e: any) {
               console.error(`[LLM] ❌ Failed to read image file (${path.basename(imagePath)}): ${e.message}`);
-              continue; // Skip this image if reading fails
           }
       }
       
-      // FIX: Check if images were successfully prepared
-      if (imageParts.length === 0) {
-          console.error("[LLM] ❌ Error: Successfully prepared 0 image files.");
-          return "❌ Error: Could not read any image files for analysis.";
-      }
-
+      if (imageParts.length === 0) return "❌ Error: Could not read any images.";
       console.log(`[LLM] ✅ Successfully prepared ${imageParts.length} images for API call.`);
       
-      // The first part of the prompt is the text message
-      // --- NEW: Inject Memory into Vision Prompt too ---
-      let visionPrompt = (message || "Analyze these images sequentially and provide a single, comprehensive solution or explanation.");
-      if (this.sessionTranscript.length > 0) {
-          visionPrompt += `\n\n=== RECENT AUDIO CONTEXT (MEMORY) ===\n${this.sessionTranscript}\n`;
-      }
-      visionPrompt += "\n\nIMPORTANT: Use $$ for block math and $ for inline math.";
-
+      let visionPrompt = message || "Analyze these images.";
+      if (this.sessionTranscript) visionPrompt += `\n\nContext: ${this.sessionTranscript}`;
       const textPart = { type: "text", text: visionPrompt };
 
       for (const config of VISION_MODELS) {
@@ -361,8 +260,6 @@ export class LLMHelper {
               if (config.type === 'gemini') {
                   if (!this.genAI) continue;
                   const model = this.genAI.getGenerativeModel({ model: config.model });
-                  
-                  // Combine text part and all image parts
                   const parts = [{ text: textPart.text }, ...imageParts];
                   const result = await model.generateContentStream(parts);
                   
@@ -374,95 +271,75 @@ export class LLMHelper {
                   console.log(`[LLM] ✅ VISION SUCCESS: ${config.model}`);
                   return this.cleanResponse(fullResponse);
               } 
+              // --- RESTORED FALLBACK FOR OPENAI/GITHUB/PERPLEXITY ---
               else if (['github', 'openai', 'perplexity'].includes(config.type)) {
                   let client = null;
                   if (config.type === 'github') client = this.githubClient;
                   else if (config.type === 'openai') client = this.openaiClient;
                   else if (config.type === 'perplexity') client = this.perplexityClient;
 
-                  if (!client) continue;
-                  
-                  // Combine text part and all image parts for OpenAI-style API
-                  const openAIParts: any[] = [textPart, ...imageParts.map(p => ({ 
-                      type: "image_url", 
-                      image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` } 
-                  }))];
+                  if (client) {
+                      // Correctly format image payload for OpenAI-compatible APIs
+                      const openAIParts: any[] = [textPart, ...imageParts.map(p => ({ 
+                          type: "image_url", 
+                          image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` } 
+                      }))];
 
-                  const stream = await client.chat.completions.create({
-                      model: config.model,
-                      messages: [{ role: "user", content: openAIParts }],
-                      max_tokens: 2000, // Increased max tokens for multi-image tasks
-                      stream: true 
-                  });
+                      const stream = await client.chat.completions.create({
+                          model: config.model,
+                          messages: [{ role: "user", content: openAIParts }],
+                          max_tokens: 2000, 
+                          stream: true 
+                      });
 
-                  for await (const chunk of stream) {
-                      const content = chunk.choices[0]?.delta?.content || "";
-                      if (/\[\d+\]/.test(content)) continue; 
-
-                      if (content) {
-                          fullResponse += content;
-                          if (onToken) onToken(content);
+                      for await (const chunk of stream) {
+                          const content = chunk.choices[0]?.delta?.content || "";
+                          if (content) {
+                              fullResponse += content;
+                              if (onToken) onToken(content);
+                          }
                       }
+                      console.log(`[LLM] ✅ VISION SUCCESS: ${config.model}`);
+                      return this.cleanResponse(fullResponse);
                   }
-                  console.log(`[LLM] ✅ VISION SUCCESS: ${config.model}`);
-                  return this.cleanResponse(fullResponse);
               }
-          } catch (error: any) {
-              console.warn(`[LLM] ❌ Vision Model ${config.model} failed: ${error.message}`);
-          }
+          } catch (error: any) { console.warn(`[LLM] ❌ Vision Model ${config.model} failed: ${error.message}`); }
       }
       return "❌ Error: All vision models failed.";
   }
 
-  // --- AUDIO & MISC ---
+  // --- AUDIO LOGIC ---
   public async analyzeAudioFile(audioPath: string): Promise<{ text: string, timestamp: number }> {
       try {
           console.log(`[LLM] 🎙️ Transcribing Audio via Local Service...`);
           const form = new FormData();
           form.append('file', fs.createReadStream(audioPath));
-          // --- UPDATED: 0 Timeout (Infinite) for Long Meetings ---
           const response = await axios.post('http://localhost:3000/v1/audio/transcriptions', form, {
-              headers: form.getHeaders(), 
-              timeout: 0, // <--- 0 = No timeout (Wait as long as needed)
-              httpAgent: httpAgent
+              headers: form.getHeaders(), timeout: 0, httpAgent: httpAgent
           });
           const text = response.data?.text?.trim();
           if (text) {
               console.log("[LLM] ✅ Audio Transcription Success (Local)");
-              
-              // --- NEW: Add to Session Memory ---
-              const time = new Date().toLocaleTimeString();
-              this.sessionTranscript += `\n[${time}] ${text}`;
-              console.log(`[LLM] 🧠 Added to Memory (${text.length} chars)`);
-              
+              this.sessionTranscript += `\n[${new Date().toLocaleTimeString()}] ${text}`;
               return { text: text, timestamp: Date.now() };
           }
-      } catch (e) {
-          console.warn("[LLM] ⚠️ Local transcription failed. Trying Cloud...");
-      }
+      } catch (e) { console.warn("[LLM] ⚠️ Local transcription failed. Trying Cloud..."); }
       
       if (this.groqClient) {
           try {
-              console.log("[LLM] ☁️ Transcribing Audio via Groq (Whisper)...");
+              console.log("[LLM] ☁️ Transcribing Audio via Groq...");
               const transcription = await this.groqClient.audio.transcriptions.create({
                   file: fs.createReadStream(audioPath),
                   model: 'whisper-large-v3-turbo',
                   response_format: 'json',
               });
-              
-              // --- NEW: Add to Session Memory ---
               const text = transcription.text.trim();
               if (text) {
-                const time = new Date().toLocaleTimeString();
-                this.sessionTranscript += `\n[${time}] ${text}`;
-                console.log(`[LLM] 🧠 Added to Memory (${text.length} chars)`);
+                console.log("[LLM] ✅ Audio Transcription Success (Groq)");
+                this.sessionTranscript += `\n[${new Date().toLocaleTimeString()}] ${text}`;
               }
-              
-              console.log("[LLM] ✅ Audio Transcription Success (Groq)");
               return { text: text, timestamp: Date.now() };
-          } catch (e) { 
-              console.error("[LLM] ❌ Audio Transcription Failed (All providers)");
-          }
+          } catch (e) { console.error("[LLM] ❌ Audio Transcription Failed."); }
       }
       return { text: "", timestamp: Date.now() };
   }
@@ -471,35 +348,27 @@ export class LLMHelper {
       if (!base64Data || base64Data.length < 100) return { text: "", timestamp: Date.now() };
       const tempPath = path.join(os.tmpdir(), `temp_audio_${Date.now()}.wav`);
       try {
-          const buffer = Buffer.from(base64Data, 'base64');
-          await fs.promises.writeFile(tempPath, buffer);
+          await fs.promises.writeFile(tempPath, Buffer.from(base64Data, 'base64'));
           const result = await this.analyzeAudioFile(tempPath);
-          try { fs.unlinkSync(tempPath); } catch (e) {}
+          try { fs.unlinkSync(tempPath); } catch {}
           return result;
-      } catch (error) { return { text: "", timestamp: Date.now() }; }
+      } catch { return { text: "", timestamp: Date.now() }; }
   }
 
   public async generateSolution(problemInfo: any) {
       console.log("[LLM] 🧠 Generating Solution...");
       const solutionText = await this.chatWithGemini(`Solve:\n${JSON.stringify(problemInfo)}`, [], "Developer");
-      try { return JSON.parse(this.cleanResponse(solutionText).replace(/^```json/, '').replace(/```$/, '')); } catch { return { solution: { code: solutionText, explanation: "AI Generated" } }; }
+      return { solution: { code: solutionText, explanation: "AI Generated" } };
   }
 
   public async debugSolutionWithImages(problemInfo: any, currentCode: string, debugImagePaths: string[]) {
       console.log(`[LLM] 🐞 Debugging with ${debugImagePaths.length} screenshots...`);
-      // FIX: Debugging now uses ALL images for full context, not just the first one.
       const response = await this.chatWithImage(`Debug:\n${JSON.stringify(problemInfo)}\nCode: ${currentCode}`, debugImagePaths);
-      try { return JSON.parse(this.cleanResponse(response).replace(/^```json/, '').replace(/```$/, '')); } catch { return { solution: { code: currentCode, explanation: response } }; }
+      return { solution: { code: currentCode, explanation: response } };
   }
   
-  // --- NEW: Helper to clear memory manually if needed ---
-  public clearTranscript() {
-      this.sessionTranscript = "";
-      console.log("[LLM] 🧹 Session Memory Cleared");
-  }
-
   public async analyzeImageFile(imagePath: string) { 
-      console.log(`[LLM] 🖼️ Analyzing Image File: ${path.basename(imagePath)}`);
+      console.log(`[LLM] 🖼️ Analyzing Single Image File: ${path.basename(imagePath)}`);
       return { text: "", timestamp: Date.now() }; 
   }
   
@@ -509,11 +378,9 @@ export class LLMHelper {
   }
   
   public async getOllamaModels() { return []; } 
-  public isUsingOllama() { return this.useOllama; }
-  public getCurrentProvider() { return "multi-provider"; }
+  public isUsingOllama() { return false; }
+  public getCurrentProvider() { return "Cloud Waterfall"; }
   public getCurrentModel() { return "auto"; }
-  public async switchToOllama(model?: string, url?: string) { this.useOllama = true; }
-  public async switchToGemini(apiKey?: string) { if(apiKey) this.initializeProviders(apiKey); this.useOllama = false; }
-  private async callOllama(prompt: string): Promise<string> { return ""; }
-  private async initializeOllamaModel(): Promise<void> {}
+  public async switchToOllama() { return { success: false, error: "Ollama removed" }; }
+  public async switchToGemini(apiKey?: string) { if(apiKey) this.initializeProviders(apiKey); }
 }

@@ -11,15 +11,35 @@ html, body {
   color: #e5e7eb;
 }
 
-/* --- NEW: Deep Stealth Cursor Class --- */
-/* This class is applied by React when the window is ignoring mouse events */
+/* --- NEW: Auto-Collapse Styling --- */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 500ms;
+}
+
+/* When the timer hits 10s, fade the UI to be less obtrusive */
+.app-collapsed {
+  opacity: 0.25; /* Very transparent */
+  transform: scale(0.99); /* Slight subtle shrink */
+  filter: grayscale(0.8); /* Desaturate colors to minimize distraction */
+  pointer-events: none; /* Clicks go through the window until you hover back */
+}
+
+/* Instant wake-up on hover */
+.app-collapsed:hover {
+  opacity: 1;
+  transform: scale(1);
+  filter: grayscale(0);
+  pointer-events: auto;
+}
+
+/* --- EXISTING CURSOR & INTERACTION --- */
 .cursor-deep-stealth {
   cursor: none !important; 
 }
-/* ------------------------------------- */
 
 /* --- MAIN WINDOW --- */
-/* CHANGED: cluely-window to moubely-window */
 .moubely-window {
   display: flex;
   flex-direction: column;
@@ -29,23 +49,15 @@ html, body {
   background: transparent;
 }
 
-/* EXPANDED: 75% Opacity (0.75) */
+/* EXPANDED: 75% Opacity */
 .moubely-window.expanded {
   height: 100vh;
-  background: rgba(15, 15, 20, 0.75); /* UPDATED: 75% */
+  background: rgba(15, 15, 20, 0.75); 
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
 }
-
-.app-collapsed {
-  opacity: 0.25;
-  transform: scale(0.99);
-  height: 60px; /* Match the new small physical height */
-  overflow: hidden;
-}
-
 
 .status-pill {
   background: #2563eb;
@@ -65,14 +77,13 @@ html, body {
 
 /* TOP BAR: Matches 75% Opacity */
 .compact-bar {
-  background: rgba(26, 26, 26, 0.75); /* UPDATED: 75% */
+  background: rgba(26, 26, 26, 0.75); 
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
   padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(12px);
   width: 100%;
 }
@@ -114,7 +125,6 @@ html, body {
   border-radius: 18px;
   border-top-right-radius: 4px;
   padding: 10px 18px;
-  /* Fluid font size for small windows */
   font-size: clamp(12px, 2.5vmin, 14px); 
   line-height: 1.5;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -124,7 +134,7 @@ html, body {
 /* AI Message */
 .ai-message {
   color: #f3f4f6;
-  font-size: clamp(13px, 2.5vmin, 15px); /* Responsive Font */
+  font-size: clamp(13px, 2.5vmin, 15px); 
   line-height: 1.6;
   padding: 4px 0;
   max-width: 65ch;
@@ -141,11 +151,12 @@ html, body {
   @apply bg-blue-500/20 text-blue-300 border-blue-500/30;
 }
 
-/* Scrollbar */
+/* Drag & Interaction */
+.interactive { cursor: default; -webkit-app-region: no-drag; pointer-events: auto; }
+.draggable { -webkit-app-region: drag; cursor: grab; }
+
+/* Existing Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 20px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
-
-.interactive { cursor: default; -webkit-app-region: no-drag; pointer-events: auto; }
-.draggable { -webkit-app-region: drag; cursor: grab; }

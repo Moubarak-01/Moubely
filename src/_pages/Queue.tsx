@@ -27,7 +27,6 @@ interface Message {
   id: string
   role: "user" | "ai"
   text: string
-  // FIX: Reworked to handle the entire array for display
   queuedScreenshots?: ScreenshotData[]; 
   timestamp: number
   isStreaming?: boolean 
@@ -52,9 +51,18 @@ interface ChatContext {
   isInMeeting: boolean;
   uploadedFilesContent: string;
   meetingTranscript: string;
-  // FIX: User image is now derived from the first item in queuedScreenshots
   userImage?: string; 
 }
+
+// --- TITLE CLEANER UTILITY ---
+const cleanMeetingTitle = (rawTitle: string): string => {
+  if (!rawTitle) return "Untitled Meeting";
+  return rawTitle
+    .replace(/[#*`"']/g, '') // Remove Markdown chars (#, *, `) and quotes
+    .replace(/^Title:\s*/i, '') // Remove "Title:" prefix if present
+    .replace(/Meeting Title:\s*/i, '')
+    .trim();
+};
 
 const preparePayload = (userMessage: string, context: ChatContext) => {
   let systemInstruction = "";
@@ -233,11 +241,12 @@ const StudentModeSetupModal = ({ open, onClose, onSave }: { open: boolean, onClo
     }
   };
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    // FIX: Added 'interactive' class so clicks register even if window is click-through
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 interactive">
       <div className="bg-[#1e1e1e] border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         <h2 className="text-xl font-semibold text-white mb-2">Student Mode Setup</h2>
         <p className="text-gray-400 text-sm mb-4">Upload resume or project files (max 6).</p>
-        <div className="border-2 border-dashed border-white/10 rounded-xl p-8 flex flex-col items-center justify-center bg-white/5 hover:bg-white/10 transition-colors relative">
+        <div className="border-2 border-dashed border-white/10 rounded-xl p-8 flex flex-col items-center justify-center bg-white/5 hover:bg-white/10 transition-colors relative cursor-pointer">
             <input type="file" multiple accept=".pdf,.txt,.md,.ts,.js,.py" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"/>
             <Upload size={32} className="text-blue-400 mb-2"/>
             <span className="text-sm text-gray-300">Click to upload files</span>
@@ -324,10 +333,8 @@ const Queue: React.FC<any> = ({ setView }) => {
   const MAX_QUEUE_SIZE = 6;
 
   // Helper to capture a screenshot and manage the queue/send action
-  // FIX: This function is now ALWAYS a queue action.
   const handleCapture = async () => {
     try { 
-        // CRITICAL FIX: Ensure API is available before proceeding
         if (!window.electronAPI) {
             console.error("[UI] Electron API is undefined. Cannot capture screenshot.");
             return;
@@ -335,17 +342,14 @@ const Queue: React.FC<any> = ({ setView }) => {
 
         console.log(`[UI] 📸 Starting capture (Queue Action)`); 
         
-        // 1. Capture the image
         const result: ScreenshotData = await window.electronAPI.takeScreenshot(); 
         if (!result || !result.path) {
              console.warn("[UI] Capture failed or returned empty result.");
              return;
         }
         
-        // 2. Queue the result
         setQueuedScreenshots(prev => {
             const newQueue = [...prev, result];
-            // Enforce max size
             if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift(); 
             return newQueue;
         });
@@ -355,43 +359,30 @@ const Queue: React.FC<any> = ({ setView }) => {
         
     } catch(e) {
         console.error("[UI] Screenshot Failed:", e);
-        // Display user-friendly alert
         alert("Screenshot failed. Check console for details.");
     } 
   }
   
-  // Replaces handleUseScreen (Monitor Button)
-  const handleUseScreen = () => {
-    // This button now always acts as a "Take & Queue" action
-    handleCapture(); 
-  }
+  const handleUseScreen = () => { handleCapture(); }
   
-  // Listener to remove an item from the queue
   const handleRemoveQueuedScreenshot = async (pathToRemove: string) => {
       if (!window.electronAPI) return;
-      // Call Electron to delete the file physically
       await window.electronAPI.deleteScreenshot(pathToRemove); 
-      // Update UI state
       setQueuedScreenshots(prev => prev.filter(img => img.path !== pathToRemove));
   };
   
-  // Listener to clear the entire queue
   const handleClearQueue = async () => {
       if (!window.electronAPI) return;
-      // Call Electron to delete all files in the current queue
       await Promise.all(queuedScreenshots.map(img => window.electronAPI.deleteScreenshot(img.path)));
-      // Clear UI state
       setQueuedScreenshots([]);
   };
 
   useEffect(() => {
-    // FIX 1: CRITICAL SAFETY CHECK on initial window size calls
     if (window.electronAPI) {
         window.electronAPI.setWindowSize({ width: 450, height: 120 })
     }
     setIsExpanded(false) 
     
-    // --- FETCH STEALTH MODE ON STARTUP ---
     if (window.electronAPI && window.electronAPI.getStealthMode) {
       window.electronAPI.getStealthMode().then(setIsStealth).catch(console.error);
     }
@@ -401,11 +392,9 @@ const Queue: React.FC<any> = ({ setView }) => {
         try { setPastMeetings(JSON.parse(saved)) } catch(e) {}
     }
 
-    // --- NEW: STREAMING LISTENER WITH TIMER CANCELLATION ---
     let cleanupStream = () => {};
     if (window.electronAPI && window.electronAPI.onTokenReceived) {
         cleanupStream = window.electronAPI.onTokenReceived((token) => {
-            // 1. First word arrived! Kill timer immediately.
             if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
             setShowSlowLoader(false);
 
@@ -434,18 +423,14 @@ const Queue: React.FC<any> = ({ setView }) => {
             })
         );
         
-        // FIX 2: Listener for shortcut actions (Ctrl+H and Ctrl+Shift+H)
         cleanupFunctions.push(
             window.electronAPI.onScreenshotAction((data) => {
-                // Since shortcuts.ts now ONLY sends "take-and-queue" for Ctrl+H, 
-                // we only need to respond to that action.
                 if (data.action === "take-and-queue") {
                     handleCapture(); 
                 }
             })
         );
     }
-
 
     return () => { 
         cleanupFunctions.forEach(fn => fn());
@@ -458,9 +443,7 @@ const Queue: React.FC<any> = ({ setView }) => {
     setMessages([{ id: "init", role: "ai", text: "Hi there. I'm Moubely. I'm ready to listen.", timestamp: Date.now() }]);
   }
 
-  // --- TOGGLE STEALTH FUNCTION ---
   const handleToggleStealth = async () => {
-    // FIX: Guard against undefined API
     if (window.electronAPI) {
         const newState = await window.electronAPI.toggleStealthMode();
         setIsStealth(newState);
@@ -490,7 +473,6 @@ const Queue: React.FC<any> = ({ setView }) => {
     }
   }, [input]);
 
-  // --- FIX: Full Implementation of startRecordingLoop ---
   const startRecordingLoop = () => {
       if (!isRecordingRef.current || !destinationRef.current || !window.electronAPI) return;
       const recorder = new MediaRecorder(destinationRef.current.stream, { mimeType: 'audio/webm;codecs=opus' });
@@ -525,32 +507,27 @@ const Queue: React.FC<any> = ({ setView }) => {
           if (isRecordingRef.current && !isPausedRef.current) { setTimeout(() => startRecordingLoop(), 100); }
       };
       recorder.start();
-      setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 5000); // Record in 5s chunks
+      setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 5000); 
   };
 
-  // --- FIX: Full Implementation of handleStartSession ---
   const handleStartSession = async () => {
     try {
         setTranscriptError(null);
-        // Request Microphone access
         const micStream = await navigator.mediaDevices.getUserMedia({ 
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } 
         });
         
         let systemStream: MediaStream | null = null;
-        // Attempt to capture system audio (may fail depending on OS/browser)
         try { systemStream = await navigator.mediaDevices.getDisplayMedia({ video: false, audio: true }); } catch (err) {}
 
         const audioCtx = new AudioContext();
         audioContextRef.current = audioCtx;
         const destination = audioCtx.createMediaStreamDestination();
         
-        // Connect mic stream
         const micSource = audioCtx.createMediaStreamSource(micStream);
         micSource.connect(destination);
         sourceNodeRef.current = micSource;
 
-        // Connect system stream (if captured)
         if (systemStream && systemStream.getAudioTracks().length > 0) {
             const systemSource = audioCtx.createMediaStreamSource(systemStream);
             systemSource.connect(destination);
@@ -576,7 +553,6 @@ const Queue: React.FC<any> = ({ setView }) => {
         if(!isExpanded) handleExpandToggle();
         setActiveTab("Transcript");
         
-        // Start the recording loop
         startRecordingLoop();
 
     } catch (err) { 
@@ -585,41 +561,34 @@ const Queue: React.FC<any> = ({ setView }) => {
     }
   }
 
-  // --- FIX: Full Implementation of handlePauseToggle ---
   const handlePauseToggle = () => {
       if (isPaused) {
-          // Resume
           setIsPaused(false); 
           isPausedRef.current = false; 
-          if (isRecordingRef.current) startRecordingLoop(); // Restart loop if session is running
+          if (isRecordingRef.current) startRecordingLoop(); 
       } else {
-          // Pause
           setIsPaused(true); 
           isPausedRef.current = true; 
           if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-              mediaRecorderRef.current.stop(); // Stop the current recording chunk
+              mediaRecorderRef.current.stop(); 
           }
       }
   }
 
-  // --- FIX: Full Implementation of handleStopSession ---
   const handleStopSession = () => {
       setIsRecording(false); 
       setIsPaused(false); 
       isRecordingRef.current = false; 
       isPausedRef.current = false;
       
-      // Stop the current recorder instance if active
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
           mediaRecorderRef.current.stop();
       }
       
-      // Stop all streams/tracks to release the mic/audio source
       if (sourceNodeRef.current && sourceNodeRef.current.mediaStream) {
           sourceNodeRef.current.mediaStream.getTracks().forEach(track => track.stop());
       }
       
-      // Close audio context
       if (audioContextRef.current) { 
           audioContextRef.current.close(); 
           audioContextRef.current = null; 
@@ -633,16 +602,14 @@ const Queue: React.FC<any> = ({ setView }) => {
   }
 
   const handleExpandToggle = () => {
-    // FIX: Guard against undefined API
     if (window.electronAPI) {
         if (!isExpanded) { window.electronAPI.setWindowSize({ width: 500, height: 700 }); setIsExpanded(true); } 
         else { window.electronAPI.setWindowSize({ width: 450, height: 120 }); setIsExpanded(false); }
     } else {
-        setIsExpanded(!isExpanded); // Fallback state update
+        setIsExpanded(!isExpanded); 
     }
   }
 
-  // --- FIX: Implemented 15-second minimum wait logic ---
   const handleMeetingEnd = async () => {
     if (transcriptLogs.length === 0 && !isFinalizing) return;
     
@@ -656,8 +623,6 @@ const Queue: React.FC<any> = ({ setView }) => {
     let lastLength = transcriptLengthRef.current;
     
     if (lastLength > 0 || isFinalizing) {
-        // We will run the loop up to 30 times (30 seconds total max wait).
-        // The loop is structured to ensure at least 15 iterations pass before allowing the stability break.
         for (let i = 0; i < 30; i++) { 
             await new Promise(r => setTimeout(r, 1000));
             const currentLength = transcriptLengthRef.current;
@@ -665,8 +630,6 @@ const Queue: React.FC<any> = ({ setView }) => {
             if (currentLength === lastLength) stableCount++;
             else { stableCount = 0; lastLength = currentLength; }
             
-            // FIX: Only allow the loop to break after the 15-second minimum (i >= 14) 
-            // AND the transcript has been stable for 2 seconds (stableCount >= 2).
             if (i >= 14 && stableCount >= 2) { 
                 break; 
             }
@@ -688,10 +651,13 @@ const Queue: React.FC<any> = ({ setView }) => {
               try {
                   const [emailResponse, titleResponse] = await Promise.all([
                       window.electronAPI.invoke("gemini-chat", `Based on this transcript, draft a professional follow-up email:\n\n${fullTranscript}`),
-                      window.electronAPI.invoke("gemini-chat", `Based on this transcript, generate a very short, concise title (under 6 words) for this meeting:\n\n${fullTranscript}`)
+                      window.electronAPI.invoke("gemini-chat", `Based on this transcript, generate a very short, concise title (under 6 words) for this meeting. No quotes, no markdown:\n\n${fullTranscript}`)
                   ]);
+                  
                   generatedEmail = emailResponse;
-                  generatedTitle = titleResponse.replace(/^["']|["']$/g, '');
+                  // FIX: Use cleaner function
+                  generatedTitle = cleanMeetingTitle(titleResponse);
+                  
                   setEmailDraft(emailResponse);
                   const newMeeting: MeetingSession = {
                       id: Date.now().toString(),
@@ -712,7 +678,6 @@ const Queue: React.FC<any> = ({ setView }) => {
 
   const handleModeSelect = async (selectedMode: string) => {
       setMode(selectedMode); setShowModeMenu(false);
-      // FIX: Guard against undefined API
       if (selectedMode === "Student" && window.electronAPI) {
           const exists = await window.electronAPI.checkProfileExists();
           if (!exists) setShowStudentModal(true);
@@ -720,7 +685,6 @@ const Queue: React.FC<any> = ({ setView }) => {
   };
 
   const handleSaveStudentFiles = async (files: File[]) => {
-      // FIX: Guard against undefined API
       if (!window.electronAPI) return; 
       if (files.length > 0) {
           const fileDataArray = await Promise.all(files.map(async (file) => {
@@ -737,7 +701,6 @@ const Queue: React.FC<any> = ({ setView }) => {
   const handleCopyUserMessage = (text: string) => { navigator.clipboard.writeText(text); }
   const startResize = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); resizeRef.current = { startX: e.clientX, startY: e.clientY, startW: document.body.offsetWidth, startH: document.body.offsetHeight }; document.addEventListener('mousemove', doResize); document.addEventListener('mouseup', stopResize); }
   const doResize = (e: MouseEvent) => { 
-      // FIX: Guard against undefined API
       if (!resizeRef.current || !window.electronAPI) return; 
       const diffX = e.clientX - resizeRef.current.startX; 
       const diffY = e.clientY - resizeRef.current.startY; 
@@ -749,9 +712,7 @@ const Queue: React.FC<any> = ({ setView }) => {
   const loadMeeting = (m: MeetingSession) => { setTranscriptLogs(m.transcript); setEmailDraft(m.emailDraft); setShowPostMeeting(true); setActiveTab("Transcript"); setMessages([{id: Date.now().toString(), role: "ai", text: `Loaded meeting: ${new Date(m.date).toLocaleString()}`, timestamp: Date.now()}]); }
   const deleteMeeting = (id: string, e: React.MouseEvent) => { e.stopPropagation(); const u = pastMeetings.filter(m => m.id !== id); setPastMeetings(u); localStorage.setItem('moubely_meetings', JSON.stringify(u)); }
 
-  // --- HANDLE SEND (Streaming Enabled + 2s Timer + Multi-Image) ---
   const handleSend = async (overrideText?: string) => {
-    // FIX: Guard against undefined API
     if (!window.electronAPI) return;
       
     const textToSend = overrideText || input
@@ -762,14 +723,12 @@ const Queue: React.FC<any> = ({ setView }) => {
 
     const aiMsgId = (Date.now() + 1).toString();
 
-    // 1. Add User Message and empty AI placeholder immediately
     const newMessages: Message[] = [
         ...messages,
         { 
             id: Date.now().toString(), 
             role: "user", 
             text: textToSend || (hasImages ? `Analyze ${imagesToSend.length} screens.` : ""), 
-            // FIX: Save the entire array of screenshots for display in the chat history
             queuedScreenshots: hasImages ? imagesToSend : undefined,
             timestamp: Date.now() 
         },
@@ -784,13 +743,11 @@ const Queue: React.FC<any> = ({ setView }) => {
 
     setMessages(newMessages)
     setInput("")
-    // NOTE: We clear queuedScreenshots AFTER successful API call in finally block
 
     setIsThinking(true)
     setThinkingStep(hasImages ? `Vision processing ${imagesToSend.length} screens...` : "Thinking...")
     isAtBottomRef.current = true;
 
-    // --- Start 2s Timer ---
     setShowSlowLoader(false);
     if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
     loadingTimerRef.current = setTimeout(() => {
@@ -801,7 +758,6 @@ const Queue: React.FC<any> = ({ setView }) => {
         isInMeeting: isRecording || showPostMeeting,
         meetingTranscript: transcriptLogs.map(t => t.text).join("\n"),
         uploadedFilesContent: "", 
-        // Use the first image for general context/preview in the payload logic
         userImage: hasImages ? imagesToSend[0].preview : undefined 
     };
 
@@ -817,16 +773,12 @@ const Queue: React.FC<any> = ({ setView }) => {
       };
 
       if (hasImages) {
-         // Vision call uses the array of paths
          const imagePaths = imagesToSend.map(i => i.path);
-         // FIX: Use the correct IPC channel signature (message, imagePaths array)
          fullResponse = await window.electronAPI.chatWithImage(finalPrompt, imagePaths)
       } else {
-         // Chat streams
          fullResponse = await window.electronAPI.invoke("gemini-chat", args)
       }
       
-      // Finalize the message
       setMessages(prev => prev.map(m => 
           m.id === aiMsgId ? { ...m, text: fullResponse, isStreaming: false } : m
       ));
@@ -836,21 +788,17 @@ const Queue: React.FC<any> = ({ setView }) => {
           m.id === aiMsgId ? { ...m, text: "Error: " + error.message, isStreaming: false } : m
       ));
     } finally { 
-      // CLEANUP TIMER
       if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
       setShowSlowLoader(false);
       setIsThinking(false);
       
-      // Crucial: Clear the queue and delete the files after they are sent.
       if (hasImages) {
           handleClearQueue(); 
       }
     }
   }
 
-  // --- TRIGGER ASSIST ACTION (Streaming + 2s Timer) ---
   const triggerAssistAction = async (actionType: "Assist" | "WhatToSay" | "FollowUp" | "Recap") => {
-    // FIX: Guard against undefined API
     if (!window.electronAPI) return;
       
     let transcriptText = transcriptLogs.map(t => t.text).join(" ");
@@ -866,7 +814,6 @@ const Queue: React.FC<any> = ({ setView }) => {
     setThinkingStep("Thinking...");
     isAtBottomRef.current = true;
     
-    // --- NEW: Start 2s Timer ---
     setShowSlowLoader(false);
     if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
     loadingTimerRef.current = setTimeout(() => {
@@ -916,7 +863,6 @@ const Queue: React.FC<any> = ({ setView }) => {
       <div className="px-4 pt-3 pb-0 z-50 shrink-0">
         {!isExpanded && (
           <div className="flex justify-center mb-3 animate-in fade-in slide-in-from-top-2">
-             {/* FIX: Resume button calls handleStartSession */}
              <button onClick={isRecording ? handlePauseToggle : handleStartSession} className={`status-pill interactive hover:scale-105 transition-all no-drag ${isRecording ? 'bg-blue-600' : 'bg-white/10 hover:bg-white/20'}`}>
                 {!isRecording ? <><Play size={12} fill="currentColor" /><span>Start Moubely</span></> : 
                  isPaused ? <><Play size={12} fill="currentColor" /><span>Resume Session</span></> :
@@ -975,7 +921,6 @@ const Queue: React.FC<any> = ({ setView }) => {
                       <div key={msg.id} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                         {msg.role === "user" && (
                             <div className="group relative max-w-[85%]">
-                                {/* FIX: Iterate over all queued screenshots and display them */}
                                 {msg.queuedScreenshots && msg.queuedScreenshots.length > 0 && (
                                     <div className={`mb-2 grid gap-2 ${msg.queuedScreenshots.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                                         {msg.queuedScreenshots.map((img, index) => (
@@ -999,7 +944,6 @@ const Queue: React.FC<any> = ({ setView }) => {
                         )}
                       </div>
                     ))}
-                    {/* UPDATED CONDITION: Only show if showSlowLoader is true */}
                     {showSlowLoader && (
                         <div className="flex items-center gap-3 text-sm text-gray-400 pl-1">
                             <Loader2 size={16} className="animate-spin text-blue-400"/>
@@ -1033,7 +977,6 @@ const Queue: React.FC<any> = ({ setView }) => {
            </div>
            {activeTab === "Chat" && (
              <div className="p-5 bg-gradient-to-t from-black via-black/90 to-transparent shrink-0">
-                {/* NEW: Multi-Screenshot Preview Area */}
                 {queuedScreenshots.length > 0 && (
                     <div className="mb-3 flex items-center gap-3 p-2 bg-white/5 border border-white/10 rounded-xl overflow-x-auto">
                         <span className="text-xs text-gray-400 font-medium whitespace-nowrap">{queuedScreenshots.length}/{MAX_QUEUE_SIZE} screens ready:</span>
