@@ -163,6 +163,7 @@ Moubely is built using a modern, performant, and resilient full-stack JavaScript
 
     # 5. CONTEXT (Personalization)
     NOTION_TOKEN=your_notion_token_here
+    NOTION_PAGE_ID=your_notion_page_id_here
 
     # 6. PDF RECOVERY (Scanned Docs)
     OCR_SPACE_API_KEY=your_ocr_key_here
