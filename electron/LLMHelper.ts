@@ -431,7 +431,9 @@ export class LLMHelper {
   }
 
   // --- AUDIO LOGIC (TWO-SPEED HYBRID ENGINE) ---
-  public async analyzeAudioFile(audioPath: string, isUrgent: boolean = false): Promise<{ text: string, timestamp: number }> {
+  
+  // FIX 1: Add optional timestamp parameter
+  public async analyzeAudioFile(audioPath: string, isUrgent: boolean = false, timestamp?: number): Promise<{ text: string, timestamp: number }> {
       const localTimeout = isUrgent ? 1000 : 20000;
       const speedLabel = isUrgent ? "⚡ URGENT" : "🐢 CASUAL";
 
@@ -451,7 +453,8 @@ export class LLMHelper {
           if (text) {
               console.log(`[LLM] ✅ Local Whisper Success: "${text.slice(0, 30)}..."`);
               this.sessionTranscript += `\n[${new Date().toLocaleTimeString()}] ${text}`;
-              return { text: text, timestamp: Date.now() };
+              // FIX 2: Return provided timestamp if available, else Date.now()
+              return { text: text, timestamp: timestamp || Date.now() };
           }
       } catch (e: any) { 
           if (e.code === 'ECONNABORTED') {
@@ -474,7 +477,8 @@ export class LLMHelper {
                   console.log(`[LLM] ✅ Groq Success: "${text.slice(0, 30)}..."`);
                   this.sessionTranscript += `\n[${new Date().toLocaleTimeString()}] ${text}`; 
               }
-              return { text: text, timestamp: Date.now() };
+              // FIX 3: Return provided timestamp if available
+              return { text: text, timestamp: timestamp || Date.now() };
           } catch (e: any) { 
               console.error(`[LLM] ❌ Groq Audio Failed: ${e.message}`);
           }
@@ -482,10 +486,12 @@ export class LLMHelper {
           console.error("[LLM] ❌ No Groq Client available for fallback.");
       }
 
-      return { text: "", timestamp: Date.now() };
+      // FIX 4: Return timestamp
+      return { text: "", timestamp: timestamp || Date.now() };
   }
 
-  public async analyzeAudioFromBase64(base64Data: string, mimeType: string, isUrgent: boolean = false) {
+  // FIX 5: Accept timestamp in base64 handler
+  public async analyzeAudioFromBase64(base64Data: string, mimeType: string, isUrgent: boolean = false, timestamp?: number) {
       if (!base64Data || base64Data.length < 100) {
           console.warn("[LLM] ⚠️ Audio data empty or too short.");
           return { text: "", timestamp: Date.now() };
@@ -496,7 +502,8 @@ export class LLMHelper {
           console.log(`[LLM] 💾 Saving temp audio file (Urgent: ${isUrgent})`);
           await fs.promises.writeFile(tempPath, Buffer.from(base64Data, 'base64'));
           
-          const result = await this.analyzeAudioFile(tempPath, isUrgent);
+          // FIX 6: Pass timestamp to analyzeAudioFile
+          const result = await this.analyzeAudioFile(tempPath, isUrgent, timestamp);
           
           try { fs.unlinkSync(tempPath); } catch {}
           return result;

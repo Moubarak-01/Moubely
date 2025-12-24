@@ -108,7 +108,8 @@ export function initializeIpcHandlers(appState: AppState) {
   });
 
   // --- 4. AUDIO HANDLER ---
-  ipcMain.handle("analyze-audio-base64", async (event, base64Data, mimeType, isUrgent) => {
+  // FIX: Added 'timestamp' argument to support correct ordering (Race Condition Fix)
+  ipcMain.handle("analyze-audio-base64", async (event, base64Data, mimeType, isUrgent, timestamp) => {
     const size = base64Data ? base64Data.length : 0;
     const safeUrgency = isUrgent || false;
     const urgencyLabel = safeUrgency ? "⚡ URGENT" : "🐢 CASUAL";
@@ -120,23 +121,18 @@ export function initializeIpcHandlers(appState: AppState) {
       return { text: "Audio Error: LLM Not Ready" };
     }
     
-    return await llmHelper.analyzeAudioFromBase64(base64Data, mimeType, safeUrgency);
+    // FIX: Pass timestamp to helper so it comes back attached to the text
+    return await llmHelper.analyzeAudioFromBase64(base64Data, mimeType, safeUrgency, timestamp);
   });
 
-  // --- 5. SCREENSHOT HANDLERS (FIXED) ---
+  // --- 5. SCREENSHOT HANDLERS ---
   ipcMain.handle("take-screenshot", async () => {
     logIPC("take-screenshot", "Capturing screen...");
     try {
-        // 1. Get the path from the helper
         const filePath = await appState.takeScreenshot();
-        
-        // 2. Generate the preview (base64) immediately
-        // FIX: Access ScreenshotHelper via the getter on AppState, NOT via processingHelper
         const preview = await appState.getScreenshotHelper().getImagePreview(filePath);
         
         logIPC("take-screenshot", "✅ Success: Returning Object");
-        
-        // 3. Return the OBJECT { path, preview } that Queue.tsx expects
         return { path: filePath, preview };
         
     } catch (e: any) {

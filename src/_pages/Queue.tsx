@@ -522,17 +522,33 @@ const Queue: React.FC<any> = ({ setView }) => {
               reader.readAsDataURL(blob);
               reader.onloadend = async () => {
                   const base64Audio = (reader.result as string).split(',')[1];
+                  
+                  // FIX 1: Generate "Ticket Number" (Timestamp) HERE
+                  const chunkTimestamp = Date.now();
+                  
                   try {
-                      // UPDATED: Check the dynamic Urgency Ref
                       const urgencyState = isUrgentRef.current;
                       
-                      const result = await window.electronAPI.analyzeAudioFromBase64(base64Audio, 'audio/webm', urgencyState);
+                      // FIX 2: Pass Timestamp ID to backend
+                      const result = await window.electronAPI.analyzeAudioFromBase64(base64Audio, 'audio/webm', urgencyState, chunkTimestamp);
+                      
                       if (result.text && result.text.length > 0) {
-                          const elapsed = Math.floor((Date.now() - meetingStartTimeRef.current) / 1000);
+                          // Use the TICKET timestamp for display time calculation
+                          const elapsed = Math.floor((chunkTimestamp - meetingStartTimeRef.current) / 1000);
                           const mins = Math.floor(elapsed / 60);
                           const secs = elapsed % 60;
                           const displayTime = `${mins}:${secs.toString().padStart(2, '0')}`;
-                          setTranscriptLogs(prev => [...prev, { id: Date.now().toString(), text: result.text, timestamp: Date.now(), displayTime }]);
+                          
+                          // FIX 3: Sort Logs by Timestamp (Fixes Race Condition)
+                          setTranscriptLogs(prev => {
+                              const newLog = { 
+                                  id: chunkTimestamp.toString(), 
+                                  text: result.text, 
+                                  timestamp: chunkTimestamp, 
+                                  displayTime 
+                              };
+                              return [...prev, newLog].sort((a, b) => a.timestamp - b.timestamp);
+                          });
                       }
                   } catch (e: any) {
                       if (e.message && e.message.includes("API key")) {
@@ -679,8 +695,15 @@ const Queue: React.FC<any> = ({ setView }) => {
               let generatedTitle = `Meeting ${new Date().toLocaleDateString()}`;
               try {
                   const [emailResponse, titleResponse] = await Promise.all([
-                      window.electronAPI.invoke("gemini-chat", { message: `Based on this transcript, draft a professional follow-up email:\n\n${fullTranscript}` }),
-                      window.electronAPI.invoke("gemini-chat", { message: `Based on this transcript, generate a very short, concise title (under 6 words) for this meeting. No quotes, no markdown:\n\n${fullTranscript}` })
+                      // FIX 4: Force Student Persona for Emails
+                      window.electronAPI.invoke("gemini-chat", { 
+                          message: `Based on this transcript, draft a professional follow-up email:\n\n${fullTranscript}`,
+                          mode: "Student", 
+                          isCandidateMode: true
+                      }),
+                      window.electronAPI.invoke("gemini-chat", { 
+                          message: `Based on this transcript, generate a very short, concise title (under 6 words) for this meeting. No quotes, no markdown:\n\n${fullTranscript}` 
+                      })
                   ]);
                   
                   generatedEmail = emailResponse;
