@@ -36,7 +36,7 @@ export class WindowHelper {
         preload: path.join(__dirname, "preload.js")
       },
       show: false,
-      alwaysOnTop: true,
+      alwaysOnTop: true, // Keep initial setting
       frame: false,
       transparent: true,
       hasShadow: false,
@@ -47,9 +47,13 @@ export class WindowHelper {
 
     this.setStealthMode(this.appState.getIsStealthMode()) 
 
+    // --- NEW: Universal "Top Lock" for Zoom/Full-screen dominance ---
+    // 'screen-saver' is the highest priority level on macOS and works as strict topmost on Windows.
+    this.mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    
+    // Explicitly allow visibility over full-screen apps (Mac)
     if (process.platform === "darwin") {
-      this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-      this.mainWindow.setAlwaysOnTop(true, "floating")
+      this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     }
     
     this.mainWindow.setSkipTaskbar(true)
@@ -89,6 +93,10 @@ export class WindowHelper {
       this.mainWindow.center(); 
       this.mainWindow.show(); 
       this.mainWindow.focus();
+      
+      // --- NEW: Re-assert dominance whenever the window is shown ---
+      // This counters Windows/Mac pushing the window back when you click into Zoom.
+      this.mainWindow.setAlwaysOnTop(true, 'screen-saver'); 
   }
 
   public moveWindowRight() { this.moveWindow(20, 0) }
