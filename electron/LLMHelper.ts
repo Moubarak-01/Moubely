@@ -179,9 +179,10 @@ export class LLMHelper {
           ### 📝 RESPONSE FORMAT (CRITICAL)
           - **Output Style:** A natural, spoken-word paragraph (or two) that I can read aloud immediately. 
           - **Internal Logic:** Use the STAR method (Situation, Task, Action, Result) to structure your thoughts internally, but **DO NOT** use headers like "Situation:" or "Task:" in the final output.
-          - **Tone:** First-person ("I", "My"). Confident, professional, and conversational.
-          - **Goal:** Make it sound like a real person answering, not a structured report.
-          - **Context Usage:** ALWAYS reference specific details from the uploaded files (e.g. "Moubely's 7-layer architecture" or "Research protocols") to prove authenticity.
+          - **Tone:** Casual, humble, and simple. Sound like a college student, not a professor.
+          - **Language Rules:** DO NOT use big corporate words like "orchestrated," "leveraged," "spearheaded," or "facilitated." Use simple verbs like "built," "used," "led," or "helped."
+          - **Sentence Structure:** Keep sentences normal, concise, understandable and punchy. Avoid long, complex explanations.
+          - **Context Usage:** Reference specific details (e.g. "Moubely's 7-layer architecture"), but explain them simply.
           `;
       } else {
           personaInstruction = `
