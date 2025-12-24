@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useCallback } from "react"
 import { 
   Play, Pause, Square, ChevronDown, ChevronUp, 
   X, Mic, Monitor, Zap, Send, 
@@ -6,7 +6,7 @@ import {
   GripHorizontal, HelpCircle, MessageCircleQuestion, FileText,
   Scaling, Copy, Check, Trash2, Mail,
   Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
-  Eye, EyeOff 
+  Eye, EyeOff, MessageCircle 
 } from "lucide-react"
 
 // --- IMPORTS FOR FORMULAS & HIGHLIGHTING ---
@@ -58,8 +58,8 @@ interface ChatContext {
 const cleanMeetingTitle = (rawTitle: string): string => {
   if (!rawTitle) return "Untitled Meeting";
   return rawTitle
-    .replace(/[#*`"']/g, '') // Remove Markdown chars (#, *, `, ", ')
-    .replace(/^Title:\s*/i, '') // Remove "Title:" prefix if present
+    .replace(/[#*`"']/g, '') 
+    .replace(/^Title:\s*/i, '') 
     .replace(/Meeting Title:\s*/i, '')
     .trim();
 };
@@ -231,7 +231,7 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
 };
 
 // --- STUDENT SETUP MODAL ---
-const StudentModeSetupModal = ({ open, onClose, onSave }: { open: boolean, onClose: () => void, onSave: (files: File[]) => void }) => {
+const StudentModeSetupModal = ({ open, onClose, onSave, mode }: { open: boolean, onClose: () => void, onSave: (files: File[]) => void, mode: string }) => {
   const [files, setFiles] = useState<File[]>([]);
   if (!open) return null;
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -241,7 +241,6 @@ const StudentModeSetupModal = ({ open, onClose, onSave }: { open: boolean, onClo
     }
   };
   return (
-    // FIX: Added 'interactive' class so clicks register even if window is click-through
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 interactive">
       <div className="bg-[#1e1e1e] border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         <h2 className="text-xl font-semibold text-white mb-2">Student Mode Setup</h2>
@@ -285,7 +284,8 @@ const Queue: React.FC<any> = ({ setView }) => {
   const [showSlowLoader, setShowSlowLoader] = useState(false)
   const loadingTimerRef = useRef<any>(null)
   
-  const [mode, setMode] = useState("General")
+  // --- MODE STATE (PERSISTED) ---
+  const [mode, setMode] = useState(() => sessionStorage.getItem("moubely_mode") || "General")
   const [showModeMenu, setShowModeMenu] = useState(false)
   const [isSmartMode, setIsSmartMode] = useState(false)
   
@@ -313,6 +313,15 @@ const Queue: React.FC<any> = ({ setView }) => {
   const meetingStartTimeRef = useRef<number>(0)
   const transcriptLengthRef = useRef(0);
   
+  // --- URGENCY REF ---
+  const isUrgentRef = useRef(false);
+
+  // --- SYNC SMART MODE TO URGENCY (NEW) ---
+  useEffect(() => {
+      isUrgentRef.current = isSmartMode;
+      console.log(`[UI] ⚡ Smart Mode Toggled: ${isSmartMode ? "ON (Always Urgent)" : "OFF (Casual)"}`);
+  }, [isSmartMode]);
+  
   const chatEndRef = useRef<HTMLDivElement>(null)
   const transcriptEndRef = useRef<HTMLDivElement>(null)
   const resizeRef = useRef<{ startX: number, startY: number, startW: number, startH: number } | null>(null)
@@ -332,15 +341,25 @@ const Queue: React.FC<any> = ({ setView }) => {
 
   const MAX_QUEUE_SIZE = 6;
 
-  // Helper to capture a screenshot and manage the queue/send action
-  const handleCapture = async () => {
+  // --- ONE SINGLE DECLARATION HERE ---
+  const handleExpandToggle = () => {
+    if (window.electronAPI) {
+        if (!isExpanded) { window.electronAPI.setWindowSize({ width: 500, height: 700 }); setIsExpanded(true); } 
+        else { window.electronAPI.setWindowSize({ width: 450, height: 120 }); setIsExpanded(false); }
+    } else {
+        setIsExpanded(!isExpanded); 
+    }
+  }
+
+  // --- SCREENSHOT CAPTURE LOGIC (Wrapped in useCallback) ---
+  const handleCapture = useCallback(async () => {
     try { 
         if (!window.electronAPI) {
-            console.error("[UI] Electron API is undefined. Cannot capture screenshot.");
+            console.error("[UI] Electron API is undefined.");
             return;
         }
 
-        console.log(`[UI] 📸 Starting capture (Queue Action)`); 
+        console.log(`[UI] 📸 Starting capture (Action)`); 
         
         const result: ScreenshotData = await window.electronAPI.takeScreenshot(); 
         if (!result || !result.path) {
@@ -354,15 +373,20 @@ const Queue: React.FC<any> = ({ setView }) => {
             return newQueue;
         });
 
-        if (!isExpanded) handleExpandToggle(); 
+        // Ensure window is expanded to show the queue
+        if (!isExpandedRef.current) {
+            if (window.electronAPI) {
+                window.electronAPI.setWindowSize({ width: 500, height: 700 });
+                setIsExpanded(true);
+            }
+        }
         setActiveTab("Chat"); 
         
     } catch(e) {
         console.error("[UI] Screenshot Failed:", e);
-        alert("Screenshot failed. Check console for details.");
     } 
-  }
-  
+  }, []); // Empty deps as we use refs/functional updates where needed
+
   const handleUseScreen = () => { handleCapture(); }
   
   const handleRemoveQueuedScreenshot = async (pathToRemove: string) => {
@@ -406,7 +430,7 @@ const Queue: React.FC<any> = ({ setView }) => {
                 return prev;
             });
             setIsThinking(false);
-            isAtBottomRef.current = true;
+            // isAtBottomRef.current = true;  <-- CORRECT: Commented out to allow scrolling up
         });
     }
 
@@ -432,12 +456,23 @@ const Queue: React.FC<any> = ({ setView }) => {
         );
     }
 
+    // --- ADDED: CTRL+H LISTENER FOR LOCAL CAPTURE ---
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'h' || e.key === 'H')) {
+        e.preventDefault();
+        console.log("[UI] ⌨️ Ctrl+H Detected -> Triggering Capture");
+        handleCapture();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => { 
         cleanupFunctions.forEach(fn => fn());
         cleanupStream(); 
         if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+        window.removeEventListener('keydown', handleKeyDown); // Cleanup listener
     };
-  }, [])
+  }, [handleCapture]) 
 
   const resetChat = () => {
     setMessages([{ id: "init", role: "ai", text: "Hi there. I'm Moubely. I'm ready to listen.", timestamp: Date.now() }]);
@@ -488,7 +523,10 @@ const Queue: React.FC<any> = ({ setView }) => {
               reader.onloadend = async () => {
                   const base64Audio = (reader.result as string).split(',')[1];
                   try {
-                      const result = await window.electronAPI.analyzeAudioFromBase64(base64Audio, 'audio/webm');
+                      // UPDATED: Check the dynamic Urgency Ref
+                      const urgencyState = isUrgentRef.current;
+                      
+                      const result = await window.electronAPI.analyzeAudioFromBase64(base64Audio, 'audio/webm', urgencyState);
                       if (result.text && result.text.length > 0) {
                           const elapsed = Math.floor((Date.now() - meetingStartTimeRef.current) / 1000);
                           const mins = Math.floor(elapsed / 60);
@@ -601,15 +639,6 @@ const Queue: React.FC<any> = ({ setView }) => {
       handleMeetingEnd(); 
   }
 
-  const handleExpandToggle = () => {
-    if (window.electronAPI) {
-        if (!isExpanded) { window.electronAPI.setWindowSize({ width: 500, height: 700 }); setIsExpanded(true); } 
-        else { window.electronAPI.setWindowSize({ width: 450, height: 120 }); setIsExpanded(false); }
-    } else {
-        setIsExpanded(!isExpanded); 
-    }
-  }
-
   const handleMeetingEnd = async () => {
     if (transcriptLogs.length === 0 && !isFinalizing) return;
     
@@ -650,12 +679,11 @@ const Queue: React.FC<any> = ({ setView }) => {
               let generatedTitle = `Meeting ${new Date().toLocaleDateString()}`;
               try {
                   const [emailResponse, titleResponse] = await Promise.all([
-                      window.electronAPI.invoke("gemini-chat", `Based on this transcript, draft a professional follow-up email:\n\n${fullTranscript}`),
-                      window.electronAPI.invoke("gemini-chat", `Based on this transcript, generate a very short, concise title (under 6 words) for this meeting. No quotes, no markdown:\n\n${fullTranscript}`)
+                      window.electronAPI.invoke("gemini-chat", { message: `Based on this transcript, draft a professional follow-up email:\n\n${fullTranscript}` }),
+                      window.electronAPI.invoke("gemini-chat", { message: `Based on this transcript, generate a very short, concise title (under 6 words) for this meeting. No quotes, no markdown:\n\n${fullTranscript}` })
                   ]);
                   
                   generatedEmail = emailResponse;
-                  // FIX: Use cleaner function
                   generatedTitle = cleanMeetingTitle(titleResponse);
                   
                   setEmailDraft(emailResponse);
@@ -677,7 +705,10 @@ const Queue: React.FC<any> = ({ setView }) => {
   }, [isFinalizing, showPostMeeting]);
 
   const handleModeSelect = async (selectedMode: string) => {
-      setMode(selectedMode); setShowModeMenu(false);
+      setMode(selectedMode); 
+      sessionStorage.setItem("moubely_mode", selectedMode); 
+      setShowModeMenu(false);
+      
       if (selectedMode === "Student" && window.electronAPI) {
           const exists = await window.electronAPI.checkProfileExists();
           if (!exists) setShowStudentModal(true);
@@ -769,7 +800,9 @@ const Queue: React.FC<any> = ({ setView }) => {
       const args = {
           message: finalPrompt,
           mode: mode,
-          history: messages.map(m => ({ role: m.role, text: m.text })) 
+          history: messages.map(m => ({ role: m.role, text: m.text })),
+          type: "general",
+          isCandidateMode: mode === 'Student' 
       };
 
       if (hasImages) {
@@ -798,68 +831,80 @@ const Queue: React.FC<any> = ({ setView }) => {
     }
   }
 
-  // --- UPDATED: TRIGGER ASSIST ACTION (New Logic) ---
-  const triggerAssistAction = async (actionType: "Assist" | "WhatToSay" | "FollowUp" | "Recap") => {
+  // --- UPDATED: 5-BUTTON LOGIC & DIGITAL TWIN ---
+  const triggerAssistAction = async (actionType: "assist" | "reply" | "answer" | "ask" | "recap") => {
     if (!window.electronAPI) return;
       
+    // --- URGENT MODE ACTIVATION ---
+    isUrgentRef.current = true;
+    // Reset back to Casual after 10s
+    setTimeout(() => { isUrgentRef.current = false; }, 10000);
+
     // 1. Get Context
     let transcriptText = transcriptLogs.map(t => t.text).join(" ");
-    // Fallback to chat history if transcript is empty
     if (!transcriptText.trim() && messages.length > 0) {
         transcriptText = messages.slice(-5).map(m => `${m.role.toUpperCase()}: ${m.text}`).join("\n");
     }
     
-    if (!transcriptText.trim()) {
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "I haven't heard enough yet to assist.", timestamp: Date.now() }]);
+    if (!transcriptText.trim() && actionType !== 'answer') {
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "I need more context or conversation history first.", timestamp: Date.now() }]);
         return;
     }
 
     // 2. Set UI State
     setActiveTab("Chat")
     setIsThinking(true)
-    setThinkingStep("Thinking...");
+    setThinkingStep("Processing...");
+    
+    // UPDATED: Set the Slow Loader Timer (2s)
+    setShowSlowLoader(false);
+    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+    loadingTimerRef.current = setTimeout(() => {
+        setShowSlowLoader(true);
+    }, 2000);
     
     // 3. Add User Message
     let userDisplayMessage = "";
-    let systemPrompt = "";
-    
     switch (actionType) {
-      case "Assist": 
-          userDisplayMessage = "Assist me."; 
-          systemPrompt = `Based on this transcript: "${transcriptText}". Provide helpful facts, context, or technical details relevant to the current topic. Be concise.`; 
-          break;
-      case "WhatToSay": 
-          userDisplayMessage = "What next?"; 
-          systemPrompt = `Based on this transcript: "${transcriptText}". Suggest 3 distinct, professional, and smart responses I could say right now.`; 
-          break;
-      case "FollowUp": 
-          userDisplayMessage = "Follow-up Qs."; 
-          systemPrompt = `Based on this transcript: "${transcriptText}". Generate 3 insightful follow-up questions I should ask the speaker.`; 
-          break;
-      case "Recap": 
-          userDisplayMessage = "Recap."; 
-          systemPrompt = `Based on this transcript: "${transcriptText}". Provide a quick bullet-point summary of what has been discussed so far.`; 
-          break;
+      case "assist": userDisplayMessage = "Assist me with facts."; break;
+      case "reply": userDisplayMessage = "What should I say?"; break;
+      case "answer": userDisplayMessage = "Answer this for me (Digital Twin)."; break;
+      case "ask": userDisplayMessage = "What should I ask?"; break;
+      case "recap": userDisplayMessage = "Recap the discussion."; break;
     }
     
-    const aiMsgId = (Date.now() + 1).toString();
+    // FIX: Freeze time to prevent ID collision
+    const now = Date.now();
+    const userId = now.toString();
+    const aiMsgId = (now + 1).toString();
+
     setMessages(prev => [
         ...prev,
-        { id: Date.now().toString(), role: "user", text: userDisplayMessage, timestamp: Date.now() },
-        { id: aiMsgId, role: "ai", text: "", timestamp: Date.now(), isStreaming: true }
+        { id: userId, role: "user", text: userDisplayMessage, timestamp: now },
+        { id: aiMsgId, role: "ai", text: "", timestamp: now, isStreaming: true }
     ]);
 
     // 4. Call AI
     try {
         const history = messages.map(m => ({ role: m.role, text: m.text }));
-        // Use "General" mode to allow universal context
-        const response = await window.electronAPI.invoke("gemini-chat", { message: systemPrompt, mode: "General", history: history });
+        const isCandidateMode = actionType === 'answer' || mode === 'Student';
+        
+        const response = await window.electronAPI.invoke("gemini-chat", { 
+            message: transcriptText || "Context from files",
+            mode: mode,
+            history: history,
+            type: actionType,
+            isCandidateMode: isCandidateMode
+        });
         
         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m));
     } catch (e: any) { 
         console.error(e);
         setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: "Error: " + e.message, isStreaming: false } : m));
     } finally { 
+        // Clear timer and stop thinking
+        if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+        setShowSlowLoader(false);
         setIsThinking(false);
     }
   }
@@ -871,7 +916,19 @@ const Queue: React.FC<any> = ({ setView }) => {
 
   return (
     <div className={`moubely-window ${isExpanded ? 'expanded' : ''} flex flex-col h-full relative overflow-hidden`}>
-      <StudentModeSetupModal open={showStudentModal} onClose={() => { setShowStudentModal(false); if(mode === "Student") setMode("General"); }} onSave={handleSaveStudentFiles} />
+      <StudentModeSetupModal 
+          open={showStudentModal} 
+          onClose={() => { 
+              setShowStudentModal(false); 
+              if(mode === "Student") {
+                  setMode("General");
+                  sessionStorage.setItem("moubely_mode", "General"); 
+              }
+          }} 
+          onSave={handleSaveStudentFiles} 
+          mode={mode}
+      />
+      
       <div className="px-4 pt-3 pb-0 z-50 shrink-0">
         {!isExpanded && (
           <div className="flex justify-center mb-3 animate-in fade-in slide-in-from-top-2">
@@ -892,7 +949,6 @@ const Queue: React.FC<any> = ({ setView }) => {
             </div>
             <div className="flex-1 flex justify-center"><div className="draggable cursor-grab active:cursor-grabbing p-2 rounded hover:bg-white/5 group"><GripHorizontal size={20} className="text-gray-600 group-hover:text-gray-400"/></div></div>
             <div className="flex items-center gap-2">
-               {/* STEALTH TOGGLE */}
                <button 
                  onClick={handleToggleStealth} 
                  className={`icon-btn ${isStealth ? 'text-gray-500 hover:text-white' : 'text-yellow-500 hover:text-yellow-400'}`}
@@ -908,37 +964,54 @@ const Queue: React.FC<any> = ({ setView }) => {
       </div>
       {isExpanded && (
         <div className="flex-1 flex flex-col min-h-0 interactive animate-in fade-in slide-in-from-top-4 duration-500 delay-75">
-           <div className="tab-nav justify-start overflow-x-auto no-scrollbar shrink-0">
+           
+           <div className="tab-nav justify-start overflow-x-auto no-scrollbar shrink-0 border-b border-white/5">
               <button onClick={() => setActiveTab("Chat")} className={`tab-btn ${activeTab === 'Chat' ? 'active' : ''}`}>Chat</button>
               <button onClick={() => setActiveTab("Transcript")} className={`tab-btn ${activeTab === 'Transcript' ? 'active' : ''}`}>Transcript</button>
               
               {showPostMeeting && <button onClick={() => setActiveTab("Email")} className={`tab-btn flex items-center gap-1.5 ${activeTab === 'Email' ? 'active' : ''}`}><Mail size={14}/> Email</button>}
               <button onClick={() => setActiveTab("History")} className={`tab-btn flex items-center gap-1.5 ${activeTab === 'History' ? 'active' : ''}`}><History size={14}/> History</button>
-              
-              {/* --- UPDATED: ASSIST BUTTONS --- */}
-              {!showPostMeeting && (
-                  <> 
-                    <div className="w-px h-4 bg-white/10 mx-2 self-center shrink-0"/>
-                    
-                    <button onClick={() => triggerAssistAction("Assist")} className="tab-btn flex items-center gap-1.5 hover:text-blue-300 whitespace-nowrap">
-                        <Sparkles size={14}/> Assist
-                    </button>
-                    
-                    <button onClick={() => triggerAssistAction("WhatToSay")} className="tab-btn flex items-center gap-1.5 hover:text-green-300 whitespace-nowrap">
-                        <MessageCircleQuestion size={14}/> What to say?
-                    </button>
-                    
-                    <button onClick={() => triggerAssistAction("FollowUp")} className="tab-btn flex items-center gap-1.5 hover:text-purple-300 whitespace-nowrap">
-                        <HelpCircle size={14}/> Follow-up
-                    </button>
-                    
-                    <button onClick={() => triggerAssistAction("Recap")} className="tab-btn flex items-center gap-1.5 hover:text-orange-300 whitespace-nowrap">
-                        <FileText size={14}/> Recap
-                    </button> 
-                  </>
-              )}
-              {/* --------------------------- */}
            </div>
+
+           {!showPostMeeting && (
+             <div className="flex justify-center items-center gap-3 px-3 py-3 border-b border-white/5 bg-black/20 shrink-0 overflow-x-auto no-scrollbar">
+                <button 
+                   onClick={() => triggerAssistAction("assist")} 
+                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 text-xs font-medium transition-colors border border-blue-500/10"
+                >
+                    <Sparkles size={13}/> <span>Assist</span>
+                </button>
+                
+                <button 
+                   onClick={() => triggerAssistAction("reply")} 
+                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-medium transition-colors border border-emerald-500/10"
+                >
+                    <MessageCircle size={13}/> <span>Reply</span>
+                </button>
+                
+                <button 
+                    onClick={() => triggerAssistAction("answer")} 
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 text-xs font-bold transition-all border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)] ring-1 ring-purple-500/20"
+                >
+                    <Zap size={13} className="fill-purple-400/50"/> <span>Answer</span>
+                </button>
+                
+                <button 
+                   onClick={() => triggerAssistAction("ask")} 
+                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 text-xs font-medium transition-colors border border-orange-500/10"
+                >
+                    <HelpCircle size={13}/> <span>Ask</span>
+                </button>
+                
+                <button 
+                   onClick={() => triggerAssistAction("recap")} 
+                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium transition-colors border border-white/5"
+                >
+                    <FileText size={13}/> <span>Recap</span>
+                </button> 
+             </div>
+           )}
+
            <div className="content-area flex-1 overflow-hidden flex flex-col">
               {activeTab === "Chat" && (
                 <div className="flex-1 flex flex-col min-h-0">

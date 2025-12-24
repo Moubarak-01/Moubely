@@ -19,45 +19,48 @@ async function safePdfParse(buffer: Buffer) {
     return parser(buffer);
 }
 
-// --- 1. THE EXPANDED WATERFALL BRAINS (Chat & Logic) ---
+// --- 1. THE EXPANDED WATERFALL BRAINS ---
 const CHAT_MODELS = [
-    // --- TIER 1: NEXT GEN (Gemini 3.0) ---
-    // Best overall performance and speed as of late 2025
-    { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3.0 Flash' },
+    // --- TIER 1: NEXT GEN (Gemini 3.0 & 2.5) ---
+    { type: 'gemini', model: 'gemini-3-flash', name: 'Gemini 3.0 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
+    { type: 'gemini', model: 'gemini-2.5-flash-native', name: 'Gemini 2.5 Flash Native' },
 
     // --- TIER 2: SPECIALIZED & PREVIEW ---
     { type: 'gemini', model: 'gemini-robotics-er-1.5-preview', name: 'Gemini Robotics' },
+    { type: 'gemini', model: 'gemini-2.5-flash-tts', name: 'Gemini 2.5 Flash TTS' },
 
-    // --- TIER 3: OPEN MULTIMODAL (Gemma 3 Family) ---
-    // Now fully multimodal (Text + Vision)
-    { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B (Vision)' },
-    { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B (Vision)' },
-    { type: 'gemini', model: 'gemma-3-4b-it', name: 'Gemma 3 4B (Vision)' },
+    // --- TIER 3: ELITE REASONING (OpenRouter) ---
+    { type: 'openrouter', model: 'openai/o3-mini', name: 'OpenAI o3-Pro' },
+    { type: 'openrouter', model: 'anthropic/claude-3-opus', name: 'Claude 3 Opus' },
 
-    // --- TIER 4: RESEARCH & SEARCH (Perplexity Sonar) ---
+    // --- TIER 4: OPEN MULTIMODAL (Gemma 3 Family) ---
+    { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B' },
+    { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B' },
+    { type: 'gemini', model: 'gemma-3-4b-it', name: 'Gemma 3 4B' },
+    { type: 'gemini', model: 'gemma-3-2b-it', name: 'Gemma 3 2B' },
+    { type: 'gemini', model: 'gemma-3-1b-it', name: 'Gemma 3 1B' },
+
+    // --- TIER 5: RESEARCH & SEARCH (Perplexity) ---
     { type: 'perplexity', model: 'sonar-reasoning-pro', name: 'Sonar Reasoning Pro' },
-    { type: 'perplexity', model: 'sonar-deep-research', name: 'Sonar Deep Research' },
-    { type: 'perplexity', model: 'sonar-pro', name: 'Sonar Pro' },
     { type: 'perplexity', model: 'sonar', name: 'Sonar' },
 
-    // --- TIER 5: RELIABLE BACKUPS ---
+    // --- TIER 6: RELIABLE BACKUPS ---
     { type: 'github', model: 'gpt-4o', name: 'GPT-4o' },
-    { type: 'github', model: 'DeepSeek-R1', name: 'DeepSeek R1' },
+    { type: 'openrouter', model: 'deepseek/deepseek-r1', name: 'DeepSeek R1' },
     { type: 'groq', model: 'llama-3.3-70b-versatile', name: 'Groq Llama 3.3' }
 ];
 
 // --- 2. THE EYES (Vision Waterfall) ---
 const VISION_MODELS = [
-    { type: 'gemini', model: 'gemini-3-flash-preview' },      // NEW PRIMARY: 15% better image accuracy
-    { type: 'gemini', model: 'gemini-2.5-flash' },      // Primary Fast Vision
-    { type: 'gemini', model: 'gemma-3-27b-it' },      // Powerful open-weight vision alternative
-    { type: 'perplexity', model: 'sonar-reasoning-pro' }, // Reasoning Vision
-    { type: 'perplexity', model: 'sonar' },           // Basic search-based vision
-    { type: 'gemini', model: 'gemini-2.5-flash-lite' }, // Fast, low-cost fallback
-    { type: 'github', model: 'gpt-4o' },                // Backup
-    { type: 'openai', model: 'gpt-4o' }                 
+    { type: 'gemini', model: 'gemini-3-flash' },      
+    { type: 'gemini', model: 'gemini-2.5-flash' },    
+    { type: 'gemini', model: 'gemma-3-27b-it' },      
+    { type: 'openrouter', model: 'anthropic/claude-3.5-sonnet' },
+    { type: 'perplexity', model: 'sonar-reasoning-pro' },
+    { type: 'gemini', model: 'gemini-2.5-flash-lite' },
+    { type: 'github', model: 'gpt-4o' }
 ];
 
 export class LLMHelper {
@@ -65,16 +68,16 @@ export class LLMHelper {
   private githubClient: OpenAI | null = null
   private groqClient: OpenAI | null = null
   private perplexityClient: OpenAI | null = null
+  private openRouterClient: OpenAI | null = null
   private openaiClient: OpenAI | null = null
   private notionClient: NotionClient | null = null
   
-  // Session Memory
   private sessionTranscript: string = "";
 
-  // --- SMART CACHING SYSTEM ---
-  private cachedStudentText: string = ""; // Full text for Gemini/GPT
-  private cachedStudentSummary: string = ""; // Distilled text for Perplexity
-  private cachedStudentPdfPart: any = null; // Binary for Gemini Vision
+  // --- SMART CACHING ---
+  private cachedStudentText: string = ""; 
+  private cachedStudentSummary: string = ""; 
+  private cachedStudentPdfPart: any = null; 
   
   private readonly systemPrompt = `
   You are 'Moubely', an intelligent AI assistant.
@@ -98,10 +101,22 @@ export class LLMHelper {
       if (process.env.NOTION_TOKEN) this.notionClient = new NotionClient({ auth: process.env.NOTION_TOKEN });
       if (geminiKey) this.genAI = new GoogleGenerativeAI(geminiKey);
       
-      // Initialize Clients (GitHub, Perplexity, Groq, OpenAI)
       if (process.env.GITHUB_TOKEN) this.githubClient = new OpenAI({ baseURL: "https://models.inference.ai.azure.com", apiKey: process.env.GITHUB_TOKEN, dangerouslyAllowBrowser: true });
       if (process.env.PERPLEXITY_API_KEY) this.perplexityClient = new OpenAI({ baseURL: "https://api.perplexity.ai", apiKey: process.env.PERPLEXITY_API_KEY, dangerouslyAllowBrowser: true });
       if (process.env.GROQ_API_KEY) this.groqClient = new OpenAI({ baseURL: "https://api.groq.com/openai/v1", apiKey: process.env.GROQ_API_KEY, dangerouslyAllowBrowser: true });
+      
+      if (process.env.OPENROUTER_API_KEY) {
+          this.openRouterClient = new OpenAI({ 
+              baseURL: "https://openrouter.ai/api/v1", 
+              apiKey: process.env.OPENROUTER_API_KEY, 
+              dangerouslyAllowBrowser: true,
+              defaultHeaders: {
+                "HTTP-Referer": "https://moubely.app",
+                "X-Title": "Moubely"
+              }
+          });
+      }
+
       if (process.env.OPENAI_API_KEY) this.openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, dangerouslyAllowBrowser: true });
   }
 
@@ -109,7 +124,6 @@ export class LLMHelper {
       return text.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/\[\d+\]/g, "").trim();
   }
 
-  // --- CACHE MANAGEMENT ---
   public clearStudentCache() {
       this.cachedStudentText = "";
       this.cachedStudentSummary = "";
@@ -117,12 +131,10 @@ export class LLMHelper {
       console.log("[LLM] 🧹 Student Cache & Summary Cleared (Memory Wiped)");
   }
 
-  // --- CONTEXT DISTILLATION (Fixes Perplexity) ---
   private async generateStudentSummary(fullText: string): Promise<string> {
       if (!this.genAI || !fullText) return "";
       try {
           console.log("[LLM] ⚗️ Distilling Student Context for Search Models...");
-          // Use the fastest model for internal summarization
           const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
           const result = await model.generateContent(`
             Summarize the following student profile/resume into 3-4 concise, high-density sentences.
@@ -132,46 +144,82 @@ export class LLMHelper {
             PROFILE:
             ${fullText.slice(0, 15000)}
           `);
-          const summary = result.response.text();
-          console.log(`[LLM] ✅ Distillation Complete (${summary.length} chars).`);
-          return summary;
+          return result.response.text();
       } catch (e) {
-          console.warn("[LLM] ⚠️ Distillation failed, using truncated text.");
+          console.warn("[LLM] ⚠️ Distillation failed.");
           return fullText.slice(0, 1000) + "...";
       }
+  }
+
+  // --- PERSONA GENERATOR (UPDATED: DIGITAL TWIN PIVOT) ---
+  private getSystemInstruction(type: string, isCandidateMode: boolean): string {
+      let personaInstruction = "";
+      let taskInstruction = "";
+
+      if (isCandidateMode) {
+          // --- UPDATED: NATURAL DIGITAL TWIN PROMPT ---
+          personaInstruction = `
+          You are THE CANDIDATE. You are currently in a high-stakes technical interview. 
+          Your goal is to get hired by proving your specific skills using ONLY the evidence in your resume and project files.
+
+          ### 🚫 CRITICAL INSTRUCTION: THE "PIVOT" RULE (DO NOT IGNORE)
+          The user may ask generic behavioral questions (e.g., "Tell me about a conflict in your engineering team").
+          1. **CHECK THE FACTS:** Look at my provided "STUDENT FILES". Do I have a software engineering team? 
+             - If **NO** (e.g., my projects are individual efforts like Moubely/Movie App), you MUST NOT hallucinate a software team. 
+             - **DO NOT** make up a story about a "SaaS product" or "Microservices debate" if it is not in the files.
+             
+          2. **EXECUTE THE PIVOT:** Instead of lying, you must say:
+             "As a student at Rust College, my primary software projects like Moubely were individual engineering efforts. HOWEVER, I handled a similar [conflict/challenge/leadership] situation during my [Insert Real Experience from Resume, e.g., Biology Research Internship]..."
+
+          3. **USE "WAR STORIES":** Back up your answer with specific, hard data from the files.
+             - If discussing **Moubely**: Mention the "7-layer waterfall architecture" or "Deep Stealth mode."
+             - If discussing **Research**: Mention "managing 20+ protocols" or "reducing error rates by 15%."
+             - If discussing **Movie App**: Mention "Appwrite trending algorithm" or "Debouncing."
+
+          ### 📝 RESPONSE FORMAT (CRITICAL)
+          - **Output Style:** A natural, spoken-word paragraph (or two) that I can read aloud immediately. 
+          - **Internal Logic:** Use the STAR method (Situation, Task, Action, Result) to structure your thoughts internally, but **DO NOT** use headers like "Situation:" or "Task:" in the final output.
+          - **Tone:** First-person ("I", "My"). Confident, professional, and conversational.
+          - **Goal:** Make it sound like a real person answering, not a structured report.
+          - **Context Usage:** ALWAYS reference specific details from the uploaded files (e.g. "Moubely's 7-layer architecture" or "Research protocols") to prove authenticity.
+          `;
+      } else {
+          personaInstruction = `
+          *** MODE: TECHNICAL ASSISTANT ***
+          You are a helpful coding assistant named 'Moubely'.
+          - Speak objectively.
+          - Be concise and dense.
+          `;
+      }
+
+      switch (type) {
+          case 'assist': taskInstruction = "Provide technical facts, documentation, or definitions."; break;
+          case 'reply': taskInstruction = "Draft a short, 1-2 sentence response."; break;
+          case 'answer': taskInstruction = "Provide a deep, comprehensive answer using the STAR method."; break;
+          case 'ask': taskInstruction = "Suggest 2-3 insightful follow-up questions."; break;
+          case 'recap': taskInstruction = "Summarize the conversation in 3 brief bullet points."; break;
+          default: taskInstruction = "Answer the user's request."; break;
+      }
+
+      return `${this.systemPrompt}\n\n${personaInstruction}\n\nTASK GOAL: ${taskInstruction}`;
   }
 
   // --- PDF & CONTEXT TOOLS ---
   private async extractTextFromPdf(buffer: Buffer): Promise<string> {
       try {
+          console.log("[LLM] 📄 Parsing PDF locally...");
           const data = await safePdfParse(buffer);
-          if (data && data.text && data.text.trim().length > 50) return data.text.trim();
+          if (data && data.text && data.text.trim().length > 50) {
+              console.log(`[LLM] ✅ PDF Parsed (${data.text.length} chars)`);
+              return data.text.trim();
+          }
       } catch (e) { console.warn("[LLM] ⚠️ Local PDF parse failed."); }
-
-      const ocrKey = process.env.OCR_SPACE_API_KEY;
-      if (ocrKey) {
-          try {
-              console.log("[LLM] 👁️ Attempting OCR via OCR Space...");
-              const formData = new FormData();
-              formData.append('base64Image', `data:application/pdf;base64,${buffer.toString('base64')}`);
-              formData.append('isOverlayRequired', 'false');
-              formData.append('OCREngine', '2');
-              
-              const response = await axios.post('https://api.ocr.space/parse/image', formData, { 
-                  headers: { ...formData.getHeaders(), 'apikey': ocrKey }, timeout: 30000 
-              });
-
-              if (response.data && response.data.ParsedResults) {
-                  return response.data.ParsedResults.map((r: any) => r.ParsedText).join('\n');
-              }
-          } catch (e: any) { console.error(`[LLM] ❌ OCR Failed: ${e.message}`); }
-      }
       return "";
   }
 
   public async getFileContext(filePath: string): Promise<{ text: string, isPdf: boolean, base64?: string, mimeType?: string }> {
       try {
-          console.log(`[LLM] 📂 Reading file context: ${path.basename(filePath)}`);
+          console.log(`[LLM] 📂 Reading file: ${path.basename(filePath)}`);
           const ext = path.extname(filePath).toLowerCase();
           const buffer = await fs.promises.readFile(filePath);
           if (ext === '.pdf') {
@@ -181,15 +229,15 @@ export class LLMHelper {
               return { text: `=== FILE (${path.basename(filePath)}) ===\n${buffer.toString('utf-8')}\n`, isPdf: false };
           }
           return { text: "", isPdf: false };
-      } catch { return { text: "", isPdf: false }; }
+      } catch (e) { 
+          console.error(`[LLM] ❌ Error reading file ${filePath}:`, e);
+          return { text: "", isPdf: false }; 
+      }
   }
 
-  // --- UNIVERSAL NOTION CONTEXT ---
   private async getNotionContext(): Promise<string> {
     if (!this.notionClient) return "";
     try {
-      // Runs for ALL modes now
-      console.log("[LLM] 📝 Fetching Universal Notion Context...");
       const response = await this.notionClient.search({ query: "", page_size: 5, sort: { direction: 'descending', timestamp: 'last_edited_time' }});
       let context = "=== RECENT NOTION WORKSPACE ACTIVITY ===\n";
       for (const result of response.results) {
@@ -204,17 +252,24 @@ export class LLMHelper {
   }
 
   // --- 🧠 MAIN CHAT WATERFALL ---
-  public async chatWithGemini(message: string, history: any[], mode: string = "General", fileContext: string = "", onToken?: (token: string) => void): Promise<string> {
-      // 1. Student Context: READ ONCE, CACHE FOREVER
+  public async chatWithGemini(
+      message: string, 
+      history: any[], 
+      mode: string = "General", 
+      fileContext: string = "", 
+      type: string = "general",       
+      isCandidateMode: boolean = false, 
+      onToken?: (token: string) => void
+  ): Promise<string> {
+      
       const studentDir = path.join(app.getPath("userData"), "student_profile");
       
-      // Load context if in Student mode OR if cache exists (to persist across mode switches if desired)
-      if (mode === "Student") {
+      if (mode === "Student" || isCandidateMode) {
           if (this.cachedStudentText) {
-              console.log("[LLM] 🧠 Cache Hit: Using existing Student Context & Summary.");
+              console.log("[LLM] 🧠 Cache Hit: Using existing Student Context.");
           } 
           else if (fs.existsSync(studentDir)) {
-              console.log("[LLM] 📂 Cache Miss: Reading & Distilling Student Files...");
+              console.log("[LLM] 📂 Cache Miss: Reading Student Files...");
               try {
                 const files = fs.readdirSync(studentDir);
                 let fullText = "";
@@ -224,32 +279,27 @@ export class LLMHelper {
                     if (isPdf && base64) this.cachedStudentPdfPart = { inlineData: { data: base64, mimeType: "application/pdf" } };
                 }
                 this.cachedStudentText = fullText;
-                // Generate Summary for Perplexity
                 this.cachedStudentSummary = await this.generateStudentSummary(fullText);
               } catch(e) { console.error("[LLM] ❌ File Read Error:", e); }
           }
       }
 
-      // 2. Load Universal Notion Context
       let notionContext = await this.getNotionContext();
       
-      // 3. Base System Prompt
-      let baseSystemInstruction = this.systemPrompt;
+      let baseSystemInstruction = this.getSystemInstruction(type, isCandidateMode);
+
       if (this.sessionTranscript) baseSystemInstruction += `\n\n=== LIVE MEMORY ===\n${this.sessionTranscript}\n`;
       if (notionContext) baseSystemInstruction += `\n\n${notionContext}`;
 
       let validHistory = history.map(h => ({ role: h.role === 'ai' ? 'model' : 'user', parts: [{ text: h.text }] }));
 
-      // 4. Waterfall Execution with SMART ROUTING
       for (const config of CHAT_MODELS) {
           try {
-              console.log(`[LLM] 🔄 Trying Chat Model: ${config.model} (${config.type})...`);
+              console.log(`[LLM] 🔄 Waterfall: Trying ${config.model} (${config.type})...`);
               
-              // --- SMART ROUTING: Perplexity gets Summary, Others get Full Text ---
               let finalSystemInstruction = baseSystemInstruction;
-              if (mode === "Student" && this.cachedStudentText) {
+              if ((mode === "Student" || isCandidateMode) && this.cachedStudentText) {
                   if (config.type === 'perplexity') {
-                      console.log("[LLM] ℹ️ Injecting Distilled Summary for Perplexity.");
                       finalSystemInstruction += `\n\n=== STUDENT SUMMARY ===\n${this.cachedStudentSummary}\n`;
                   } else {
                       finalSystemInstruction += `\n\n=== STUDENT FILES ===\n${this.cachedStudentText}\n`;
@@ -264,7 +314,6 @@ export class LLMHelper {
                   const chat = geminiModel.startChat({ history: validHistory });
                   
                   let parts: any[] = [{ text: finalSystemInstruction + "\n\n" + message }];
-                  // Attach PDF binary only for Gemini if available
                   if (this.cachedStudentPdfPart) parts.push(this.cachedStudentPdfPart);
 
                   const result = await chat.sendMessageStream(parts);
@@ -273,12 +322,12 @@ export class LLMHelper {
                       fullResponse += text;
                       if (onToken) onToken(text); 
                   }
-                  console.log(`[LLM] ✅ SUCCESS: ${config.model}`);
                   return this.cleanResponse(fullResponse);
               } 
               else {
                   let client: OpenAI | null = null;
-                  if (config.type === 'github') client = this.githubClient; 
+                  if (config.type === 'openrouter') client = this.openRouterClient;
+                  else if (config.type === 'github') client = this.githubClient; 
                   else if (config.type === 'groq') client = this.groqClient;
                   else if (config.type === 'perplexity') client = this.perplexityClient;
                   
@@ -304,14 +353,17 @@ export class LLMHelper {
                       return this.cleanResponse(fullResponse);
                   }
               }
-          } catch (error) { console.warn(`[LLM] ❌ Model ${config.model} failed. Switching...`); continue; }
+          } catch (error: any) { 
+              console.warn(`[LLM] ❌ Model ${config.model} failed: ${error.message?.slice(0, 100)}`); 
+              continue; 
+          }
       }
-      return "⚠️ All AI providers failed.";
+      return "⚠️ All AI providers failed. Check API Keys.";
   }
 
   // --- VISION WATERFALL ---
   public async chatWithImage(message: string, imagePaths: string[], onToken?: (token: string) => void): Promise<string> {
-      console.log(`[LLM] 🖼️ Analyzing ${imagePaths.length} images...`);
+      console.log(`[LLM] 🖼️ Vision Waterfall: Analyzing ${imagePaths.length} images...`);
       const imageParts: { inlineData: { data: string; mimeType: string } }[] = [];
 
       for (const imagePath of imagePaths) {
@@ -328,9 +380,7 @@ export class LLMHelper {
 
       for (const config of VISION_MODELS) {
           try {
-              console.log(`[LLM] 👁️ Trying Vision Model: ${config.model}...`);
               let fullResponse = "";
-
               if (config.type === 'gemini') {
                   if (!this.genAI) continue;
                   const model = this.genAI.getGenerativeModel({ model: config.model });
@@ -340,86 +390,124 @@ export class LLMHelper {
                       fullResponse += text;
                       if (onToken) onToken(text);
                   }
+                  
+                  // --- FIX: ADDED LOGGING HERE ---
+                  console.log(`[LLM] ✅ Vision Success: ${config.model}`);
+                  
                   return this.cleanResponse(fullResponse);
               } 
-              else if (['github', 'openai', 'perplexity'].includes(config.type)) {
-                  let client = null;
-                  if (config.type === 'github') client = this.githubClient; 
-                  else if (config.type === 'openai') client = this.openaiClient;
-                  else if (config.type === 'perplexity') client = this.perplexityClient;
+              else if (['github', 'openai', 'perplexity', 'openrouter'].includes(config.type)) {
+                   let client = null;
+                   if (config.type === 'openrouter') client = this.openRouterClient;
+                   else if (config.type === 'github') client = this.githubClient;
+                   else if (config.type === 'openai') client = this.openaiClient;
+                   else if (config.type === 'perplexity') client = this.perplexityClient;
 
-                  if (client) {
-                      const openAIParts: any[] = [textPart, ...imageParts.map(p => ({ 
-                          type: "image_url", 
-                          image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` } 
-                      }))];
-
-                      const stream = await client.chat.completions.create({
-                          model: config.model,
-                          messages: [{ role: "user", content: openAIParts }],
-                          max_tokens: 2000, 
-                          stream: true 
-                      });
-
-                      for await (const chunk of stream) {
-                          const content = chunk.choices[0]?.delta?.content || "";
-                          if (content) {
-                              fullResponse += content;
-                              if (onToken) onToken(content);
-                          }
-                      }
-                      console.log(`[LLM] ✅ VISION SUCCESS: ${config.model}`);
-                      return this.cleanResponse(fullResponse);
-                  }
+                   if (client) {
+                       const openAIParts: any[] = [textPart, ...imageParts.map(p => ({ 
+                           type: "image_url", 
+                           image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` } 
+                       }))];
+                       const stream = await client.chat.completions.create({
+                           model: config.model,
+                           messages: [{ role: "user", content: openAIParts }],
+                           max_tokens: 2000, 
+                           stream: true 
+                       });
+                       for await (const chunk of stream) {
+                           const content = chunk.choices[0]?.delta?.content || "";
+                           if (content) { fullResponse += content; if (onToken) onToken(content); }
+                       }
+                       
+                       // --- FIX: ADDED LOGGING HERE ---
+                       console.log(`[LLM] ✅ Vision Success: ${config.model}`);
+                       
+                       return this.cleanResponse(fullResponse);
+                   }
               }
           } catch (error) { console.warn(`[LLM] ❌ Vision ${config.model} failed.`); }
       }
       return "❌ All vision models failed.";
   }
 
-  // --- AUDIO LOGIC ---
-  public async analyzeAudioFile(audioPath: string): Promise<{ text: string, timestamp: number }> {
+  // --- AUDIO LOGIC (TWO-SPEED HYBRID ENGINE) ---
+  public async analyzeAudioFile(audioPath: string, isUrgent: boolean = false): Promise<{ text: string, timestamp: number }> {
+      const localTimeout = isUrgent ? 1000 : 20000;
+      const speedLabel = isUrgent ? "⚡ URGENT" : "🐢 CASUAL";
+
       try {
-          console.log("[LLM] 🎙️ Trying Local Whisper...");
+          console.log(`[LLM] 🎙️ Attempting Local Whisper (${speedLabel} - Timeout: ${localTimeout}ms)...`);
+          
           const form = new FormData();
           form.append('file', fs.createReadStream(audioPath));
-          const response = await axios.post('http://localhost:3000/v1/audio/transcriptions', form, { headers: form.getHeaders(), timeout: 0, httpAgent: httpAgent });
+          
+          const response = await axios.post('http://localhost:3000/v1/audio/transcriptions', form, { 
+              headers: form.getHeaders(), 
+              timeout: localTimeout, 
+              httpAgent: httpAgent 
+          });
+          
           const text = response.data?.text?.trim();
           if (text) {
-              console.log("[LLM] ✅ Local Audio Success");
+              console.log(`[LLM] ✅ Local Whisper Success: "${text.slice(0, 30)}..."`);
               this.sessionTranscript += `\n[${new Date().toLocaleTimeString()}] ${text}`;
               return { text: text, timestamp: Date.now() };
           }
-      } catch (e) { console.warn("[LLM] ⚠️ Local Whisper failed. Switching to Cloud..."); }
+      } catch (e: any) { 
+          if (e.code === 'ECONNABORTED') {
+              console.warn(`[LLM] ⏱️ Local Whisper Timed Out (${localTimeout}ms). Switching to Cloud...`);
+          } else {
+              console.warn(`[LLM] ⚠️ Local Whisper Failed: ${e.message}. Switching to Cloud...`); 
+          }
+      }
       
       if (this.groqClient) {
           try {
-              console.log("[LLM] ☁️ Trying Groq Whisper...");
-              const transcription = await this.groqClient.audio.transcriptions.create({ file: fs.createReadStream(audioPath), model: 'whisper-large-v3-turbo', response_format: 'json' });
+              console.log("[LLM] ☁️ Attempting Groq Whisper...");
+              const transcription = await this.groqClient.audio.transcriptions.create({ 
+                  file: fs.createReadStream(audioPath), 
+                  model: 'whisper-large-v3-turbo', 
+                  response_format: 'json' 
+              });
               const text = transcription.text.trim();
-              if (text) {
-                console.log("[LLM] ✅ Groq Audio Success");
-                this.sessionTranscript += `\n[${new Date().toLocaleTimeString()}] ${text}`;
+              if (text) { 
+                  console.log(`[LLM] ✅ Groq Success: "${text.slice(0, 30)}..."`);
+                  this.sessionTranscript += `\n[${new Date().toLocaleTimeString()}] ${text}`; 
               }
               return { text: text, timestamp: Date.now() };
-          } catch (e) { console.error("[LLM] ❌ Audio Failed."); }
+          } catch (e: any) { 
+              console.error(`[LLM] ❌ Groq Audio Failed: ${e.message}`);
+          }
+      } else {
+          console.error("[LLM] ❌ No Groq Client available for fallback.");
       }
+
       return { text: "", timestamp: Date.now() };
   }
 
-  public async analyzeAudioFromBase64(base64Data: string, mimeType: string) {
-      if (!base64Data || base64Data.length < 100) return { text: "", timestamp: Date.now() };
+  public async analyzeAudioFromBase64(base64Data: string, mimeType: string, isUrgent: boolean = false) {
+      if (!base64Data || base64Data.length < 100) {
+          console.warn("[LLM] ⚠️ Audio data empty or too short.");
+          return { text: "", timestamp: Date.now() };
+      }
+      
       const tempPath = path.join(os.tmpdir(), `temp_audio_${Date.now()}.wav`);
       try {
+          console.log(`[LLM] 💾 Saving temp audio file (Urgent: ${isUrgent})`);
           await fs.promises.writeFile(tempPath, Buffer.from(base64Data, 'base64'));
-          const result = await this.analyzeAudioFile(tempPath);
+          
+          const result = await this.analyzeAudioFile(tempPath, isUrgent);
+          
           try { fs.unlinkSync(tempPath); } catch {}
           return result;
-      } catch { return { text: "", timestamp: Date.now() }; }
+      } catch (e) { 
+          console.error("[LLM] ❌ Audio processing error:", e);
+          return { text: "", timestamp: Date.now() }; 
+      }
   }
 
   public async generateSolution(problemInfo: any) {
-      const solutionText = await this.chatWithGemini(`Solve:\n${JSON.stringify(problemInfo)}`, [], "Developer");
+      const solutionText = await this.chatWithGemini(`Solve:\n${JSON.stringify(problemInfo)}`, [], "Developer", "", "answer", false);
       return { solution: { code: solutionText, explanation: "AI Generated" } };
   }
 
@@ -429,15 +517,10 @@ export class LLMHelper {
   }
   
   public async analyzeImageFile(imagePath: string) { 
-      console.log(`[LLM] 🖼️ Analyzing Single Image File: ${path.basename(imagePath)}`);
       return { text: "", timestamp: Date.now() }; 
   }
   
-  public async testConnection() { 
-      console.log("[LLM] 📡 Testing AI Connections...");
-      return { success: true }; 
-  }
-  
+  public async testConnection() { return { success: true }; }
   public async getOllamaModels() { return []; } 
   public isUsingOllama() { return false; }
   public getCurrentProvider() { return "Cloud Waterfall"; }
