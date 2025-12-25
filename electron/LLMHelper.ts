@@ -21,34 +21,35 @@ async function safePdfParse(buffer: Buffer) {
 
 // --- 1. THE EXPANDED WATERFALL BRAINS ---
 const CHAT_MODELS = [
-    // --- TIER 1: THE BRAINS (NEW & NEXT GEN) ---
+    // --- TIER 1: SUPREME REASONING (Gemini & Claude) ---
     { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro' },
     { type: 'gemini', model: 'gemini-3-deep-think', name: 'Gemini 3 Deep Think' },
+    { type: 'openrouter', model: 'anthropic/claude-opus-4.5', name: 'Claude 4.5 Opus' },
+    { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Thinking)' },
+
+    // --- TIER 2: HIGH-SPEED PERFORMANCE ---
     { type: 'gemini', model: 'gemini-3-flash', name: 'Gemini 3.0 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+    { type: 'openrouter', model: 'anthropic/claude-sonnet-4.5', name: 'Claude 4.5 Sonnet' },
+    { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet' },
+
+    // --- TIER 3: EFFICIENCY & SPECIALIZED ---
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-2.5-flash-native', name: 'Gemini 2.5 Flash Native' },
-
-    // --- TIER 2: SPECIALIZED & PREVIEW ---
     { type: 'gemini', model: 'gemini-robotics-er-1.5-preview', name: 'Gemini Robotics' },
-    { type: 'gemini', model: 'gemini-2.5-flash-tts', name: 'Gemini 2.5 Flash TTS' },
-
-    // --- TIER 3: TOP-TIER CODING (UPGRADED) ---
-    { type: 'openrouter', model: 'openai/o3-mini', name: 'OpenAI o3-Pro' },
-    { type: 'openrouter', model: 'anthropic/claude-4.5', name: 'Claude 4.5 Opus' },
+    { type: 'openrouter', model: 'anthropic/claude-haiku-4.5', name: 'Claude 4.5 Haiku' },
 
     // --- TIER 4: OPEN MULTIMODAL (Gemma 3 Family) ---
     { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B' },
     { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B' },
     { type: 'gemini', model: 'gemma-3-4b-it', name: 'Gemma 3 4B' },
-    { type: 'gemini', model: 'gemma-3-2b-it', name: 'Gemma 3 2B' },
-    { type: 'gemini', model: 'gemma-3-1b-it', name: 'Gemma 3 1B' },
 
     // --- TIER 5: RESEARCH & SEARCH (Perplexity) ---
     { type: 'perplexity', model: 'sonar-reasoning-pro', name: 'Sonar Reasoning Pro' },
     { type: 'perplexity', model: 'sonar', name: 'Sonar' },
 
     // --- TIER 6: RELIABLE BACKUPS ---
+    { type: 'openrouter', model: 'openai/o3-mini', name: 'OpenAI o3-Pro' },
     { type: 'github', model: 'gpt-4o', name: 'GPT-4o' },
     { type: 'openrouter', model: 'deepseek/deepseek-r1', name: 'DeepSeek R1' },
     { type: 'groq', model: 'llama-3.3-70b-versatile', name: 'Groq Llama 3.3' }
@@ -56,9 +57,18 @@ const CHAT_MODELS = [
 
 // --- 2. THE EYES (Vision Waterfall) ---
 const VISION_MODELS = [
+    // --- TIER 1: ELITE VISION ---
     { type: 'gemini', model: 'gemini-3-pro-image-preview' }, // Nano Banana Pro
+    { type: 'openrouter', model: 'anthropic/claude-opus-4.5', name: 'Claude 4.5 Opus (Vision)' },
+    { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Reasoning Vision)' },
+    
+    // --- TIER 2: FAST & RELIABLE ---
     { type: 'gemini', model: 'gemini-3-flash' },      
     { type: 'gemini', model: 'gemini-2.5-flash' },    
+    { type: 'openrouter', model: 'anthropic/claude-sonnet-4.5', name: 'Claude 4.5 Sonnet (Vision)' },
+    { type: 'openrouter', model: 'anthropic/claude-haiku-4.5', name: 'Claude 4.5 Haiku (Fast Vision)' },
+    
+    // --- TIER 3: BACKUPS ---
     { type: 'gemini', model: 'gemma-3-27b-it' },      
     { type: 'openrouter', model: 'anthropic/claude-3.5-sonnet' },
     { type: 'perplexity', model: 'sonar-reasoning-pro' },
@@ -328,7 +338,12 @@ export class LLMHelper {
       if (this.sessionTranscript) baseSystemInstruction += `\n\n=== LIVE MEMORY ===\n${this.sessionTranscript}\n`;
       if (notionContext) baseSystemInstruction += `\n\n${notionContext}`;
 
-      let validHistory = history.map(h => ({ role: h.role === 'ai' ? 'model' : 'user', parts: [{ text: h.text }] }));
+      // --- CRITICAL FIX: HISTORY SANITIZATION ---
+      // We must ensure the history starts with a USER message for Gemini/Perplexity.
+      // This strips any initial AI greetings or system/model starts.
+      let mappedHistory = history.map(h => ({ role: h.role === 'ai' ? 'model' : 'user', parts: [{ text: h.text }] }));
+      const firstUserIndex = mappedHistory.findIndex(h => h.role === 'user');
+      let validHistory = firstUserIndex !== -1 ? mappedHistory.slice(firstUserIndex) : [];
 
       for (const config of CHAT_MODELS) {
           try {
