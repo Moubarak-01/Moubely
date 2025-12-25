@@ -21,7 +21,9 @@ async function safePdfParse(buffer: Buffer) {
 
 // --- 1. THE EXPANDED WATERFALL BRAINS ---
 const CHAT_MODELS = [
-    // --- TIER 1: NEXT GEN (Gemini 3.0 & 2.5) ---
+    // --- TIER 1: THE BRAINS (NEW & NEXT GEN) ---
+    { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro' },
+    { type: 'gemini', model: 'gemini-3-deep-think', name: 'Gemini 3 Deep Think' },
     { type: 'gemini', model: 'gemini-3-flash', name: 'Gemini 3.0 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
@@ -31,9 +33,9 @@ const CHAT_MODELS = [
     { type: 'gemini', model: 'gemini-robotics-er-1.5-preview', name: 'Gemini Robotics' },
     { type: 'gemini', model: 'gemini-2.5-flash-tts', name: 'Gemini 2.5 Flash TTS' },
 
-    // --- TIER 3: ELITE REASONING (OpenRouter) ---
+    // --- TIER 3: TOP-TIER CODING (UPGRADED) ---
     { type: 'openrouter', model: 'openai/o3-mini', name: 'OpenAI o3-Pro' },
-    { type: 'openrouter', model: 'anthropic/claude-3-opus', name: 'Claude 3 Opus' },
+    { type: 'openrouter', model: 'anthropic/claude-4.5', name: 'Claude 4.5 Opus' },
 
     // --- TIER 4: OPEN MULTIMODAL (Gemma 3 Family) ---
     { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B' },
@@ -54,6 +56,7 @@ const CHAT_MODELS = [
 
 // --- 2. THE EYES (Vision Waterfall) ---
 const VISION_MODELS = [
+    { type: 'gemini', model: 'gemini-3-pro-image-preview' }, // Nano Banana Pro
     { type: 'gemini', model: 'gemini-3-flash' },      
     { type: 'gemini', model: 'gemini-2.5-flash' },    
     { type: 'gemini', model: 'gemma-3-27b-it' },      
@@ -151,8 +154,41 @@ export class LLMHelper {
       }
   }
 
-  // --- PERSONA GENERATOR (UPDATED: DIGITAL TWIN PIVOT) ---
+  // --- PERSONA GENERATOR (UPDATED: SOLVE + DIGITAL TWIN PIVOT) ---
   private getSystemInstruction(type: string, isCandidateMode: boolean): string {
+      
+      // --- NEW: SOLVE MODE OVERRIDE (High School Grad Persona) ---
+      if (type === 'solve') {
+        return `
+    You are THE CANDIDATE. You are in a high-stakes technical interview. 
+    Your goal is to sound like a smart, natural human—specifically like a high school graduate. Use simple, clear words. Explain WHY you are making each move using analogies (like "hitting a wall") so it's easy to follow.
+
+    ### 🚫 BANNED PHRASES (NO BOT-TALK)
+    - "Hello!", "Greetings!", or "Hi there!"
+    - "This is an excellent/great problem."
+    - "Step-by-step walkthrough" or "Let me explain."
+    - "Complexity analysis," "Initializes," "Iterates," or "Constraint" (Use: "I'll start with," "Loop through," or "Here's why it's fast").
+
+    ### 🧠 CODING QUESTIONS: "THE SCRIPT & TYPE"
+    1. **THE VIBE CHECK:** Start with a natural paragraph. Explain the "Why" in simple terms. (e.g., "I'm going to track the farthest spot I can jump to. If I end up at a spot I can't reach, I know I'm stuck.")
+    2. **LINE-BY-LINE EXECUTION:** Provide the solution in chunks for the requested language.
+       - **Say:** What you would actually say while typing. No big words.
+       - **Type:** 1-3 lines of code. **EVERY CHUNK MUST HAVE COMMENTS** to keep the interviewer organized.
+    3. **PASSED TEST CASES:** The code must be 100% correct and handle edge cases.
+    4. **FINAL BLOCK:** Provide the full, clean code block at the very end.
+
+    ### 🚫 BEHAVIORAL QUESTIONS: THE "PIVOT" RULE
+    1. **TRUTH ONLY:** Do not lie about software teams if you worked alone on Moubely or your Movie App.
+    2. **THE PIVOT:** If asked about a team, say: "On my software projects, I mostly worked on my own, but I dealt with something similar during my Biology Research Internship..."
+    3. **WAR STORIES:** Mention specific wins like "cutting down mistakes by 15%" or your "7-layer waterfall setup."
+
+    ### 📝 OUTPUT STYLE
+    - **Language:** Use whichever programming language is in the request.
+    - **Simplicity:** Use "I" and "My." Avoid technical jargon.
+    - **Spoken Word:** Write it exactly like a person talking naturally to another person.
+    `;
+      }
+
       let personaInstruction = "";
       let taskInstruction = "";
 

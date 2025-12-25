@@ -6,7 +6,7 @@ import {
   GripHorizontal, HelpCircle, MessageCircleQuestion, FileText,
   Scaling, Copy, Check, Trash2, Mail,
   Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
-  Eye, EyeOff, MessageCircle 
+  Eye, EyeOff, MessageCircle, Terminal 
 } from "lucide-react"
 
 // --- IMPORTS FOR FORMULAS & HIGHLIGHTING ---
@@ -932,6 +932,101 @@ const Queue: React.FC<any> = ({ setView }) => {
     }
   }
 
+  // --- NEW: TRIGGER SOLVE ACTION ---
+  const triggerSolveAction = async () => {
+      if (!window.electronAPI) return;
+
+      // 1. Activate Urgent Mode (10s burst)
+      isUrgentRef.current = true;
+      setTimeout(() => { isUrgentRef.current = false; }, 10000);
+
+      // 2. Prepare Context (Images or Transcript)
+      const hasImages = queuedScreenshots.length > 0;
+      let contextText = transcriptLogs.map(t => t.text).join(" ");
+
+      if (!contextText.trim() && messages.length > 0) {
+          contextText = messages.slice(-5).map(m => `${m.role.toUpperCase()}: ${m.text}`).join("\n");
+      }
+
+      // 3. UI Setup
+      setActiveTab("Chat");
+      setIsThinking(true);
+      setThinkingStep("Solving problem...");
+
+      setShowSlowLoader(false);
+      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+      loadingTimerRef.current = setTimeout(() => { setShowSlowLoader(true); }, 2000);
+
+      // 4. Add User Message
+      const now = Date.now();
+      const aiMsgId = (now + 1).toString();
+      const userDisplayMessage = hasImages ? "Solve this coding problem (Screenshots attached)." : "Solve this coding problem based on the discussion.";
+
+      setMessages(prev => [
+          ...prev,
+          { 
+              id: now.toString(), 
+              role: "user", 
+              text: userDisplayMessage, 
+              queuedScreenshots: hasImages ? queuedScreenshots : undefined,
+              timestamp: now 
+          },
+          { id: aiMsgId, role: "ai", text: "", timestamp: now, isStreaming: true }
+      ]);
+
+      // 5. Call API
+      try {
+          let response = "";
+
+          if (hasImages) {
+              // --- PATH A: VISION BRAIN (Screenshots Attached) ---
+              const solvePersona = `
+    You are THE CANDIDATE (Moubarak). You are in a high-stakes technical interview. 
+    Your goal is to sound like a smart, natural human—specifically like a high school graduate. Use simple, clear words. Explain WHY you are making each move using analogies (like "hitting a wall") so it's easy to follow.
+
+    ### 🚫 BANNED PHRASES (NO BOT-TALK)
+    - "Hello!", "Greetings!", or "Hi there!"
+    - "This is an excellent/great problem."
+    - "Step-by-step walkthrough" or "Let me explain."
+    - "Complexity analysis," "Initializes," "Iterates," or "Constraint" (Use: "I'll start with," "Loop through," or "Here's why it's fast").
+
+    ### 🧠 CODING QUESTIONS: "THE SCRIPT & TYPE"
+    1. **THE VIBE CHECK:** Start with a natural paragraph. Explain the "Why" in simple terms.
+    2. **LINE-BY-LINE EXECUTION:** Provide the solution in chunks.
+       - **Say:** What you would actually say while typing.
+       - **Type:** 1-3 lines of code. **EVERY CHUNK MUST HAVE COMMENTS**.
+    3. **PASSED TEST CASES:** The code must be 100% correct.
+    4. **FINAL BLOCK:** Provide the full, clean code block.
+
+    USER QUESTION: Solve the problem in these images.
+              `;
+              
+              const imagePaths = queuedScreenshots.map(i => i.path);
+              response = await window.electronAPI.chatWithImage(solvePersona, imagePaths);
+              handleClearQueue(); 
+
+          } else {
+              // --- PATH B: TEXT BRAIN (Transcript Only) ---
+              response = await window.electronAPI.invoke("gemini-chat", { 
+                  message: contextText || "Solve the current coding problem.", 
+                  mode: mode,
+                  history: messages.map(m => ({ role: m.role, text: m.text })),
+                  type: "solve",             
+                  isCandidateMode: true
+              });
+          }
+
+          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m));
+
+      } catch (e: any) { 
+          setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: "Error: " + e.message, isStreaming: false } : m));
+      } finally { 
+          if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+          setShowSlowLoader(false);
+          setIsThinking(false);
+      }
+  }
+
   const handleInputFocus = () => { 
       setIsInputFocused(true); 
       if (!isExpanded) handleExpandToggle(); 
@@ -1017,6 +1112,13 @@ const Queue: React.FC<any> = ({ setView }) => {
                     className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 text-xs font-bold transition-all border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)] ring-1 ring-purple-500/20"
                 >
                     <Zap size={13} className="fill-purple-400/50"/> <span>Answer</span>
+                </button>
+                
+                <button 
+                    onClick={triggerSolveAction} 
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 text-xs font-bold transition-all border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/20"
+                >
+                    <Terminal size={13} className="fill-indigo-400/50"/> <span>Solve</span>
                 </button>
                 
                 <button 
