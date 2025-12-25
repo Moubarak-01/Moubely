@@ -11,9 +11,7 @@
 We have just deployed major engineering improvements to intelligence, stability, and visibility:
 
 * **⚡ The "Solve" Button**: A new dedicated coding tool (Terminal Icon).
-    * **Visual Logic**: If screenshots are present, it uses the **Vision Brain** to "see" the code and debug it.
-    * **Audio Logic**: If no screen is captured, it listens to the live meeting transcript to solve the verbal coding problem.
-    * **Persona**: Enforces a strict **"High School Graduate"** persona—it uses analogies (e.g., "hitting a wall"), avoids jargon, and explains code line-by-line.
+    Moubely uses its Vision Brain to debug code from screenshots or listens to meeting transcripts to solve verbal problems when no screen is captured. It explains solutions line-by-line using a simple persona that relies on analogies and avoids technical jargon.
 * **Expanded 18-Model "Brain"**: Integrated a massive Tier-1 logic engine including **Gemini 3.0 Pro**, **Gemini 3 Deep Think**, **Claude 3.7 Sonnet (Thinking)**, and **Claude 4.5 Opus**.
 * **Critical Crash Fix (History Sanitization)**: Implemented a smart history slicer that prevents API rejections by ensuring conversation history *always* starts with a user message, unlocking strict APIs like Gemini and Perplexity.
 * **"Blind Vision" Patch**: Fixed a routing logic error where the "Solve" button was sending images to the Text Brain. It now intelligently routes traffic to the correct Vision or Text model based on payload content.
