@@ -101,11 +101,11 @@ Moubely is built using a modern, performant, and resilient full-stack JavaScript
 
 ### 5. The "Tesla" Persona Hallucination
 * **The Problem:** The AI sounded too high-level and invented fake software teams for behavioral questions.
-* **The Fix:** We added a **Simple Voice Filter** in `LLMHelper.ts`. It explicitly bans corporate jargon and forces a "Pivot Rule" to use your real Biology Research experience when software team context is missing.
+* **The Fix:** We added a **Simple Voice Filter** in `LLMHelper.ts`. It explicitly bans corporate jargon and forces a "Pivot Rule" to use your real experience you have when software team context is missing.
 
 ### 6. The Ghost Window (Critical Visibility Crash)
 * **The Problem:** The app would start with no window visible at all due to Electron transparency bugs.
-* **The Fix:** In `electron/WindowHelper.ts`, we implemented an aggressive `ready-to-show` callback with an explicit `win.focus()` to force the OS compositor to render the window.
+* **The Fix:** In `electron/WindowHelper.ts`, we implemented an aggressive `ready-to-show` callback with an explicit `win.focus()` to force the OS compositor to render the window. (Faced a lot of those by the way).
 
 ### 7. The "Silent Crash" (Circular Dependency)
 * **The Problem:** The app would hang on startup because `Main` and `IPC Handlers` were importing each other.
