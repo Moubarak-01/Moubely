@@ -231,7 +231,7 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
 };
 
 // --- STUDENT SETUP MODAL ---
-const StudentModeSetupModal = ({ open, onClose, onSave, mode }: { open: boolean, onClose: () => void, onSave: (files: File[]) => void, mode: string }) => {
+const StudentModeSetupModal = ({ open, onClose, onSave }: { open: boolean, onClose: () => void, onSave: (files: File[]) => void, mode: string }) => {
   const [files, setFiles] = useState<File[]>([]);
   if (!open) return null;
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -267,7 +267,7 @@ const StudentModeSetupModal = ({ open, onClose, onSave, mode }: { open: boolean,
 };
 
 // --- MAIN COMPONENT ---
-const Queue: React.FC<any> = ({ setView }) => {
+const Queue: React.FC<any> = () => {
   const [isExpanded, setIsExpanded] = useState(false)
   const [activeTab, setActiveTab] = useState<"Chat" | "Transcript" | "Email" | "History">("Chat")
   const [isInputFocused, setIsInputFocused] = useState(false)

@@ -23,12 +23,12 @@ async function safePdfParse(buffer: Buffer) {
 const CHAT_MODELS = [
     // --- TIER 1: SUPREME REASONING (Gemini & Claude) ---
     { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro' },
-    { type: 'gemini', model: 'gemini-3-deep-think', name: 'Gemini 3 Deep Think' },
+    { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3 Deep Think' },
     { type: 'openrouter', model: 'anthropic/claude-opus-4.5', name: 'Claude 4.5 Opus' },
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Thinking)' },
 
     // --- TIER 2: HIGH-SPEED PERFORMANCE ---
-    { type: 'gemini', model: 'gemini-3-flash', name: 'Gemini 3.0 Flash' },
+    { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3.0 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'openrouter', model: 'anthropic/claude-sonnet-4.5', name: 'Claude 4.5 Sonnet' },
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet' },
@@ -63,7 +63,7 @@ const VISION_MODELS = [
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Reasoning Vision)' },
     
     // --- TIER 2: FAST & RELIABLE ---
-    { type: 'gemini', model: 'gemini-3-flash' },      
+    { type: 'gemini', model: 'gemini-3-flash-preview' },      
     { type: 'gemini', model: 'gemini-2.5-flash' },    
     { type: 'openrouter', model: 'anthropic/claude-sonnet-4.5', name: 'Claude 4.5 Sonnet (Vision)' },
     { type: 'openrouter', model: 'anthropic/claude-haiku-4.5', name: 'Claude 4.5 Haiku (Fast Vision)' },
@@ -164,10 +164,7 @@ export class LLMHelper {
       }
   }
 
-  // --- PERSONA GENERATOR (UPDATED: SOLVE + DIGITAL TWIN PIVOT) ---
   private getSystemInstruction(type: string, isCandidateMode: boolean): string {
-      
-      // --- NEW: SOLVE MODE OVERRIDE (High School Grad Persona) ---
       if (type === 'solve') {
         return `
     You are THE CANDIDATE. You are in a high-stakes technical interview. 
@@ -188,9 +185,9 @@ export class LLMHelper {
     4. **FINAL BLOCK:** Provide the full, clean code block at the very end.
 
     ### 🚫 BEHAVIORAL QUESTIONS: THE "PIVOT" RULE
-    1. **TRUTH ONLY:** Do not lie about software teams if you worked alone on Moubely or your Movie App.
-    2. **THE PIVOT:** If asked about a team, say: "On my software projects, I mostly worked on my own, but I dealt with something similar during my Biology Research Internship..."
-    3. **WAR STORIES:** Mention specific wins like "cutting down mistakes by 15%" or your "7-layer waterfall setup."
+    1. **TRUTH ONLY:** Check "STUDENT FILES". Do not lie about software teams.
+    2. **THE PIVOT:** If asked about a team when I have only individual software projects, say: "On my software projects, I mostly worked on my own, but I dealt with something similar during my [Non-Software Experience from Resume]..."
+    3. **WAR STORIES:** Mention specific technical wins found in the files (e.g., "achieving X score" or "implementing X logic").
 
     ### 📝 OUTPUT STYLE
     - **Language:** Use whichever programming language is in the request.
@@ -203,39 +200,117 @@ export class LLMHelper {
       let taskInstruction = "";
 
       if (isCandidateMode) {
-          // --- UPDATED: NATURAL DIGITAL TWIN PROMPT ---
-          personaInstruction = `
-          You are THE CANDIDATE. You are currently in a high-stakes technical interview. 
-          Your goal is to get hired by proving your specific skills using ONLY the evidence in your resume and project files.
+        personaInstruction = `
+YOU ARE IN STRICT CANDIDATE MODE.
 
-          ### 🚫 CRITICAL INSTRUCTION: THE "PIVOT" RULE (DO NOT IGNORE)
-          The user may ask generic behavioral questions (e.g., "Tell me about a conflict in your engineering team").
-          1. **CHECK THE FACTS:** Look at my provided "STUDENT FILES". Do I have a software engineering team? 
-             - If **NO** (e.g., my projects are individual efforts like Moubely/Movie App), you MUST NOT hallucinate a software team. 
-             - **DO NOT** make up a story about a "SaaS product" or "Microservices debate" if it is not in the files.
-             
-          2. **EXECUTE THE PIVOT:** Instead of lying, you must say:
-             "As a student at Rust College, my primary software projects like Moubely were individual engineering efforts. HOWEVER, I handled a similar [conflict/challenge/leadership] situation during my [Insert Real Experience from Resume, e.g., Biology Research Internship]..."
+You are THE CANDIDATE in a high-stakes technical interview.
+Your goal is to get hired by proving your skills using ONLY verifiable evidence found in the provided STUDENT FILES (resume, projects, notes) and to sound like a smart, natural human—specifically like a high school graduate. Use simple, clear words. Explain WHY you are making each move using analogies (like "hitting a wall") so it's easy to follow.
 
-          3. **USE "WAR STORIES":** Back up your answer with specific, hard data from the files.
-             - If discussing **Moubely**: Mention the "7-layer waterfall architecture" or "Deep Stealth mode."
-             - If discussing **Research**: Mention "managing 20+ protocols" or "reducing error rates by 15%."
-             - If discussing **Movie App**: Mention "Appwrite trending algorithm" or "Debouncing."
 
-          ### 📝 RESPONSE FORMAT (CRITICAL)
-          - **Output Style:** A natural, spoken-word paragraph (or two) that I can read aloud immediately. 
-          - **Internal Logic:** Use the STAR method (Situation, Task, Action, Result) to structure your thoughts internally, but **DO NOT** use headers like "Situation:" or "Task:" in the final output.
-          - **Tone:** Casual, humble, and simple. Sound like a college student, not a professor.
-          - **Language Rules:** DO NOT use big corporate words like "orchestrated," "leveraged," "spearheaded," or "facilitated." Use simple verbs like "built," "used," "led," or "helped."
-          - **Sentence Structure:** Keep sentences normal, concise, understandable and punchy. Avoid long, complex explanations.
-          - **Context Usage:** Reference specific details (e.g. "Moubely's 7-layer architecture"), but explain them simply.
-          `;
+ABSOLUTE ENFORCEMENT RULES (NO EXCEPTIONS):
+- If a fact is not explicitly present in the files, it DOES NOT EXIST.
+- You MUST NOT guess, assume, exaggerate, or invent details.
+- Any hallucination or unsupported claim is considered a failure.
+
+VOICE & COMMUNICATION STYLE (MANDATORY):
+- Speak like a smart, natural human.
+- Education level: high-school graduate.
+- Use simple words and short sentences.
+- Explain reasoning using plain analogies (e.g., “it felt like hitting a wall”).
+- Sound calm, honest, and grounded. Never theatrical or corporate.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚫 CRITICAL FACT-CHECK & PIVOT RULE (HARD-LOCKED)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1 — FACT VERIFICATION (REQUIRED BEFORE ANSWERING):
+You MUST verify from the STUDENT FILES:
+- Whether projects were individual or team-based
+- Whether any professional software organization existed
+
+STRICT PROHIBITIONS:
+- If projects are individual, you MUST NOT reference:
+  - software teams
+  - startups or SaaS companies
+  - microservices debates
+  - enterprise environments
+- You MUST NOT invent collaboration, leadership, or workplace dynamics.
+
+STEP 2 — REQUIRED PIVOT (ONLY WHEN NECESSARY):
+If asked about teamwork, conflict, or leadership AND no software team exists,
+you MUST pivot using this structure:
+
+“As a student at [institution from files], most of my software work was individual. HOWEVER, I handled a similar challenge during my [specific non-software experience listed in the resume], where I…”
+
+You may ONLY reference experiences that are explicitly documented.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏆 UNIVERSAL PROJECT PRIORITIZATION SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You MUST internally analyze all provided projects and rank them by technical complexity.
+
+PRIORITY ORDER (STRICT):
+1. SYSTEM-LEVEL ENGINEERING
+   - OS-level behavior
+   - native APIs
+   - complex execution flows
+   - advanced AI or model-routing systems
+
+2. FULL-STACK PRODUCT BUILDS
+   - web or mobile apps
+   - user-facing products
+   - UX and performance optimizations
+
+HARD RULE:
+When asked for the “best,” “most impressive,” or “most challenging” project,
+you MUST lead with the highest-complexity system-level project identified in the files.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚫 CONVERSATION INTEGRITY RULES (ENFORCED)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. DEDUPLICATION:
+- Check session context before responding.
+- NEVER repeat the same technical story, bug, or challenge twice.
+
+2. TOPIC ROTATION:
+- If a specific challenge has already been discussed,
+  you MUST switch to a different technical problem from a different project.
+
+3. TRANSITIONS:
+- Use natural bridges such as:
+  “Building on what I mentioned earlier…”
+  “Switching to a different technical challenge…”
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🛠️ TECHNICAL DISCUSSION CONSTRAINTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- You may ONLY discuss technologies, problems, and solutions that appear in the files.
+- Do NOT introduce tools, systems, or architectures that are not documented.
+- Emphasize problem-solving, trade-offs, and learning moments over buzzwords.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 RESPONSE FORMAT (STRICT)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Output: 1–2 natural spoken paragraphs.
+- Internal reasoning may follow STAR, but DO NOT label sections.
+- Tone: casual, humble, clear.
+- Vocabulary enforcement:
+  FORBIDDEN WORDS:
+  “orchestrated”, “leveraged”, “spearheaded”, “facilitated”
+
+  REQUIRED STYLE:
+  simple verbs like “built”, “used”, “fixed”, “learned”, “helped”.
+
+ANY RULE VIOLATION INVALIDATES THE RESPONSE.
+`;
       } else {
           personaInstruction = `
           *** MODE: TECHNICAL ASSISTANT ***
-          You are a helpful coding assistant named 'Moubely'.
-          - Speak objectively.
-          - Be concise and dense.
+          You are a helpful coding assistant named 'Moubely'. Speak objectively, concisely and dense.
           `;
       }
 
@@ -243,7 +318,7 @@ export class LLMHelper {
           case 'assist': taskInstruction = "Provide technical facts, documentation, or definitions."; break;
           case 'reply': taskInstruction = "Draft a short, 1-2 sentence response."; break;
           case 'answer': taskInstruction = "Provide a deep, comprehensive answer using the STAR method."; break;
-          case 'ask': taskInstruction = "Suggest 2-3 insightful follow-up questions."; break;
+          case 'ask': taskInstruction = "Suggest 3-4 insightful follow-up questions."; break;
           case 'recap': taskInstruction = "Summarize the conversation in 3 brief bullet points."; break;
           default: taskInstruction = "Answer the user's request."; break;
       }
@@ -251,16 +326,45 @@ export class LLMHelper {
       return `${this.systemPrompt}\n\n${personaInstruction}\n\nTASK GOAL: ${taskInstruction}`;
   }
 
-  // --- PDF & CONTEXT TOOLS ---
   private async extractTextFromPdf(buffer: Buffer): Promise<string> {
       try {
           console.log("[LLM] 📄 Parsing PDF locally...");
           const data = await safePdfParse(buffer);
           if (data && data.text && data.text.trim().length > 50) {
-              console.log(`[LLM] ✅ PDF Parsed (${data.text.length} chars)`);
+              console.log(`[LLM] ✅ Local PDF Parse Success: (${data.text.length} chars)`);
               return data.text.trim();
           }
-      } catch (e) { console.warn("[LLM] ⚠️ Local PDF parse failed."); }
+          console.warn("[LLM] ⚠️ Local PDF parse returned empty or tiny text. Possibly a scan.");
+      } catch (e) { 
+          console.warn("[LLM] ❌ Local PDF Parse Exception. Switching to Cloud OCR..."); 
+      }
+      
+      if (process.env.OCR_SPACE_API_KEY) {
+          console.log("[LLM] 🔍 Triggering Cloud OCR Recovery (OCR.Space)...");
+          try {
+              const formData = new FormData();
+              formData.append('file', buffer, { filename: 'file.pdf', contentType: 'application/pdf' });
+              formData.append('apikey', process.env.OCR_SPACE_API_KEY);
+              formData.append('language', 'eng');
+              formData.append('isOverlayRequired', 'false');
+              formData.append('filetype', 'PDF');
+
+              const response = await axios.post('https://api.ocr.space/parse/image', formData, {
+                  headers: formData.getHeaders(),
+                  timeout: 30000
+              });
+
+              const text = response.data?.ParsedResults?.[0]?.ParsedText;
+              if (text) {
+                  console.log(`[LLM] ✅ Cloud OCR Success: (${text.length} chars)`);
+                  return text.trim();
+              }
+          } catch (ocrError: any) {
+              console.error("[LLM] ❌ Cloud OCR Request Failed:", ocrError.message);
+          }
+      } else {
+          console.warn("[LLM] ⚠️ Cloud OCR Recovery unavailable (No API Key).");
+      }
       return "";
   }
 
@@ -298,7 +402,6 @@ export class LLMHelper {
     } catch { return ""; }
   }
 
-  // --- 🧠 MAIN CHAT WATERFALL ---
   public async chatWithGemini(
       message: string, 
       history: any[], 
@@ -332,15 +435,11 @@ export class LLMHelper {
       }
 
       let notionContext = await this.getNotionContext();
-      
       let baseSystemInstruction = this.getSystemInstruction(type, isCandidateMode);
 
       if (this.sessionTranscript) baseSystemInstruction += `\n\n=== LIVE MEMORY ===\n${this.sessionTranscript}\n`;
       if (notionContext) baseSystemInstruction += `\n\n${notionContext}`;
 
-      // --- CRITICAL FIX: HISTORY SANITIZATION ---
-      // We must ensure the history starts with a USER message for Gemini/Perplexity.
-      // This strips any initial AI greetings or system/model starts.
       let mappedHistory = history.map(h => ({ role: h.role === 'ai' ? 'model' : 'user', parts: [{ text: h.text }] }));
       const firstUserIndex = mappedHistory.findIndex(h => h.role === 'user');
       let validHistory = firstUserIndex !== -1 ? mappedHistory.slice(firstUserIndex) : [];
@@ -374,6 +473,7 @@ export class LLMHelper {
                       fullResponse += text;
                       if (onToken) onToken(text); 
                   }
+                  console.log(`[LLM] ✅ SUCCESS: ${config.model}`);
                   return this.cleanResponse(fullResponse);
               } 
               else {
@@ -413,7 +513,6 @@ export class LLMHelper {
       return "⚠️ All AI providers failed. Check API Keys.";
   }
 
-  // --- VISION WATERFALL ---
   public async chatWithImage(message: string, imagePaths: string[], onToken?: (token: string) => void): Promise<string> {
       console.log(`[LLM] 🖼️ Vision Waterfall: Analyzing ${imagePaths.length} images...`);
       const imageParts: { inlineData: { data: string; mimeType: string } }[] = [];
@@ -442,10 +541,7 @@ export class LLMHelper {
                       fullResponse += text;
                       if (onToken) onToken(text);
                   }
-                  
-                  // --- FIX: ADDED LOGGING HERE ---
                   console.log(`[LLM] ✅ Vision Success: ${config.model}`);
-                  
                   return this.cleanResponse(fullResponse);
               } 
               else if (['github', 'openai', 'perplexity', 'openrouter'].includes(config.type)) {
@@ -470,10 +566,7 @@ export class LLMHelper {
                            const content = chunk.choices[0]?.delta?.content || "";
                            if (content) { fullResponse += content; if (onToken) onToken(content); }
                        }
-                       
-                       // --- FIX: ADDED LOGGING HERE ---
                        console.log(`[LLM] ✅ Vision Success: ${config.model}`);
-                       
                        return this.cleanResponse(fullResponse);
                    }
               }
@@ -482,38 +575,28 @@ export class LLMHelper {
       return "❌ All vision models failed.";
   }
 
-  // --- AUDIO LOGIC (TWO-SPEED HYBRID ENGINE) ---
-  
-  // FIX 1: Add optional timestamp parameter
   public async analyzeAudioFile(audioPath: string, isUrgent: boolean = false, timestamp?: number): Promise<{ text: string, timestamp: number }> {
       const localTimeout = isUrgent ? 1000 : 20000;
       const speedLabel = isUrgent ? "⚡ URGENT" : "🐢 CASUAL";
 
       try {
           console.log(`[LLM] 🎙️ Attempting Local Whisper (${speedLabel} - Timeout: ${localTimeout}ms)...`);
-          
           const form = new FormData();
           form.append('file', fs.createReadStream(audioPath));
-          
           const response = await axios.post('http://localhost:3000/v1/audio/transcriptions', form, { 
               headers: form.getHeaders(), 
               timeout: localTimeout, 
               httpAgent: httpAgent 
           });
-          
           const text = response.data?.text?.trim();
           if (text) {
               console.log(`[LLM] ✅ Local Whisper Success: "${text.slice(0, 30)}..."`);
               this.sessionTranscript += `\n[${new Date().toLocaleTimeString()}] ${text}`;
-              // FIX 2: Return provided timestamp if available, else Date.now()
               return { text: text, timestamp: timestamp || Date.now() };
           }
       } catch (e: any) { 
-          if (e.code === 'ECONNABORTED') {
-              console.warn(`[LLM] ⏱️ Local Whisper Timed Out (${localTimeout}ms). Switching to Cloud...`);
-          } else {
-              console.warn(`[LLM] ⚠️ Local Whisper Failed: ${e.message}. Switching to Cloud...`); 
-          }
+          if (e.code === 'ECONNABORTED') console.warn(`[LLM] ⏱️ Local Whisper Timed Out (${localTimeout}ms). Switching to Cloud...`);
+          else console.warn(`[LLM] ⚠️ Local Whisper Failed: ${e.message}. Switching to Cloud...`); 
       }
       
       if (this.groqClient) {
@@ -529,40 +612,21 @@ export class LLMHelper {
                   console.log(`[LLM] ✅ Groq Success: "${text.slice(0, 30)}..."`);
                   this.sessionTranscript += `\n[${new Date().toLocaleTimeString()}] ${text}`; 
               }
-              // FIX 3: Return provided timestamp if available
               return { text: text, timestamp: timestamp || Date.now() };
-          } catch (e: any) { 
-              console.error(`[LLM] ❌ Groq Audio Failed: ${e.message}`);
-          }
-      } else {
-          console.error("[LLM] ❌ No Groq Client available for fallback.");
+          } catch (e: any) { console.error(`[LLM] ❌ Groq Audio Failed: ${e.message}`); }
       }
-
-      // FIX 4: Return timestamp
       return { text: "", timestamp: timestamp || Date.now() };
   }
 
-  // FIX 5: Accept timestamp in base64 handler
   public async analyzeAudioFromBase64(base64Data: string, mimeType: string, isUrgent: boolean = false, timestamp?: number) {
-      if (!base64Data || base64Data.length < 100) {
-          console.warn("[LLM] ⚠️ Audio data empty or too short.");
-          return { text: "", timestamp: Date.now() };
-      }
-      
+      if (!base64Data || base64Data.length < 100) return { text: "", timestamp: Date.now() };
       const tempPath = path.join(os.tmpdir(), `temp_audio_${Date.now()}.wav`);
       try {
-          console.log(`[LLM] 💾 Saving temp audio file (Urgent: ${isUrgent})`);
           await fs.promises.writeFile(tempPath, Buffer.from(base64Data, 'base64'));
-          
-          // FIX 6: Pass timestamp to analyzeAudioFile
           const result = await this.analyzeAudioFile(tempPath, isUrgent, timestamp);
-          
           try { fs.unlinkSync(tempPath); } catch {}
           return result;
-      } catch (e) { 
-          console.error("[LLM] ❌ Audio processing error:", e);
-          return { text: "", timestamp: Date.now() }; 
-      }
+      } catch (e) { return { text: "", timestamp: Date.now() }; }
   }
 
   public async generateSolution(problemInfo: any) {
@@ -575,10 +639,7 @@ export class LLMHelper {
       return { solution: { code: currentCode, explanation: response } };
   }
   
-  public async analyzeImageFile(imagePath: string) { 
-      return { text: "", timestamp: Date.now() }; 
-  }
-  
+  public async analyzeImageFile(imagePath: string) { return { text: "", timestamp: Date.now() }; }
   public async testConnection() { return { success: true }; }
   public async getOllamaModels() { return []; } 
   public isUsingOllama() { return false; }

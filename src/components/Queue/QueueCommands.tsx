@@ -4,18 +4,12 @@ import { Sparkles, MessageCircle, Zap, HelpCircle, FileText } from "lucide-react
 
 interface QueueCommandsProps {
   onTooltipVisibilityChange: (visible: boolean, height: number) => void
-  screenshots: Array<{ path: string; preview: string }>
-  onChatToggle: () => void
-  onSettingsToggle: () => void
   // New prop to handle the 5 toolbar commands
   onCommand: (type: 'assist' | 'reply' | 'answer' | 'ask' | 'recap', isCandidateMode: boolean) => void
 }
 
 const QueueCommands: React.FC<QueueCommandsProps> = ({
   onTooltipVisibilityChange,
-  screenshots,
-  onChatToggle,
-  onSettingsToggle,
   onCommand
 }) => {
   const [isTooltipVisible, setIsTooltipVisible] = useState(false)

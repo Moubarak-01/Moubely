@@ -13,6 +13,7 @@ const queryClient = new QueryClient({
 })
 
 const App: React.FC = () => {
+  const [debugProcessing, setDebugProcessing] = useState(false);
   const [view, setView] = useState<"queue" | "solutions" | "debug">("queue")
   const [isStealth, setIsStealth] = useState(false)
   const [isMouseIgnored, setIsMouseIgnored] = useState(false)
@@ -55,13 +56,14 @@ const App: React.FC = () => {
     >
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          <Header view={view} setView={setView} isStealth={isStealth} setIsStealth={setIsStealth} /> 
+          <Header/> 
           <Router>
             <Routes>
               <Route path="/" element={<Navigate replace to="/queue" />} />
               <Route path="/queue" element={<Queue setView={setView} />} />
               <Route path="/solutions" element={<Solutions setView={setView} />} />
-              <Route path="/debug" element={<Debug setView={setView} />} />
+              <Route path="/debug" element={<Debug isProcessing={false} setIsProcessing={() => {}} />} />
+              <Route path="/debug" element={<Debug isProcessing={debugProcessing} setIsProcessing={setDebugProcessing} />} />
             </Routes>
           </Router>
           <ToastViewport />
