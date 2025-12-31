@@ -1,4 +1,4 @@
-import { ipcMain, app } from "electron";
+import { ipcMain, app, desktopCapturer, shell } from "electron";
 import path from "path";
 import fs from "fs";
 import { AppState } from "./main";
@@ -11,6 +11,19 @@ const logIPC = (channel: string, details: string = "") => {
 export function initializeIpcHandlers(appState: AppState) {
   // Access the LLMHelper through the processingHelper existing in AppState
   const llmHelper = (appState.processingHelper as any).llmHelper;
+
+  ipcMain.handle('save-user-profile', async (event, profileData) => {
+    try {
+      const userDataPath = app.getPath('userData');
+      const profilePath = path.join(userDataPath, 'user_profile.json');
+      fs.writeFileSync(profilePath, JSON.stringify(profileData, null, 2));
+      console.log(`[IPC ⚡] ✅ User Profile Saved to: ${profilePath}`);
+      return { success: true };
+    } catch (error) {
+      console.error(`[IPC ⚡] ❌ Profile Save Failed:`, error);
+      throw error;
+    }
+  });
 
   // --- 1. CORE WINDOW COMMANDS ---
   

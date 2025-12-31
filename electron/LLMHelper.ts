@@ -165,10 +165,29 @@ export class LLMHelper {
   }
 
   private getSystemInstruction(type: string, isCandidateMode: boolean): string {
+      let userProfile = {
+          targetPersona: "High School Graduate",
+          communicationStyle: "Analogy-Heavy",
+          technicalDepth: "Beginner",
+          keyExperiences: "Biology Research Intern"
+      };
+
+      try {
+          const profilePath = path.join(app.getPath("userData"), "user_profile.json");
+          if (fs.existsSync(profilePath)) {
+              userProfile = JSON.parse(fs.readFileSync(profilePath, 'utf-8'));
+              console.log("[LLM] 🧠 Loaded Custom User Persona");
+          }
+      } catch (e) { console.warn("[LLM] ⚠️ Profile load failed."); }
+
       if (type === 'solve') {
         return `
-    You are THE CANDIDATE. You are in a high-stakes technical interview. 
-    Your goal is to sound like a smart, natural human—specifically like a high school graduate. Use simple, clear words. Explain WHY you are making each move using analogies (like "hitting a wall") so it's easy to follow.
+    You are THE CANDIDATE. 
+    PERSONA: ${userProfile.targetPersona}
+    STYLE: ${userProfile.communicationStyle}
+    DEPTH: ${userProfile.technicalDepth}
+
+    Explain WHY you are making each move using analogies.
 
     ### 🚫 BANNED PHRASES (NO BOT-TALK)
     - "Hello!", "Greetings!", or "Hi there!"
@@ -240,7 +259,7 @@ STEP 2 — REQUIRED PIVOT (ONLY WHEN NECESSARY):
 If asked about teamwork, conflict, or leadership AND no software team exists,
 you MUST pivot using this structure:
 
-“As a student at [institution from files], most of my software work was individual. HOWEVER, I handled a similar challenge during my [specific non-software experience listed in the resume], where I…”
+"As a student at [College], my work was individual. HOWEVER, I handled a similar challenge during my ${userProfile.keyExperiences}, where I..."
 
 You may ONLY reference experiences that are explicitly documented.
 

@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "react-query"
 import Debug from "./_pages/Debug"
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Header from './components/Header'
+import { ProfileSettings } from "./_pages/ProfileSettings";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: Infinity, cacheTime: Infinity } }
@@ -14,7 +15,7 @@ const queryClient = new QueryClient({
 
 const App: React.FC = () => {
   const [debugProcessing, setDebugProcessing] = useState(false);
-  const [view, setView] = useState<"queue" | "solutions" | "debug">("queue")
+  const [view, setView] = useState<"queue" | "solutions" | "debug" | "settings">("queue")
   const [isStealth, setIsStealth] = useState(false)
   const [isMouseIgnored, setIsMouseIgnored] = useState(false)
   const appRef = useRef<HTMLDivElement>(null)
@@ -64,6 +65,7 @@ const App: React.FC = () => {
               <Route path="/solutions" element={<Solutions setView={setView} />} />
               <Route path="/debug" element={<Debug isProcessing={false} setIsProcessing={() => {}} />} />
               <Route path="/debug" element={<Debug isProcessing={debugProcessing} setIsProcessing={setDebugProcessing} />} />
+              <Route path="/settings" element={<ProfileSettings />} />
             </Routes>
           </Router>
           <ToastViewport />

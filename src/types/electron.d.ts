@@ -46,6 +46,7 @@ export interface ElectronAPI {
   getStealthMode: () => Promise<boolean>
   checkProfileExists: () => Promise<boolean>
   saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => Promise<boolean>
+  saveUserProfile: (profileData: any) => Promise<{ success: boolean }>;
   
   // LLM Configuration (ALL WERE MISSING)
   getCurrentLlmConfig: () => Promise<any>
