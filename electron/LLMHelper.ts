@@ -372,6 +372,7 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
       }
 
       switch (type) {
+          case 'title': taskInstruction = "Summarize the session into one short, punchy title. Output ONLY plain text. NO headers, NO math, NO bolding. Max 6 words."; break;
           case 'assist': taskInstruction = "Provide technical facts, documentation, or definitions."; break;
           case 'reply': taskInstruction = "Draft a short, 2-3 sentence response."; break;
           case 'answer': taskInstruction = "Provide a deep, comprehensive answer using the STAR method."; break;
@@ -379,6 +380,9 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
           case 'recap': taskInstruction = "Summarize the conversation in 3 brief bullet points."; break;
           default: taskInstruction = "Answer the user's request."; break;
       }
+
+      // CRITICAL: If it's a title, return ONLY the task instruction to bypass global headers
+        if (type === 'title') return taskInstruction;
 
       return `${this.systemPrompt}\n\n${personaInstruction}\n\nTASK GOAL: ${taskInstruction}`;
   }

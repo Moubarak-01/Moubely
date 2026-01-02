@@ -702,7 +702,8 @@ const Queue: React.FC<any> = () => {
                           isCandidateMode: true
                       }),
                       window.electronAPI.invoke("gemini-chat", { 
-                          message: `Based on this transcript, generate a very short, concise title (under 6 words) for this meeting. No quotes, no markdown:\n\n${fullTranscript}` 
+                          message: `Based on this transcript, generate a very short, concise title (under 6 words) for this meeting. No quotes, no markdown:\n\n${fullTranscript}`,
+                          type: "title"
                       })
                   ]);
                   
