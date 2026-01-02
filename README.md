@@ -194,3 +194,19 @@ npm run dist
 │   │   └── AIResponse.tsx      <-- Markdown & LaTeX Rendering Logic
 │   └── index.css               <-- Glassmorphism Styles
 └── index.html
+
+
+
+## ⚖️ License, Attribution & Feedback
+
+This project is licensed under the MIT License. 
+
+### 🛡️ Mandatory Attribution
+If you clone, fork, or use any logic from this repository (especially the **Waterfall Routing** or **Stealth Systems**), you are **legally required** to:
+- Retain the original copyright notice in the `LICENSE` file.
+- Provide a visible link back to this [Moubely Repository](https://github.com/Moubarak-01/Moubely).
+- Acknowledge **Moubarak-01** as the original author.
+
+### 💡 Open to Critics & Comments
+I am a rising engineer, and I built **Moubely** to push the boundaries of what a desktop assistant can do. **I am more than open to comments, critics, and suggestions.** - If you see a way to make the logic even better, please **[Open an Issue](https://github.com/Moubarak-01/Moubely/issues)**.
+- Technical feedback on my **Electron IPC handling** or **LLM Waterfall logic** is highly encouraged!
