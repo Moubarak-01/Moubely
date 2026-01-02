@@ -194,7 +194,7 @@ npm run dist
 │   │   └── AIResponse.tsx      <-- Markdown & LaTeX Rendering Logic
 │   └── index.css               <-- Glassmorphism Styles
 └── index.html
-
+```
 
 
 ## ⚖️ License, Attribution & Feedback
