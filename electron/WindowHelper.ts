@@ -22,46 +22,48 @@ export class WindowHelper {
   public createWindow(): void {
     if (this.mainWindow !== null) return
 
-    const { width: screenWidth } = screen.getPrimaryDisplay().workAreaSize;
-    const bladeWidth = 450; 
+    const { width: screenWidth, x: screenX, y: screenY } = screen.getPrimaryDisplay().workArea;
+    const bladeWidth = 600; // Startup width
 
     this.mainWindow = new BrowserWindow({
-      x: screenWidth - bladeWidth,
-      y: 0,
+      x: screenX + Math.round((screenWidth - bladeWidth) / 2), // Center Horizontally
+      y: screenY, // Top
       width: bladeWidth,
-      height: 600, // Initial height
+      height: 200, // Initial height (compact with Start button)
+      minWidth: 600,  // Safety floor - prevents content from disappearing
+      minHeight: 200, // Minimum for compact view
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: true,
         preload: path.join(__dirname, "preload.js")
       },
       show: false,
-      alwaysOnTop: true, // Keep initial setting
+      alwaysOnTop: true,
       frame: false,
       transparent: true,
       hasShadow: false,
       backgroundColor: "#00000000",
-      resizable: false, // User can't drag-resize, but code can resize
+      resizable: true, // ✅ ENABLED: User can now drag-resize from edges/corners
       movable: true,
     })
 
-    this.setStealthMode(this.appState.getIsStealthMode()) 
+    this.setStealthMode(this.appState.getIsStealthMode())
 
     // --- NEW: Universal "Top Lock" for Zoom/Full-screen dominance ---
     // 'screen-saver' is the highest priority level on macOS and works as strict topmost on Windows.
     this.mainWindow.setAlwaysOnTop(true, 'screen-saver');
-    
+
     // Explicitly allow visibility over full-screen apps (Mac)
     if (process.platform === "darwin") {
       this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     }
-    
+
     this.mainWindow.setSkipTaskbar(true)
     this.mainWindow.loadURL(startUrl).catch(console.error)
-    
+
     this.mainWindow.once('ready-to-show', () => {
       setTimeout(() => {
-          this.centerAndShowWindow() 
+        this.centerAndShowWindow()
       }, 100);
     })
 
@@ -71,12 +73,12 @@ export class WindowHelper {
   // --- STEALTH LOGIC (Fixes Recording Issue) ---
   public setStealthMode(enabled: boolean): void {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return
-    
+
     // enabled = true  -> Protected (Hidden from recording)
     // enabled = false -> Unprotected (Visible in recording)
     // This updates the flag immediately so OBS/Zoom can see it when toggled off.
     this.mainWindow.setContentProtection(enabled)
-    
+
     if (process.platform === "darwin") {
       this.mainWindow.setHiddenInMissionControl(enabled)
     }
@@ -88,15 +90,22 @@ export class WindowHelper {
   public showMainWindow() { this.mainWindow?.showInactive() }
   public toggleMainWindow() { if (this.isVisible()) this.hideMainWindow(); else this.showMainWindow(); }
 
-  public centerAndShowWindow() { 
-      if (!this.mainWindow) return;
-      this.mainWindow.center(); 
-      this.mainWindow.show(); 
-      this.mainWindow.focus();
-      
-      // --- NEW: Re-assert dominance whenever the window is shown ---
-      // This counters Windows/Mac pushing the window back when you click into Zoom.
-      this.mainWindow.setAlwaysOnTop(true, 'screen-saver'); 
+  public centerAndShowWindow() {
+    if (!this.mainWindow) return;
+
+    // Position at Top-Center
+    const { width: screenWidth, x: screenX, y: screenY } = screen.getPrimaryDisplay().workArea;
+    const [currentWidth] = this.mainWindow.getSize();
+    this.mainWindow.setPosition(
+      screenX + Math.round((screenWidth - currentWidth) / 2),
+      screenY
+    );
+    this.mainWindow.show();
+    this.mainWindow.focus();
+
+    // --- NEW: Re-assert dominance whenever the window is shown ---
+    // This counters Windows/Mac pushing the window back when you click into Zoom.
+    this.mainWindow.setAlwaysOnTop(true, 'screen-saver');
   }
 
   public moveWindowRight() { this.moveWindow(20, 0) }
@@ -104,9 +113,9 @@ export class WindowHelper {
   public moveWindowDown() { this.moveWindow(0, 20) }
   public moveWindowUp() { this.moveWindow(0, -20) }
 
-  private moveWindow(dx: number, dy: number) { 
-    if (!this.mainWindow) return; 
-    const pos = this.mainWindow.getPosition(); 
-    this.mainWindow.setPosition(pos[0] + dx, pos[1] + dy); 
+  private moveWindow(dx: number, dy: number) {
+    if (!this.mainWindow) return;
+    const pos = this.mainWindow.getPosition();
+    this.mainWindow.setPosition(pos[0] + dx, pos[1] + dy);
   }
 }

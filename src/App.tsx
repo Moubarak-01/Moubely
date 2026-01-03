@@ -23,7 +23,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!window.electronAPI) return;
     window.electronAPI.getStealthMode().then(setIsStealth);
-    window.electronAPI.setWindowSize({ width: 450, height: 600 });
+    window.electronAPI.setWindowSize({ width: 600, height: 200 });
 
     const cleanup = [
       window.electronAPI.onSolutionStart(() => setView("solutions")),
@@ -36,34 +36,34 @@ const App: React.FC = () => {
   }, []);
 
   const toggleMouseIgnore = (ignore: boolean) => {
-      if (!isStealth) return;
-      if (window.electronAPI && ignore !== isMouseIgnored) {
-          window.electronAPI.toggleMouseIgnore(ignore);
-          setIsMouseIgnored(ignore);
-          appRef.current?.classList.toggle('cursor-deep-stealth', ignore);
-      }
+    if (!isStealth) return;
+    if (window.electronAPI && ignore !== isMouseIgnored) {
+      window.electronAPI.toggleMouseIgnore(ignore);
+      setIsMouseIgnored(ignore);
+      appRef.current?.classList.toggle('cursor-deep-stealth', ignore);
+    }
   };
 
   return (
-    <div 
+    <div
       ref={appRef}
       className="min-h-0 h-screen w-screen flex flex-col transition-all duration-500"
       onMouseMove={(e) => {
-          const target = e.target as HTMLElement;
-          const interactive = target.closest('.interactive') || target.tagName === 'BUTTON';
-          toggleMouseIgnore(!interactive);
+        const target = e.target as HTMLElement;
+        const interactive = target.closest('.interactive') || target.tagName === 'BUTTON';
+        toggleMouseIgnore(!interactive);
       }}
       onMouseLeave={() => toggleMouseIgnore(false)}
     >
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          <Header/> 
+          <Header />
           <Router>
             <Routes>
               <Route path="/" element={<Navigate replace to="/queue" />} />
               <Route path="/queue" element={<Queue setView={setView} />} />
               <Route path="/solutions" element={<Solutions setView={setView} />} />
-              <Route path="/debug" element={<Debug isProcessing={false} setIsProcessing={() => {}} />} />
+              <Route path="/debug" element={<Debug isProcessing={false} setIsProcessing={() => { }} />} />
               <Route path="/debug" element={<Debug isProcessing={debugProcessing} setIsProcessing={setDebugProcessing} />} />
               <Route path="/settings" element={<ProfileSettings />} />
             </Routes>
