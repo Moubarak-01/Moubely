@@ -1,3 +1,5 @@
+<div align="center">
+
 # Moubely ✨
 
 ![Version](https://img.shields.io/badge/VERSION-2.2-blue?style=flat-square)
@@ -11,6 +13,8 @@
 [Features](#-core-features) • [Architecture](#️-engineering-architecture-the-waterfall-system) • [Tech Stack](#-tech-stack) • [Installation](#-how-to-run-locally) • [Contributing](#-contributing)
 
 > 💡 **Inspiration:** Moubely is inspired by the innovative **Cluely** app, aiming to bring similar transparent, context-aware AI capabilities to your desktop workflow.
+
+</div>
 
 ---
 
