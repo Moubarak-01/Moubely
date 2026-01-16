@@ -1,5 +1,11 @@
 # Moubely ✨
 
+![Version](https://img.shields.io/badge/VERSION-2.2-blue?style=flat-square)
+![Electron](https://img.shields.io/badge/⚡_ELECTRON-33-47848F?style=flat-square)
+![React](https://img.shields.io/badge/⚛_REACT-18-61DAFB?style=flat-square)
+![TypeScript](https://img.shields.io/badge/📘_TYPESCRIPT-5.0-3178C6?style=flat-square)
+![Vite](https://img.shields.io/badge/⚡_VITE-5.0-646CFF?style=flat-square)
+
 **An intelligent, stealthy, always-on-top AI assistant for your desktop**
 
 [Features](#-core-features) • [Architecture](#️-engineering-architecture-the-waterfall-system) • [Tech Stack](#-tech-stack) • [Installation](#-how-to-run-locally) • [Contributing](#-contributing)
@@ -14,7 +20,7 @@ Moubely is a stealthy, transparent, always-on-top AI assistant for your desktop.
 
 ### Key Highlights
 
-- � **Stealth & Visibility Control** - Toggle between invisible mode and standard window
+- 👻 **Stealth & Visibility Control** - Toggle between invisible mode and standard window
 - 📸 **Contextual Vision (Multi-Shot)** - Queue up to 6 screenshots for multi-context analysis
 - 🧠 **18-Model AI Waterfall** - Automatic fallback across Gemini, Claude, GPT-4o, and more
 - 🎙️ **Hybrid Meeting Copilot** - Local Whisper + Cloud Groq transcription
@@ -180,7 +186,7 @@ The app utilizes a massive **18-Model Waterfall** to ensure you always get an an
 
 ---
 
-## � Installation & Setup
+## 📦 Installation & Setup
 
 ### Prerequisites
 
@@ -292,7 +298,7 @@ If you clone, fork, or use any logic from this repository (especially the **Wate
 
 ---
 
-## 👨‍� Author
+## 👨‍💻 Author
 
 **Moubarak**
 - GitHub: [@Moubarak-01](https://github.com/Moubarak-01)
