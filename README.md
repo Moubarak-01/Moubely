@@ -216,20 +216,20 @@ Create a `.env` file in the root directory:
 
 ```env
 # 1. THE BRAINS & EYES (Primary Chat + Vision)
-GEMINI_API_KEY=your_google_key_here
+GEMINI_API_KEY=AIzaSy... # [Get Key](https://aistudio.google.com/app/apikey)
 
 # 2. THE LOGIC & BACKUP (DeepSeek + GPT-4o)
-GITHUB_TOKEN=your_github_token_here
+GITHUB_TOKEN=github_p... # [Get Token](https://github.com/settings/tokens)
 
 # 3. THE CLOUD EARS (Audio Backup)
-GROQ_API_KEY=your_groq_key_here
+GROQ_API_KEY=gsk... # [Get Key](https://console.groq.com/keys)
 
 # 4. THE RESEARCHER & REASONER (Search + Claude)
-PERPLEXITY_API_KEY=your_perplexity_key_here
-OPENROUTER_API_KEY=your_openrouter_key_here
+PERPLEXITY_API_KEY=pplx-... # [Get Key](https://www.perplexity.ai/settings/api)
+OPENROUTER_API_KEY=sk-or-v1-... # [Get Key](https://openrouter.ai/keys)
 
 # 5. PDF RECOVERY (Scanned Docs)
-OCR_SPACE_API_KEY=your_ocr_key_here
+OCR_SPACE_API_KEY=K82... # [Get Key](https://ocr.space/ocrapi)
 ```
 
 ### 4. Run the Local Whisper Server
