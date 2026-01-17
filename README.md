@@ -212,24 +212,35 @@ npm install
 
 ### 3. Environment Configuration
 
-Create a `.env` file in the root directory:
+### Required API Keys
+
+| Service | Variable Name | Get Key Here |
+| :--- | :--- | :--- |
+| **Google Gemini** | `GEMINI_API_KEY` | [Get Key](https://aistudio.google.com/app/apikey) |
+| **GitHub** | `GITHUB_TOKEN` | [Get Token](https://github.com/settings/tokens) |
+| **Groq** | `GROQ_API_KEY` | [Get Key](https://console.groq.com/keys) |
+| **Perplexity** | `PERPLEXITY_API_KEY` | [Get Key](https://www.perplexity.ai/settings/api) |
+| **OpenRouter** | `OPENROUTER_API_KEY` | [Get Key](https://openrouter.ai/keys) |
+| **OCR Space** | `OCR_SPACE_API_KEY` | [Get Key](https://ocr.space/ocrapi) |
+
+Create a `.env` file in the root directory and paste the following:
 
 ```env
 # 1. THE BRAINS & EYES (Primary Chat + Vision)
-GEMINI_API_KEY=AIzaSy... # [Get Key](https://aistudio.google.com/app/apikey)
+GEMINI_API_KEY=AIzaSy...
 
 # 2. THE LOGIC & BACKUP (DeepSeek + GPT-4o)
-GITHUB_TOKEN=github_p... # [Get Token](https://github.com/settings/tokens)
+GITHUB_TOKEN=github_p...
 
 # 3. THE CLOUD EARS (Audio Backup)
-GROQ_API_KEY=gsk... # [Get Key](https://console.groq.com/keys)
+GROQ_API_KEY=gsk...
 
 # 4. THE RESEARCHER & REASONER (Search + Claude)
-PERPLEXITY_API_KEY=pplx-... # [Get Key](https://www.perplexity.ai/settings/api)
-OPENROUTER_API_KEY=sk-or-v1-... # [Get Key](https://openrouter.ai/keys)
+PERPLEXITY_API_KEY=pplx-...
+OPENROUTER_API_KEY=sk-or-v1-...
 
 # 5. PDF RECOVERY (Scanned Docs)
-OCR_SPACE_API_KEY=K82... # [Get Key](https://ocr.space/ocrapi)
+OCR_SPACE_API_KEY=K82...
 ```
 
 ### 4. Run the Local Whisper Server
