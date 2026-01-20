@@ -9,19 +9,19 @@ export interface ElectronAPI {
   setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => Promise<void>
   toggleMouseIgnore: (ignore: boolean) => Promise<void> // <--- WAS MISSING
   quitApp: () => Promise<void>
-  
+
   // Screenshots
   takeScreenshot: () => Promise<any> // Changed to any or specific Interface to match return
   getScreenshots: () => Promise<Array<{ path: string; preview: string }>>
   deleteScreenshot: (path: string) => Promise<{ success: boolean; error?: string }>
-  
+
   // Events / Listeners
   onScreenshotTaken: (callback: (data: { path: string; preview: string }) => void) => () => void
   onScreenshotAction: (callback: (data: any) => void) => () => void // <--- WAS MISSING
   onSolutionsReady: (callback: (solutions: string) => void) => () => void
   onResetView: (callback: () => void) => () => void
   onTokenReceived: (callback: (token: string) => void) => () => void
-  
+
   // Debug / Processing Events (ALL WERE MISSING)
   onSolutionStart: (callback: () => void) => () => void
   onSolutionSuccess: (callback: (data: any) => void) => () => void
@@ -33,21 +33,21 @@ export interface ElectronAPI {
 
   // AI & Processing
   // Note: Updated signatures to match your usage
-  analyzeAudioFromBase64: (data: string, mimeType: string, isUrgent?: boolean, timestamp?: number) => Promise<any> 
+  analyzeAudioFromBase64: (data: string, mimeType: string, isUrgent?: boolean, timestamp?: number) => Promise<any>
   analyzeAudioFile: (path: string) => Promise<{ text: string; timestamp: number }>
   invoke: (channel: string, ...args: any[]) => Promise<any>
-  
+
   // Chat / Vision
   // Note: Updated imagePath to string[] to match usage in Queue.tsx
   chatWithImage: (message: string, imagePaths: string[]) => Promise<string>
-  
+
   // Settings & Modes
   toggleStealthMode: () => Promise<boolean>
   getStealthMode: () => Promise<boolean>
   checkProfileExists: () => Promise<boolean>
   saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => Promise<boolean>
   saveUserProfile: (profileData: any) => Promise<{ success: boolean }>;
-  
+
   // LLM Configuration (ALL WERE MISSING)
   getCurrentLlmConfig: () => Promise<any>
   getAvailableOllamaModels: () => Promise<string[]>

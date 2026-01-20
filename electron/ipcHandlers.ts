@@ -26,7 +26,7 @@ export function initializeIpcHandlers(appState: AppState) {
   });
 
   // --- 1. CORE WINDOW COMMANDS ---
-  
+
   ipcMain.handle("set-window-size", (event, { width, height }) => {
     logIPC("set-window-size", `Width: ${width}, Height: ${height}`);
     appState.setWindowDimensions(width, height);
@@ -76,7 +76,7 @@ export function initializeIpcHandlers(appState: AppState) {
       if (!llmHelper) throw new Error("LLM Helper not initialized");
 
       const { message, history, mode, fileContext, type, isCandidateMode } = args;
-      
+
       logIPC("gemini-chat", `Type: ${type?.toUpperCase() || "GENERAL"} | Mode: ${mode} | Twin: ${isCandidateMode}`);
       if (message) console.log(`[IPC ⚡] >> Prompt: "${message.slice(0, 60).replace(/\n/g, ' ')}..."`);
 
@@ -85,15 +85,15 @@ export function initializeIpcHandlers(appState: AppState) {
         history || [],
         mode || "General",
         fileContext || "",
-        type || "general",          
-        isCandidateMode || false,   
+        type || "general",
+        isCandidateMode || false,
         (token: string) => {
           if (!event.sender.isDestroyed()) {
-             event.sender.send("llm-token", token);
+            event.sender.send("llm-token", token);
           }
         }
       );
-      
+
       console.log(`[IPC ⚡] << Response Complete (${response.length} chars)`);
       return response;
 
@@ -106,12 +106,12 @@ export function initializeIpcHandlers(appState: AppState) {
   // --- 3. VISION HANDLER ---
   ipcMain.handle("chat-with-image", async (event, { message, imagePaths }) => {
     try {
-       logIPC("chat-with-image", `Images: ${imagePaths?.length || 0}`);
-       if (!llmHelper) throw new Error("LLM Helper not initialized");
+      logIPC("chat-with-image", `Images: ${imagePaths?.length || 0}`);
+      if (!llmHelper) throw new Error("LLM Helper not initialized");
 
-       return await llmHelper.chatWithImage(message, imagePaths, (token: string) => {
+      return await llmHelper.chatWithImage(message, imagePaths, (token: string) => {
         if (!event.sender.isDestroyed()) {
-           event.sender.send("llm-token", token);
+          event.sender.send("llm-token", token);
         }
       });
     } catch (error: any) {
@@ -126,14 +126,14 @@ export function initializeIpcHandlers(appState: AppState) {
     const size = base64Data ? base64Data.length : 0;
     const safeUrgency = isUrgent || false;
     const urgencyLabel = safeUrgency ? "⚡ URGENT" : "🐢 CASUAL";
-    
+
     logIPC("analyze-audio", `Format: ${mimeType} | Size: ${size} | ${urgencyLabel}`);
-    
+
     if (!llmHelper) {
       console.error("[IPC ⚡] ❌ LLM Helper is missing!");
       return { text: "Audio Error: LLM Not Ready" };
     }
-    
+
     // FIX: Pass timestamp to helper so it comes back attached to the text
     return await llmHelper.analyzeAudioFromBase64(base64Data, mimeType, safeUrgency, timestamp);
   });
@@ -142,15 +142,15 @@ export function initializeIpcHandlers(appState: AppState) {
   ipcMain.handle("take-screenshot", async () => {
     logIPC("take-screenshot", "Capturing screen...");
     try {
-        const filePath = await appState.takeScreenshot();
-        const preview = await appState.getScreenshotHelper().getImagePreview(filePath);
-        
-        logIPC("take-screenshot", "✅ Success: Returning Object");
-        return { path: filePath, preview };
-        
+      const filePath = await appState.takeScreenshot();
+      const preview = await appState.getScreenshotHelper().getImagePreview(filePath);
+
+      logIPC("take-screenshot", "✅ Success: Returning Object");
+      return { path: filePath, preview };
+
     } catch (e: any) {
-        console.error("[IPC ⚡] ❌ Screenshot Failed:", e);
-        return null;
+      console.error("[IPC ⚡] ❌ Screenshot Failed:", e);
+      return null;
     }
   });
 
@@ -174,16 +174,16 @@ export function initializeIpcHandlers(appState: AppState) {
 
     const oldFiles = fs.readdirSync(studentDir);
     for (const file of oldFiles) {
-        fs.unlinkSync(path.join(studentDir, file));
+      fs.unlinkSync(path.join(studentDir, file));
     }
 
     for (const file of files) {
       const filePath = path.join(studentDir, file.name);
       await fs.promises.writeFile(filePath, Buffer.from(file.data));
     }
-    
+
     if (llmHelper) llmHelper.clearStudentCache();
-    
+
     logIPC("save-student-files", "✅ Save Complete & Cache Cleared");
     return true;
   });

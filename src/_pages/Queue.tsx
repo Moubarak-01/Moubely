@@ -6,7 +6,7 @@ import {
     GripHorizontal, HelpCircle, MessageCircleQuestion, FileText,
     Scaling, Copy, Check, Trash2, Mail,
     Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
-    Eye, EyeOff, MessageCircle, Terminal
+    Eye, EyeOff, MessageCircle, Terminal, Edit2
 } from "lucide-react"
 
 // --- IMPORTS FOR FORMULAS & HIGHLIGHTING ---
@@ -339,7 +339,7 @@ const Queue: React.FC<any> = () => {
     useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
     useEffect(() => { transcriptLengthRef.current = transcriptLogs.length; }, [transcriptLogs]);
 
-    const MAX_QUEUE_SIZE = 6;
+    const MAX_QUEUE_SIZE = 12;
 
     // --- ONE SINGLE DECLARATION HERE ---
     const handleExpandToggle = () => {
@@ -727,7 +727,92 @@ const Queue: React.FC<any> = () => {
         };
         generateEmailAfterFinalize();
     }, [isFinalizing, showPostMeeting]);
+    // --- EDITING STATE ---
+    const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+    const [editText, setEditText] = useState("");
 
+    const handleStartEdit = (msg: Message) => {
+        setEditingMsgId(msg.id);
+        setEditText(msg.text);
+    };
+
+    const handleSaveEdit = async (msgId: string) => {
+        if (!editText.trim()) return;
+
+        // 1. Update UI immediately
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, text: editText } : m));
+        setEditingMsgId(null);
+
+        // 2. Resend to AI (Optional: if we want to re-trigger the AI response, we'd need to clear the next AI msg)
+        // For now, just editing the text for record. If user wants to "Re-ask", they usually edit and hit send nicely? 
+        // Actually, "Editable Prompts" usually implies "Edit and Retry".
+        // Let's implement robust "Edit and Retry":
+
+        // Find the index of the edited message
+        const msgIndex = messages.findIndex(m => m.id === msgId);
+        if (msgIndex === -1) return;
+
+        // Remove everything AFTER this message (the old AI response)
+        const newHistory = messages.slice(0, msgIndex + 1).map(m =>
+            m.id === msgId ? { ...m, text: editText } : m
+        );
+
+        setMessages(newHistory);
+
+        // Trigger re-send logic with the new text
+        // We reuse handleSend but need to be careful about not duplicating
+        // Actually, easiest is to just call handleSend with the new text, but we need to act like it's a new request?
+        // Better pattern: Update state, then call a "retry" helper.
+        // Let's just strip the old AI response and call handleSend(editText) but that would add a new user bubble?
+        // No, handleSend adds a NEW user bubble.
+        // We want to KEEP this user bubble but regenerate the AI response.
+
+        // IMPLEMENTATION: Update text, remove next AI response, trigger generation.
+        setMessages(prev => {
+            const idx = prev.findIndex(m => m.id === msgId);
+            if (idx === -1) return prev;
+            // Return history up to this message (inclusive) with updated text
+            return prev.slice(0, idx + 1).map(m => m.id === msgId ? { ...m, text: editText } : m);
+        });
+
+        // Trigger AI generation manually
+        setIsThinking(true);
+        setThinkingStep("Regenerating response...");
+        const aiMsgId = (Date.now() + 1).toString();
+
+        setMessages(prev => [...prev, { id: aiMsgId, role: "ai", text: "", timestamp: Date.now(), isStreaming: true }]);
+
+        // Prepare context similar to handleSend
+        const contextData = {
+            isInMeeting: isRecording || showPostMeeting,
+            meetingTranscript: transcriptLogs.map(t => t.text).join("\n"),
+            uploadedFilesContent: "",
+            userImage: undefined // Images probably attached to the message? Simplified for now.
+        };
+        const finalPrompt = preparePayload(editText, contextData);
+
+        try {
+            // Basic re-ask logic
+            const response = await window.electronAPI.invoke("gemini-chat", {
+                message: finalPrompt,
+                mode: mode,
+                history: messages.slice(0, msgIndex).map(m => ({ role: m.role, text: m.text })), // History BEFORE this msg
+                type: "general",
+                isCandidateMode: mode === 'Student'
+            });
+            setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m));
+        } catch (e: any) {
+            setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: "Error: " + e.message, isStreaming: false } : m));
+        } finally {
+            setIsThinking(false);
+            setShowSlowLoader(false);
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setEditingMsgId(null);
+        setEditText("");
+    };
     const handleModeSelect = async (selectedMode: string) => {
         setMode(selectedMode);
         sessionStorage.setItem("moubely_mode", selectedMode);
@@ -1162,8 +1247,35 @@ const Queue: React.FC<any> = () => {
                                                             ))}
                                                         </div>
                                                     )}
-                                                    <div className="user-bubble text-left">{msg.text}</div>
-                                                    <button onClick={() => handleCopyUserMessage(msg.text)} className="absolute top-1/2 -left-8 -translate-y-1/2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-white bg-black/40 rounded-full"><Copy size={12} /></button>
+
+                                                    {editingMsgId === msg.id ? (
+                                                        <div className="flex flex-col gap-2 bg-[#1a1a1a] p-2 rounded-xl border border-blue-500/50 min-w-[300px]">
+                                                            <textarea
+                                                                value={editText}
+                                                                onChange={(e) => setEditText(e.target.value)}
+                                                                className="w-full bg-transparent text-white text-sm p-2 outline-none resize-none h-20"
+                                                                autoFocus
+                                                            />
+                                                            <div className="flex justify-end gap-2">
+                                                                <button onClick={handleCancelEdit} className="px-3 py-1 text-xs text-gray-400 hover:text-white bg-white/5 rounded-md transition-colors">Cancel</button>
+                                                                <button onClick={() => handleSaveEdit(msg.id)} className="px-3 py-1 text-xs text-white bg-blue-600 hover:bg-blue-500 rounded-md transition-colors">Save & Retry</button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div className="user-bubble text-left pr-8 relative">
+                                                                {msg.text}
+                                                                <button
+                                                                    onClick={() => handleStartEdit(msg)}
+                                                                    className="absolute top-1 right-1 p-1 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-white"
+                                                                    title="Edit Message"
+                                                                >
+                                                                    <Edit2 size={12} />
+                                                                </button>
+                                                            </div>
+                                                            <button onClick={() => handleCopyUserMessage(msg.text)} className="absolute top-1/2 -left-8 -translate-y-1/2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-white bg-black/40 rounded-full"><Copy size={12} /></button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             )}
                                             {msg.role === "ai" && (

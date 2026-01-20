@@ -61,19 +61,19 @@ export class AppState {
   }
 
   // --- Live Mode Logic ---
-  
+
   public startLiveMode() {
     if (this.liveModeInterval) return { success: true };
 
     console.log("[AppState] 🚀 Starting Live Assist Loop (8s Interval)");
-    
+
     this.runLiveAssistCycle();
 
     // Loop set to 8 seconds
     this.liveModeInterval = setInterval(() => {
       this.runLiveAssistCycle();
-    }, 8000); 
-    
+    }, 8000);
+
     return { success: true };
   }
 
@@ -96,8 +96,8 @@ export class AppState {
         this.windowHelper.showMainWindow.bind(this.windowHelper)
       );
 
-      if (!screenshotPath) return; 
-      
+      if (!screenshotPath) return;
+
       // 2. Routing
       if (this.view === "solutions") {
         console.log("[LiveLoop] ℹ️ View is 'Solutions' -> Adding to Debug Queue");
@@ -140,7 +140,7 @@ export class AppState {
     if (this.tray !== null) return
     const image = nativeImage.createEmpty()
     let trayImage = image
-    try { trayImage = nativeImage.createFromBuffer(Buffer.alloc(0)) } catch (e) {}
+    try { trayImage = nativeImage.createFromBuffer(Buffer.alloc(0)) } catch (e) { }
     this.tray = new Tray(trayImage)
     const contextMenu = Menu.buildFromTemplate([
       { label: 'Show Interview Coder', click: () => { this.centerAndShowWindow() } },
@@ -161,18 +161,18 @@ export class AppState {
 async function initializeApp() {
   const appState = AppState.getInstance()
   initializeIpcHandlers(appState)
-  
+
   app.whenReady().then(() => {
     console.log("App is ready")
     appState.createWindow()
     appState.createTray()
     appState.shortcutsHelper.registerGlobalShortcuts()
   })
-  
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) appState.createWindow()
   })
-  
+
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit()
   })
