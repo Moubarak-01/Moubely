@@ -7,16 +7,30 @@ import os from "os"
 import { app } from "electron"
 import axios from "axios"
 import FormData from "form-data"
-import * as pdfLib from "pdf-parse"
 import http from "http"
 
 // CRITICAL: Keep connection open to prevent ECONNRESET
 const httpAgent = new http.Agent({ keepAlive: true });
 
+// CRITICAL: Polyfill for pdfjs-dist used by pdf-parse
+class MockDOMMatrix {
+    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
+    constructor() { }
+}
+// @ts-ignore
+global.DOMMatrix = MockDOMMatrix;
+
 async function safePdfParse(buffer: Buffer) {
-    // @ts-ignore
-    const parser = pdfLib.default || pdfLib;
-    return parser(buffer);
+    try {
+        // @ts-ignore
+        // Use require to ensure polyfill is applied BEFORE module load
+        const pdfLib = require("pdf-parse-fork");
+        const parser = pdfLib.default || pdfLib;
+        return await parser(buffer);
+    } catch (e: any) {
+        console.error("[LLM] 💥 RAW PDF PARSE ERROR:", e.message);
+        throw e; // Re-throw to trigger fallback
+    }
 }
 
 // --- 1. THE EXPANDED WATERFALL BRAINS ---
