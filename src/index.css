@@ -159,4 +159,12 @@ html, body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 20px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+/* --- STEALTH CURSOR MODE --- */
+/* Forces the cursor to always be an arrow, hiding interaction from screen recordings */
+* {
+    cursor: default !important;
+}
+
+button, a, [role="button"], .icon-btn, .control-btn, .cursor-pointer {
+    cursor: default !important;
+}
