@@ -97,10 +97,74 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 
 ---
 
-## 🐛 Solved Engineering Challenges (v2.3)
+## 🐛 Solved Engineering Challenges (11 Total)
 
 <details>
-<summary><strong>1. The "Persona Drift" (Hardcoded Logic)</strong></summary>
+<summary><strong>1. The "First Message" API Crash (Gemini/Perplexity)</strong></summary>
+
+**Problem:** Gemini 3.0 and Perplexity APIs strictly require the first message in the chat history to be from the `user`. Our app sometimes started history with an AI greeting (`role: model`), causing 100% failure rates.
+
+**Solution:** Implemented **History Sanitization** in `LLMHelper.ts`. Before sending any request, the code scans the history array, finds the index of the first `user` message, and slices everything before it.
+</details>
+
+<details>
+<summary><strong>2. The "Blind" Solve Button</strong></summary>
+
+**Problem:** The "Solve" button was blindly sending requests to the `gemini-chat` (Text) endpoint, even when screenshots were attached.
+
+**Solution:** Implemented **Split Routing** in `Queue.tsx`. The function now checks `if (hasImages)` and routes to the correct endpoint.
+</details>
+
+<details>
+<summary><strong>3. Deep Stealth Mouse Control</strong></summary>
+
+**Problem:** Even with `setContentProtection`, the mouse pointer was visible to screen recorders when interacting with the window.
+
+**Solution:** Implemented synchronized, time-gated control with `win.setIgnoreMouseEvents` and `cursor: none` CSS.
+</details>
+
+<details>
+<summary><strong>4. The Transcript "Race Condition"</strong></summary>
+
+**Problem:** Groq (Cloud) processed faster than Local Whisper, causing transcripts to appear out of order.
+
+**Solution:** Implemented a **Ticket System** with timestamps to ensure perfect chronological order.
+</details>
+
+<details>
+<summary><strong>5. The "Tesla" Persona Hallucination</strong></summary>
+
+**Problem:** The AI sounded too high-level and invented fake software teams for behavioral questions.
+
+**Solution:** Added a **Simple Voice Filter** with a "Pivot Rule" to use real experience from student files.
+</details>
+
+<details>
+<summary><strong>6. The Ghost Window (Critical Visibility Crash)</strong></summary>
+
+**Problem:** The app would start with no window visible at all due to Electron transparency bugs.
+
+**Solution:** Implemented an aggressive `ready-to-show` callback with explicit `win.focus()`.
+</details>
+
+<details>
+<summary><strong>7. The "Silent Crash" (Circular Dependency)</strong></summary>
+
+**Problem:** The app would hang on startup because `Main` and `IPC Handlers` were importing each other.
+
+**Solution:** Refactored the architecture to use **Type-Only Imports** (`import type`).
+</details>
+
+<details>
+<summary><strong>8. "Thinking" Process Clean-Up</strong></summary>
+
+**Problem:** Reasoning models output their internal monologue (`<think>...`), cluttering the chat.
+
+**Solution:** Implemented a **Universal Response Cleaner** to filter out thought tags in real-time.
+</details>
+
+<details>
+<summary><strong>9. The "Persona Drift" (Hardcoded Logic)</strong></summary>
 
 **Problem:** Models would ignore "soft" instructions to be normal human beings and revert to "AI Assistant mode".
 
@@ -108,7 +172,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 </details>
 
 <details>
-<summary><strong>2. "Smart Mode" Latency & Sync</strong></summary>
+<summary><strong>10. "Smart Mode" Latency & Sync</strong></summary>
 
 **Problem:** Fixed 2.5s chunks were too short for context, and 10s chunks were too slow for conversation.
 
@@ -116,19 +180,11 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 </details>
 
 <details>
-<summary><strong>3. The "Hardcoded" Prompt Myth</strong></summary>
+<summary><strong>11. The "Hardcoded" Prompt Myth</strong></summary>
 
 **Problem:** The prompts appeared static, limiting the app to one user.
 
 **Solution:** Architecture refactor to use **Dynamic Profile Loading**. The prompt in code is just a template; the content is loaded from `user_profile.json` at runtime.
-</details>
-
-<details>
-<summary><strong>4. The "Tesla" Persona Hallucination</strong></summary>
-
-**Problem:** The AI sounded too high-level and invented fake software teams for behavioral questions.
-
-**Solution:** Added a **Simple Voice Filter** with a "Pivot Rule" to use real experience from student files.
 </details>
 
 ---
@@ -170,7 +226,7 @@ Create a `.env` file in the root directory and paste the following:
 
 ```env
 # 1. THE BRAINS & EYES (Primary Chat + Vision)
-GEMINI_API_KEY=AIzaSy...
+GEMINI_API_KEY=AIza...
 
 # 2. THE LOGIC & BACKUP (DeepSeek + GPT-4o)
 GITHUB_TOKEN=github_p...
@@ -183,7 +239,7 @@ PERPLEXITY_API_KEY=pplx-...
 OPENROUTER_API_KEY=sk-or-v1-...
 
 # 5. PDF RECOVERY (Scanned Docs)
-OCR_SPACE_API_KEY=K82...
+OCR_SPACE_API_KEY=K8...
 ```
 
 ### 4. Run the Local Whisper Server
