@@ -2,11 +2,11 @@
 
 # Moubely ✨
 
-![Version](https://img.shields.io/badge/VERSION-2.2-blue?style=flat-square)
-![Electron](https://img.shields.io/badge/⚡_ELECTRON-33-47848F?style=flat-square)
-![React](https://img.shields.io/badge/⚛_REACT-18-61DAFB?style=flat-square)
-![TypeScript](https://img.shields.io/badge/📘_TYPESCRIPT-5.0-3178C6?style=flat-square)
-![Vite](https://img.shields.io/badge/⚡_VITE-5.0-646CFF?style=flat-square)
+![Version](https://img.shields.io/badge/Version-2.3-pink?style=for-the-badge)
+![Electron](https://img.shields.io/badge/Electron-33-47848F?style=for-the-badge&logo=electron)
+![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript)
+![Vite](https://img.shields.io/badge/Vite-7.2-646CFF?style=for-the-badge&logo=vite)
 
 **An intelligent, stealthy, always-on-top AI assistant for your desktop**
 
@@ -25,28 +25,24 @@ Moubely is a stealthy, transparent, always-on-top AI assistant for your desktop.
 ### Key Highlights
 
 - 👻 **Stealth & Visibility Control** - Toggle between invisible mode and standard window
-- 📸 **Contextual Vision (Multi-Shot)** - Queue up to 6 screenshots for multi-context analysis
-- 🧠 **18-Model AI Waterfall** - Automatic fallback across Gemini, Claude, GPT-4o, and more
+- 📸 **Contextual Vision (Multi-Shot)** - Queue up to **12 screenshots** (`Ctrl + H`) for deep multi-context analysis
+- 🧠 **18-Model AI Waterfall** - Prioritizes open/free models (Llama 3.3, Qwen 2.5) with premium fallback
 - 🎙️ **Hybrid Meeting Copilot** - Local Whisper + Cloud Groq transcription
-- ⚡ **Instant Digital Twin** - Uses STAR method with your real project experiences
+- ⚡ **Instant Digital Twin** - Universal Persona Engine that adapts to your profile
 
 ---
 
-## ✅ Project Status: Latest Updates (v2.2)
+## ✅ Version Comparison: What's New in v2.3?
 
-We have just deployed major engineering improvements to intelligence, stability, and visibility:
+We have shifted from a static, premium-first architecture to a universal, open-model-first engine.
 
-### 1. The "Solve" Button
-A new dedicated coding tool (Terminal Icon). Moubely uses its Vision Brain to debug code from screenshots or listens to meeting transcripts to solve verbal problems when no screen is captured. It explains solutions line-by-line using a simple persona that relies on analogies and avoids technical jargon.
-
-### 2. Expanded 18-Model "Brain"
-Integrated a massive Tier-1 logic engine including **Gemini 3.0 Pro**, **Gemini 3 Deep Think**, **Claude 3.7 Sonnet (Thinking)**, and **Claude 4.5 Opus**.
-
-### 3. Critical Fixes
-- **History Sanitization** - Prevents API rejections by ensuring conversation history always starts with a user message
-- **"Blind Vision" Patch** - Fixed routing logic to send images to the correct Vision model
-- **"Read Once" Smart Caching** - Resume/profile read only once on startup and cached in RAM
-- **Live Terminal Telemetry** - Comprehensive logging system (`[IPC]`, `[LLM]`, `[Processing]`)
+| Feature | v2.2 (Old) | **v2.3 (Current)** |
+| :--- | :--- | :--- |
+| **Screenshot Engine** | Limited to 6 Screens | **Expanded to 12 Screens** (Deep Context) |
+| **AI Positioning** | Premium First (Gemini Pro/Claude Opus) | **Open Efficiency First** (Llama 3.3 70B, Nemotron 12B, GLM 4.5 Air) |
+| **Story Engine** | Hardcoded Stories in TypeScript | **Universal Story Editor** (Dynamic JSON Injection) |
+| **Persona Logic** | "Prompt-Only" Suggestions | **Mandatory Human Embodiment** (Hesitations, Emotion, No Jargon) |
+| **Smart Mode** | Fixed Timer (2.5s) | **Variance-Based Selection** (Wait for >3s Silence) |
 
 ---
 
@@ -56,16 +52,15 @@ Integrated a massive Tier-1 logic engine including **Gemini 3.0 Pro**, **Gemini 
 Toggle instantly between **Stealth Mode** (invisible to screen sharing/recording) and **Visible Mode** (standard window for debugging or presentations) directly from the UI.
 
 ### 📸 Contextual Vision (Multi-Shot)
-Instantly snap screenshots (`Ctrl + H`). Repeated presses **queue up to 6 screenshots** for multi-context analysis. Moubely "sees" your screen using a multi-model approach (Gemini, Claude Vision, or GPT-4o).
+Instantly snap screenshots (`Ctrl + H`). Repeated presses **queue up to 12 screenshots** for multi-context analysis. Moubely "sees" your screen using a multi-model approach.
 
 ### 🧠 Robust AI Waterfall
 Our Expanded AI engine supports 18+ models. If one model hits a rate limit or API error (e.g., 402 or 429), Moubely automatically switches to the next available one.
 
 ### 🎙️ Hybrid Meeting Copilot
 - **Local-First Transcription** - Powered by a custom **Local Whisper Server** (Tiny.en) running directly on your machine
-- **Cloud Fallback** - Automatically switches to **Groq** if the local server gets too busy or if **Smart Mode** is enabled (1000ms timeout logic)
-- **Instant Digital Twin** - Uses the **STAR method** to provide spoken-word answers based on your actual project "war stories"
-- **Post-Meeting Reliability** - The email generation uses your Student Mode persona to ensure follow-ups are authentic
+- **Cloud Fallback** - Automatically switches to **Groq** if the local server gets too busy or if **Smart Mode** is enabled
+- **Universal Digital Twin** - Uses the **STAR method** to provide spoken-word answers based on *your* specific profile data
 
 ---
 
@@ -75,24 +70,23 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 
 ### The "Brains" (Chat & Logic) 🧠
 
-The app utilizes a massive **18-Model Waterfall** to ensure you always get an answer:
+**New in v2.3:** We now prioritize high-performance free/open models in Tier 1 to reduce costs while maintaining 70B+ parameter intelligence.
 
 | Tier | Models |
 | :--- | :--- |
-| **Tier 1: Supreme Reasoning** | Gemini 3.0 Pro, Gemini 3 Deep Think, Claude 3.7 Sonnet (Thinking), Claude 4.5 Opus |
-| **Tier 2: High-Speed** | Gemini 3.0 Flash, Claude 4.5 Sonnet |
-| **Tier 3: Efficiency** | Claude 4.5 Haiku, Gemini 2.5 Flash Lite |
-| **Tier 4: Open Source** | Gemma 3 Family (27B, 12B, 4B) |
+| **Tier 1: Open Elite** | **Llama 3.3 70B**, Nvidia Nemotron 12B VL, GLM 4.5 Air (9B), Qwen 2.5 VL |
+| **Tier 2: Open Efficiency** | Gemma 3 Family (27B, 12B, 4B), Gemini 2.0 Flash (Free) |
+| **Tier 3: Google Premium** | Gemini 3.0 Pro, Gemini 3 Flash, Gemini 2.5 Flash |
+| **Tier 4: Specialized** | Claude 4.5 Haiku, Mistral Small 3.1, Claude 3.7 Sonnet (Thinking) |
 | **Tier 5: Research** | Perplexity Sonar (Reasoning Pro) - Live Web Search |
-| **Tier 6: Backup** | GPT-4o, DeepSeek R1, Groq Llama 3.3 |
 
 ### The "Eyes" (Vision) 👁️
 
 | Tier | Models |
 | :--- | :--- |
-| **Tier 1** | Nano Banana Pro (Gemini 3 Image Preview), Claude 3.7 Sonnet (Reasoning Vision) |
-| **Tier 2** | Gemini 2.5 Flash (The reliable workhorse) |
-| **Tier 3** | Perplexity Vision & GPT-4o Vision |
+| **Tier 1: Elite Vision** | Gemini 3 Pro Image, Claude 4.5 Opus, Qwen 2.5 VL 7B |
+| **Tier 2: Fast & Reliable** | Gemini 3 Flash, Claude 3.5 Sonnet |
+| **Tier 3: Backups** | GPT-4o, Perplexity Vision |
 
 ### The "Ears" (Audio) 👂
 
@@ -101,91 +95,40 @@ The app utilizes a massive **18-Model Waterfall** to ensure you always get an an
 | **Local Whisper** | Primary. Uses `Xenova/whisper-tiny.en` running locally on port 3000 |
 | **Groq (Whisper-Large-V3)** | Instant cloud fallback if the local queue times out or fails |
 
-### Smart PDF Handling 📄
-
-- **Primary:** Uses a local `pdf-parse` library to extract text on your CPU
-- **Fallback (OCR Backup):** Uses `OCR Space` API if the PDF is an image scan
-
 ---
 
-## ⚡ Tech Stack
-
-| Category | Technology | Purpose |
-| :--- | :--- | :--- |
-| **Desktop Framework** | Electron | Cross-platform desktop application shell |
-| **Frontend** | React & TypeScript | User Interface and application logic |
-| **Styling** | Tailwind CSS | Utility-first CSS framework |
-| **Bundling/Dev** | Vite | Fast development server and build tool |
-| **AI/Logic Core** | Gemini, Claude, GPT-4o, DeepSeek | Multi-Model AI Waterfall for chat and reasoning |
-| **Local Services** | Local Whisper Server | Fast, local audio transcription |
-| **Display** | KaTeX, Highlight.js | LaTeX formulas and code syntax highlighting |
-
----
-
-## 🐛 Solved Engineering Challenges
+## 🐛 Solved Engineering Challenges (v2.3)
 
 <details>
-<summary><strong>1. The "First Message" API Crash (Gemini/Perplexity)</strong></summary>
+<summary><strong>1. The "Persona Drift" (Hardcoded Logic)</strong></summary>
 
-**Problem:** Gemini 3.0 and Perplexity APIs strictly require the first message in the chat history to be from the `user`. Our app sometimes started history with an AI greeting (`role: model`), causing 100% failure rates.
+**Problem:** Models would ignore "soft" instructions to be normal human beings and revert to "AI Assistant mode".
 
-**Solution:** Implemented **History Sanitization** in `LLMHelper.ts`. Before sending any request, the code scans the history array, finds the index of the first `user` message, and slices everything before it.
+**Solution:** Injected **5 Mandatory Rules** (Hetitations, References, Emotion) directly into the `storyEnforcement` block, making them mathematically weighted higher than the system prompt.
 </details>
 
 <details>
-<summary><strong>2. The "Blind" Solve Button</strong></summary>
+<summary><strong>2. "Smart Mode" Latency & Sync</strong></summary>
 
-**Problem:** The "Solve" button was blindly sending requests to the `gemini-chat` (Text) endpoint, even when screenshots were attached.
+**Problem:** Fixed 2.5s chunks were too short for context, and 10s chunks were too slow for conversation.
 
-**Solution:** Implemented **Split Routing** in `Queue.tsx`. The function now checks `if (hasImages)` and routes to the correct endpoint.
+**Solution:** Implemented **Variance-Based Silence Detection**. The app analyzes the audio waveform; if it detects silence >3s, it forces an early transcription.
 </details>
 
 <details>
-<summary><strong>3. Deep Stealth Mouse Control</strong></summary>
+<summary><strong>3. The "Hardcoded" Prompt Myth</strong></summary>
 
-**Problem:** Even with `setContentProtection`, the mouse pointer was visible to screen recorders when interacting with the window.
+**Problem:** The prompts appeared static, limiting the app to one user.
 
-**Solution:** Implemented synchronized, time-gated control with `win.setIgnoreMouseEvents` and `cursor: none` CSS.
+**Solution:** Architecture refactor to use **Dynamic Profile Loading**. The prompt in code is just a template; the content is loaded from `user_profile.json` at runtime.
 </details>
 
 <details>
-<summary><strong>4. The Transcript "Race Condition"</strong></summary>
-
-**Problem:** Groq (Cloud) processed faster than Local Whisper, causing transcripts to appear out of order.
-
-**Solution:** Implemented a **Ticket System** with timestamps to ensure perfect chronological order.
-</details>
-
-<details>
-<summary><strong>5. The "Tesla" Persona Hallucination</strong></summary>
+<summary><strong>4. The "Tesla" Persona Hallucination</strong></summary>
 
 **Problem:** The AI sounded too high-level and invented fake software teams for behavioral questions.
 
-**Solution:** Added a **Simple Voice Filter** with a "Pivot Rule" to use real experience.
-</details>
-
-<details>
-<summary><strong>6. The Ghost Window (Critical Visibility Crash)</strong></summary>
-
-**Problem:** The app would start with no window visible at all due to Electron transparency bugs.
-
-**Solution:** Implemented an aggressive `ready-to-show` callback with explicit `win.focus()`.
-</details>
-
-<details>
-<summary><strong>7. The "Silent Crash" (Circular Dependency)</strong></summary>
-
-**Problem:** The app would hang on startup because `Main` and `IPC Handlers` were importing each other.
-
-**Solution:** Refactored the architecture to use **Type-Only Imports** (`import type`).
-</details>
-
-<details>
-<summary><strong>8. "Thinking" Process Clean-Up</strong></summary>
-
-**Problem:** Reasoning models output their internal monologue (`<think>...`), cluttering the chat.
-
-**Solution:** Implemented a **Universal Response Cleaner** to filter out thought tags in real-time.
+**Solution:** Added a **Simple Voice Filter** with a "Pivot Rule" to use real experience from student files.
 </details>
 
 ---
@@ -255,12 +198,6 @@ node local-whisper-server.mjs
 npm start
 ```
 
-### Building for Production
-
-```bash
-npm run dist
-```
-
 ---
 
 ## 📂 Project Structure
@@ -280,7 +217,8 @@ Moubely/
 ├── src/
 │   ├── App.tsx                 # Main UI Entry
 │   ├── _pages/
-│   │   └── Queue.tsx           # Main Chat Interface (Streaming Logic)
+│   │   ├── Queue.tsx           # Main Chat Interface (Streaming Logic)
+│   │   └── ProfileSettings.tsx # Universal Story Editor
 │   ├── components/
 │   │   └── AIResponse.tsx      # Markdown & LaTeX Rendering Logic
 │   └── index.css               # Glassmorphism Styles
