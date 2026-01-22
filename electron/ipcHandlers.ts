@@ -25,6 +25,21 @@ export function initializeIpcHandlers(appState: AppState) {
     }
   });
 
+  ipcMain.handle('get-user-profile', async () => {
+    try {
+      const userDataPath = app.getPath('userData');
+      const profilePath = path.join(userDataPath, 'user_profile.json');
+      if (fs.existsSync(profilePath)) {
+        const data = fs.readFileSync(profilePath, 'utf-8');
+        return JSON.parse(data);
+      }
+      return null; // No profile exists
+    } catch (error) {
+      console.error(`[IPC ⚡] ❌ Profile Load Failed:`, error);
+      return null;
+    }
+  });
+
   // --- 1. CORE WINDOW COMMANDS ---
 
   ipcMain.handle("set-window-size", (event, { width, height }) => {

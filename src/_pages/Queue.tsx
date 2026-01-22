@@ -514,7 +514,85 @@ const Queue: React.FC<any> = () => {
         mediaRecorderRef.current = recorder;
         let chunks: Blob[] = [];
         recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+        // [NEW] SILENCE DETECTION: Monitor audio variance to detect pauses
+        let silenceFrames = 0;
+        const SILENCE_THRESHOLD_FRAMES = 30; // 30 * 100ms = 3 seconds
+        let analyser: AnalyserNode | null = null;
+        let silenceCheckInterval: NodeJS.Timeout | null = null;
+
+        if (isUrgentRef.current && audioContextRef.current) {
+            try {
+                // Create analyser node to monitor audio levels
+                analyser = audioContextRef.current.createAnalyser();
+                analyser.fftSize = 2048;
+                const bufferLength = analyser.fftSize;
+                const dataArray = new Uint8Array(bufferLength);
+
+                // Connect analyser to audio stream
+                if (sourceNodeRef.current) {
+                    sourceNodeRef.current.connect(analyser);
+                }
+
+                // Track previous volume to calculate variance
+                let previousVolumes: number[] = [];
+                const VARIANCE_WINDOW = 5; // Track last 5 samples
+
+                silenceCheckInterval = setInterval(() => {
+                    if (!analyser || recorder.state !== 'recording') return;
+
+                    // Get current volume
+                    analyser.getByteTimeDomainData(dataArray);
+                    let sum = 0;
+                    for (let i = 0; i < bufferLength; i++) {
+                        const normalized = (dataArray[i] - 128) / 128; // Convert to -1 to 1
+                        sum += normalized * normalized;
+                    }
+                    const rms = Math.sqrt(sum / bufferLength);
+                    const db = 20 * Math.log10(rms);
+
+                    // Track volume history
+                    previousVolumes.push(db);
+                    if (previousVolumes.length > VARIANCE_WINDOW) {
+                        previousVolumes.shift();
+                    }
+
+                    // Calculate variance
+                    if (previousVolumes.length >= VARIANCE_WINDOW) {
+                        const mean = previousVolumes.reduce((a, b) => a + b, 0) / previousVolumes.length;
+                        const variance = previousVolumes.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / previousVolumes.length;
+
+                        // Silence = low variance AND low volume
+                        const isSilent = (variance < 2 && db < -35);
+
+                        if (isSilent) {
+                            silenceFrames++;
+                            if (silenceFrames >= SILENCE_THRESHOLD_FRAMES) {
+                                console.log(`[UI] 🤫 3s silence detected. Triggering early transcription.`);
+                                if (recorder.state === 'recording') {
+                                    recorder.stop();
+                                }
+                                if (silenceCheckInterval) clearInterval(silenceCheckInterval);
+                            }
+                        } else {
+                            silenceFrames = 0; // Reset counter if speech detected
+                        }
+                    }
+                }, 100); // Check every 100ms
+            } catch (e) {
+                console.error('[UI] ❌ Failed to setup silence detection:', e);
+            }
+        }
+
         recorder.onstop = async () => {
+            // Clean up silence detection
+            if (silenceCheckInterval) clearInterval(silenceCheckInterval);
+            if (analyser && sourceNodeRef.current) {
+                try {
+                    sourceNodeRef.current.disconnect(analyser);
+                } catch (e) { /* Already disconnected */ }
+            }
+
             if (isPausedRef.current || !window.electronAPI) return;
             const blob = new Blob(chunks, { type: 'audio/webm' });
             if (blob.size > 0) {
@@ -561,7 +639,9 @@ const Queue: React.FC<any> = () => {
             if (isRecordingRef.current && !isPausedRef.current) { setTimeout(() => startRecordingLoop(), 100); }
         };
         recorder.start();
-        setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 5000);
+        // [OPTIMIZED] Smart Mode uses 6-second chunks (complete sentences + Groq speed)
+        const chunkDuration = isUrgentRef.current ? 6000 : 5000;
+        setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, chunkDuration);
     };
 
     const handleStartSession = async () => {
@@ -628,6 +708,12 @@ const Queue: React.FC<any> = () => {
             }
         }
     }
+
+    // [NEW] SYNC SMART MODE: Instantly update ref so the recording loop sees it immediately.
+    useEffect(() => {
+        isUrgentRef.current = isSmartMode;
+        console.log(`[UI] ⚡ Smart Mode Toggled: ${isSmartMode}`);
+    }, [isSmartMode]);
 
     const handleStopSession = () => {
         setIsRecording(false);

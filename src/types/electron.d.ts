@@ -47,6 +47,7 @@ export interface ElectronAPI {
   checkProfileExists: () => Promise<boolean>
   saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => Promise<boolean>
   saveUserProfile: (profileData: any) => Promise<{ success: boolean }>;
+  getUserProfile: () => Promise<any>;
 
   // LLM Configuration (ALL WERE MISSING)
   getCurrentLlmConfig: () => Promise<any>

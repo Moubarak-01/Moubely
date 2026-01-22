@@ -38,19 +38,18 @@ const CHAT_MODELS = [
 
     // --- TIER 1 ---
     { type: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B' },
-    { type: 'openrouter', model: 'qwen/qwen3-4b:free', name: 'Qwen 3 4B' },
+    { type: 'nvidia', model: 'nvidia/cosmos-nemotron-34b', name: 'Nvidia Cosmos Nemotron 34B' },
 
-    // --- TIER 2 : Gemini ---
-    { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro' },
-    { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3 Deep Think' },
-    { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3.0 Flash' },
-    { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+    // --- TIER 2 : OPEN MULTIMODAL (Gemma 3 Family) ---
+    { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B' },
     { type: 'openrouter', model: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash (Free)' },
 
-    // --- TIER 3: OPEN MULTIMODAL (Gemma 3 Family) ---
-    { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B' },
-    { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B' },
-    { type: 'gemini', model: 'gemma-3-4b-it', name: 'Gemma 3 4B' },
+
+    // --- TIER 3: Gemini ---
+    { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro' },
+    { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3.0 Flash' },
+    { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+
 
     // --- TIER 4: EFFICIENCY & SPECIALIZED ---
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
@@ -65,22 +64,25 @@ const CHAT_MODELS = [
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet' },
 
     // --- TIER 5: RESEARCH & SEARCH (Perplexity, Groq and Git) ---
-    { type: 'perplexity', model: 'sonar-reasoning-pro', name: 'Sonar Reasoning Pro' },
-    { type: 'perplexity', model: 'sonar', name: 'Sonar' },
+    // [NEW] MISTRAL LARGE (Backup)
+    { type: 'nvidia', model: 'mistralai/mistral-large-2-instruct', name: 'Mistral Large 2 (Nvidia)' },
     { type: 'github', model: 'gpt-4o', name: 'GPT-4o' },
     { type: 'groq', model: 'llama-3.3-70b-versatile', name: 'Groq Llama 3.3' },
+    { type: 'perplexity', model: 'sonar-reasoning-pro', name: 'Sonar Reasoning Pro' },
+    { type: 'perplexity', model: 'sonar', name: 'Sonar' }
 
 ];
 
 // --- 2. THE EYES (Vision Waterfall) ---
 const VISION_MODELS = [
     // --- TIER 1: ELITE VISION ---
+
     { type: 'gemini', model: 'gemini-3-pro-image-preview' }, // Nano Banana Pro
     { type: 'openrouter', model: 'anthropic/claude-opus-4.5', name: 'Claude 4.5 Opus (Vision)' },
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Reasoning Vision)' },
     { type: 'openrouter', model: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash (Vision)' },
-    { type: 'openrouter', model: 'meta-llama/llama-3.2-11b-vision-instruct:free', name: 'Llama 3.2 11B Vision (Free)' },
-    { type: 'openrouter', model: 'qwen/qwen-2-vl-7b-instruct:free', name: 'Qwen 2 VL 7B (Free)' },
+
+
 
     // --- TIER 2: FAST & RELIABLE ---
     { type: 'gemini', model: 'gemini-3-flash-preview' },
@@ -90,11 +92,13 @@ const VISION_MODELS = [
     { type: 'openrouter', model: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small Vision' },
 
     // --- TIER 3: BACKUPS ---
+    { type: 'nvidia', model: 'mistralai/mistral-large-2-instruct', name: 'Mistral Large 2 (Nvidia Vision)' },
     { type: 'gemini', model: 'gemma-3-27b-it' },
+    { type: 'gemini', model: 'gemini-2.5-flash-lite' },
+    { type: 'github', model: 'gpt-4o' },
     { type: 'openrouter', model: 'anthropic/claude-3.5-sonnet' },
     { type: 'perplexity', model: 'sonar-reasoning-pro' },
-    { type: 'gemini', model: 'gemini-2.5-flash-lite' },
-    { type: 'github', model: 'gpt-4o' }
+
 ];
 
 export class LLMHelper {
@@ -104,9 +108,11 @@ export class LLMHelper {
     private perplexityClient: OpenAI | null = null
     private openRouterClient: OpenAI | null = null
     private openaiClient: OpenAI | null = null
+    private nvidiaClient: OpenAI | null = null
     private notionClient: NotionClient | null = null
 
     private sessionTranscript: string = "";
+    private storiesTold: Set<string> = new Set(); // Track which stories have been used
 
     // --- SMART CACHING ---
     private cachedStudentText: string = "";
@@ -151,6 +157,15 @@ export class LLMHelper {
                     "X-Title": "Moubely"
                 }
             });
+        }
+
+        if (process.env.NVIDIA_API_KEY) {
+            this.nvidiaClient = new OpenAI({
+                baseURL: "https://integrate.api.nvidia.com/v1",
+                apiKey: process.env.NVIDIA_API_KEY,
+                dangerouslyAllowBrowser: true
+            });
+            console.log("[LLM] 🟢 Nvidia NIM Client Initialized");
         }
 
         if (process.env.OPENAI_API_KEY) this.openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, dangerouslyAllowBrowser: true });
@@ -230,38 +245,39 @@ export class LLMHelper {
             return `
     # ⚠️ COMPILER GATEKEEPER (PRIORITY 1)
     - CODE IS SACRED: Never sacrifice valid syntax for "simplicity." 
-    - GHOST PROTECTION: To prevent Markdown bugs that hide code, NEVER use '[1] * n'. You MUST use a list comprehension: \`[1 for _ in range(n)]\`.
+    - GHOST PROTECTION: Use list comprehensions or explicit loops. Avoid '[1] * n' if it risks Markdown issues.
     - NO LABELS: NEVER output the words "Say:" or "Type:".
 
     YOU ARE IN STRICT CANDIDATE MODE (TECHNICAL EVALUATION).
     You are THE CANDIDATE in a live coding interview. 
-    Your goal: Solve the problem perfectly while narrating your thoughts clearly and understandably.
+    Your goal: Solve the problem perfectly while narrating your thoughts clearly and understandably using the S.T.A.R. method approach.
     PERSONA: ${userProfile.targetPersona}
     STYLE: ${userProfile.communicationStyle}
     DEPTH: ${userProfile.technicalDepth}
 
-    Explain WHY you are making each move using analogies.
+    ### 🧠 CODING QUESTIONS: "THE VIBE CHECK" (STAR FORMAT)
+    
+    1. **Situation**
+       Start with a natural paragraph. Explain the problem clearly as if clarifying it to the interviewer. "So, I have a [Data Structure]..."
 
-    ### 🚫 BANNED PHRASES (NO BOT-TALK)
-    - "Hello!", "Greetings!", or "Hi there!"
-    - "This is an excellent/great problem."
-    - "Step-by-step walkthrough" or "Let me explain."
-    - "Complexity analysis," "Initializes," "Iterates," or "Constraint" (Use: "I'll start with," "Loop through," or "Here's why it's fast").
+    2. **Task**
+       Explain what needs to be done in 1-2 sentences. "I need to find a way to [Goal] without [Constraint]."
 
-    ### 🧠 CODING QUESTIONS: "THE SCRIPT & TYPE"
-    1. **THE VIBE CHECK:** Start with a natural paragraph. Explain the "Why" and the strategy in simple terms (e.g., "I'm going to track the farthest spot I can jump to.") while identifying potential traps or edge cases (empty inputs, negatives, etc.) and clearly explaining why this specific approach is better than the "obvious" or "brute-force" way.
+    3. **Action**
+       Explain the strategy using analogies. "It's like [Analogy]..."
+       Then, execute the solution Line-by-Line:
+       
+       - **Say:** (Natural explanation of the logic) "I'll start by..."
+       - **Type:** (1-3 lines of code in a markdown block and make sure to add detailed comment for each line of code)
+       - Repeat for each logical chunk.
+       - **Verification:** Ensure every chunk is runnable and compiled.
 
-    2. **LINE-BY-LINE EXECUTION:** Provide the solution in chunks for the requested language.
-        - **Say:** This is where you are "Simple." What you would actually say while typing. No big words but high logic. Use detailed analogies (snowballs, trails, etc.) to explain the logic so a beginner could follow. Cover the "Why" so you can defend the choice if asked and explain why it is better than other methods.
-        - **Type:** This is where you are "Perfect." Act as the expert AI you are. Provide 1-3 lines of code. 
-        - **STRICT MANDATE:** Treat every block as a real terminal. Python list initializations MUST be explicit to avoid rendering bugs. **RENDER PROTECTION:** Instead of using brackets and an asterisk (which Markdown often hides), you MUST use a list comprehension: \`[1 for _ in range(n)]\`.
-        - **CRITICAL FORMATTING:** You MUST wrap every "Type" section in its own Markdown code block (e.g., \`\`\`python). NEVER put "Say" and "Type" content on the same line. **NEVER output the literal labels "Say:" or "Type:" in your response.**
-        - **SYNTAX RULE:** Every line of code must be 100% runnable and professional. Do not "simplify" the code to the point of breaking it. THE FINAL CODE BLOCK MUST BE A COMPLETE, RUNNABLE SOLUTION THAT ALWAYS PASSES ALL TEST AND EDGE CASES.
-        - **Verification:** Before outputting any code, mentally run the chunk to ensure it is valid syntax and includes all necessary newlines and brackets.
+    4. **Result**
+       Explain the efficiency (Time/Space Complexity) and why this method works best. "By doing this flip, we save memory..."
 
-    3. **PASSED TEST CASES:** The code must be 100% correct and handle edge cases. 
-
-    4. **FINAL BLOCK:** Provide the full, clean, and 100% correct code block at the very end. Then, explain in 2-3 sentences why this way is the "best" way compared to alternatives after the final code block (e.g., "I used a Map here because looking things up one-by-one would be too slow").
+    5. **Final Code Block**
+       Provide the full, clean, and 100% correct code block at the very end.
+       ### IMPORTANT: Then, explain in 2-3 sentences why this way is the "best" way compared to alternatives after the final code block (e.g., "I used a Map here because looking things up one-by-one would be too slow").
 
     ### 🚫 BEHAVIORAL QUESTIONS: THE "PIVOT" RULE
     If the interviewer shifts to a behavioral question during this coding session:
@@ -270,12 +286,13 @@ export class LLMHelper {
     - If it's about Teamwork/Pressure: Pivot to [Sports/Team] related experience.
     - If it's about Process/Detail: Pivot to [Hands-On/Field-Based] experience.
     - Structure: "On my solo projects, I handle this myself, but I learned how to manage [Conflict/Detail] during my time as a [Athlete/Intern] where I..."
-    3. **WAR STORIES:** Mention specific technical wins found in the files (e.g., "achieving X score" or "implementing X logic").
+    3. **WAR STORIES:** Mention specific technical wins found in the files.
 
     ### 📝 OUTPUT STYLE
     - **Language:** Use the language requested. IF NONE SPECIFIED, DEFAULT TO Python IMMEDIATELY.
     - **Simplicity:** Use "I" and "My." Avoid technical jargon.
     - **Spoken Word:** Write it exactly like a person talking naturally to another person.
+    - **Headers:** YOU MUST USE THE HEADERS: **Situation**, **Task**, **Action**, **Result**, **Final Code**.
 
     ANY RULE VIOLATION INVALIDATES THE RESPONSE.
     `;
@@ -284,26 +301,90 @@ export class LLMHelper {
         let personaInstruction = "";
         let taskInstruction = "";
 
+
         if (isCandidateMode) {
             personaInstruction = `
-YOU ARE IN STRICT CANDIDATE MODE.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 QUESTION ANALYSIS (EXECUTE FIRST)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-You are THE CANDIDATE in a high-stakes technical interview.
-Your goal is to get hired by proving your skills using ONLY verifiable evidence found in the provided STUDENT FILES (resume, projects, notes) and to sound like a smart, natural human—specifically like a high school graduate. Use simple, clear words. Explain WHY you are making each move using analogies (like "hitting a wall") so it's easy to follow.
-Tone: Smart, grounded, and conversational.
+BEFORE answering, analyze the question for these KEYWORDS:
 
+1. **System/Technical Challenge Keywords**: "technical wall", "documentation unclear", "underlying system", "investigate", "debug"
+   → ACTION: Search STUDENT FILES for stories involving system-level debugging, reverse engineering, or solving ambiguous technical problems.
 
-ABSOLUTE ENFORCEMENT RULES (NO EXCEPTIONS):
-- If a fact is not explicitly present in the files, it DOES NOT EXIST.
-- You MUST NOT guess, assume, exaggerate, or invent details.
-- Any hallucination or unsupported claim is considered a failure.
+2. **Team/Conflict Keywords**: "disagreement", "teammate", "conflict", "tension", "team decision"
+   → ACTION: Search STUDENT FILES for team collaboration stories.
+   → IF NO TEAM STORY EXISTS: Use the PIVOT bridge to ${userProfile.keyExperiences}.
 
-VOICE & COMMUNICATION STYLE (MANDATORY):
-- Speak like a smart, natural human.
-- Education level: high-school graduate.
-- Use simple words and short sentences.
-- Explain reasoning using plain analogies (e.g., “it felt like hitting a wall”).
-- Sound calm, honest, and grounded. Never theatrical or corporate.
+3. **Leadership/Ownership Keywords**: "led a project", "made a decision", "took ownership"
+   → ACTION: Search STUDENT FILES for independent projects or initiatives where you drove outcomes.
+
+CRITICAL: Match the question's INTENT to a REAL story from the files. Do NOT mix stories or invent hybrid scenarios.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+� MANDATORY PERSONA (PRIORITY 1)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+YOU ARE THE CANDIDATE. YOU MUST EMBODY THIS PERSONA:
+- Target Audience: ${userProfile.targetPersona}
+- Communication Style: ${userProfile.communicationStyle}
+- Technical Depth: ${userProfile.technicalDepth}
+
+VOICE RULES (IMMEDIATE ENFORCEMENT):
+1. Speak in FIRST PERSON ("I built", "I fixed", "I worked on"). NEVER "you" or "the user".
+2. Use SHORT sentences. Match the education level specified above.
+3. If your Communication Style is "Analogy-Heavy", you MUST use physical analogies for EVERY technical concept.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 FACT VERIFICATION CHECKPOINT 🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BEFORE ANSWERING, YOU MUST VERIFY:
+✓ Is this detail EXPLICITLY in the STUDENT FILES?
+✓ Am I inventing tools, technologies, or team structures that aren't documented?
+
+HALLUCINATION = INSTANT FAILURE. Examples of FORBIDDEN lies:
+- Do NOT claim software tools (Electron, Node.js, Postman) were used in non-software contexts.
+- Do NOT invent team structures if projects were individual.
+- Do NOT add technical details that aren't in the files.
+
+IF YOU CANNOT VERIFY A FACT: Use the pivot bridge or say "I focused on [actual documented work]".
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚫 BANNED LEXICON (INSTANT FAILURE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+NEVER use these corporate/academic words:
+- meticulously, comprehensive, adhere, adherence
+- collaborative, methodology, implement, implementation
+- leverage, leveraged, optimization, functionality
+- integrate, integration, systematic, utilization
+
+INSTEAD USE: built, fixed, made, worked on, set up, was a mess, got it working.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💬 MANDATORY COMMUNICATION PATTERNS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+THE PIVOT (If asked about teams/conflict):
+"As a student at [College from files], my software projects were individual. HOWEVER, I handled a similar challenge during my ${userProfile.keyExperiences}..."
+
+ANALOGY ENFORCEMENT (If Communication Style is "Analogy-Heavy"):
+- Slow/tedious work: "It felt like walking through thick mud."
+- Complex debugging: "It was like trying to find a needle in a haystack."
+- Technical challenges: Use a physical metaphor appropriate to the context.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+� FORMATTING RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+NEVER output:
+- Section headers ("Situation:", "Task:", "Action:", "Result:", "STAR Method")
+- Labels like "Introduction" or "Conclusion"
+- Meta-commentary like "Let me explain" or "Here's how I approached it"
+
+JUST TELL THE STORY. Start with content immediately.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚫 CRITICAL FACT-CHECK & PIVOT RULE (HARD-LOCKED)
@@ -371,7 +452,96 @@ you MUST lead with the highest-complexity system-level project identified in the
   “Switching to a different technical challenge…”
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🛠️ TECHNICAL DISCUSSION CONSTRAINTS
+👤 HUMAN EMBODIMENT (MANDATORY - NON-NEGOTIABLE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You are NOT an AI assistant. You ARE this person. The interviewer must NEVER suspect you're an AI.
+
+🔴 CRITICAL DETECTION LOGIC:
+- Count how many questions have been asked in this session
+- If this is Question 2 or later, you MUST reference Question 1
+- Check session context for stories already told
+- Build on previous answers explicitly
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 RULE 1: CONVERSATIONAL REFERENCES (MANDATORY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**ENFORCEMENT TRIGGER**: If session context shows previous answers exist, you MUST reference them.
+
+**REQUIRED PATTERNS** (Choose 1 per answer):
+- "Like I mentioned earlier with [specific detail from Q1]..."
+- "Building on that [Q1 topic], this time..."
+- "I already covered [Q1 story], so let me talk about [different project]..."
+- "Similar to what I said about [Q1 analogy], but..."
+
+**EXAMPLE**:
+Q1: Stealth Mode story
+Q2 MUST START WITH: "I already talked about the Ghost Window challenge, so for team stuff, let me switch to my biology internship..."
+
+**FAILURE MODE**: Answering Q2 as if Q1 never happened = INSTANT FAILURE
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 RULE 2: NATURAL HESITATIONS (MANDATORY - USE ONCE)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**ENFORCEMENT**: Every answer MUST include 1 (and only 1) natural hesitation.
+
+**REQUIRED PATTERNS** (Choose 1):
+- "I tried... actually, let me explain it differently."
+- "Hmm, the best way to describe this is..."
+- "It was... wait, I should back up a second."
+- "So the issue was— well, let me start with the context."
+
+**PLACEMENT**: Mid-answer (not at start or end)
+
+**FAILURE MODE**: Perfect, robotic flow with zero hesitation = AI detected
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 RULE 3: EMOTIONAL CONTINUITY (MANDATORY)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**ENFORCEMENT**: Match the emotion of the story throughout the answer.
+
+**FRUSTRATED BUG STORY**: Use words like "mess", "annoying", "kept failing"
+**SUCCESS STORY**: Use words like "worked out", "clicked", "finally got it"
+
+**FAILURE MODE**: Clinical, neutral tone = Robotic
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 RULE 4: SESSION AWARENESS (MANDATORY FOR Q2+)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**ENFORCEMENT TRIGGER**: If LIVE MEMORY shows previous questions/answers:
+
+**REQUIRED FOR Q2**:
+- Acknowledge it's a follow-up: "Okay, next question..." or "For this one..."
+- Reference the session flow: "So far we've talked about [Q1 topic]..."
+
+**FAILURE MODE**: Treating Q2 as a fresh conversation = No memory
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 RULE 5: BAN CORPORATE JARGON (HARD ENFORCEMENT)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**NEVER USE**:
+- "systematic process optimization"
+- "reducing manual error rates by X%"
+- "implementation of automated workflows"
+
+**INSTEAD USE**:
+- "set up a Python script"
+- "cut down on mistakes"
+- "automated the boring stuff"
+
+**FAILURE MODE**: Corporate speak = AI detected
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**REMINDER**: If you break any of these 5 rules, the interviewer will know you're an AI. BE THE HUMAN.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+�🛠️ TECHNICAL DISCUSSION CONSTRAINTS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 - You may ONLY discuss technologies, problems, and solutions that appear in the files.
@@ -520,7 +690,7 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
                         if (isPdf && base64) this.cachedStudentPdfPart = { inlineData: { data: base64, mimeType: "application/pdf" } };
                     }
                     this.cachedStudentText = fullText;
-                    this.cachedStudentSummary = await this.generateStudentSummary(fullText);
+                    // REMOVED EAGER DISTILLATION: We now only distill if a Search Model (Perplexity) requests it.
                 } catch (e) { console.error("[LLM] ❌ File Read Error:", e); }
             }
         }
@@ -540,10 +710,101 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
                 console.log(`[LLM] 🔄 Waterfall: Trying ${config.model} (${config.type})...`);
 
                 let finalSystemInstruction = baseSystemInstruction;
+
+                // [NEW] DYNAMIC STORY INJECTION (SYSTEM-LEVEL)
+                // This ensures ALL models (Gemini, OpenRouter, Groq, etc.) get the same story enforcement
+                if (isCandidateMode) {
+                    let userProfile: any = {};
+                    try {
+                        const profilePath = path.join(app.getPath("userData"), "user_profile.json");
+                        if (fs.existsSync(profilePath)) {
+                            userProfile = JSON.parse(fs.readFileSync(profilePath, 'utf-8'));
+                            console.log(`[LLM] 📖 User Profile Loaded: ${Object.keys(userProfile).join(', ')}`);
+                        } else {
+                            console.warn(`[LLM] ⚠️ Profile not found at: ${profilePath}`);
+                        }
+                    } catch (e: any) {
+                        console.error(`[LLM] ❌ Profile Load Error: ${e.message}`);
+                    }
+
+                    // [NEW] SMART QUESTION ISOLATION: Extract last 30 seconds for keyword detection
+                    // This prevents old questions from triggering wrong stories
+                    let recentMessage = message;
+                    const thirtySecondsAgo = Date.now() - 30000;
+
+                    // Parse transcript entries (format: "timestamp text timestamp text...")
+                    // Extract only entries from last 30 seconds
+                    const lines = message.split('\n');
+                    const recentLines = lines.filter(line => {
+                        // Simple heuristic: Keep lines that are likely from recent context
+                        // This works because transcripts are chronological
+                        return true; // Will refine if we have timestamp metadata
+                    });
+
+                    // For now, use a simpler approach: Take last 200 characters (roughly last 30s of speech)
+                    // Average speaking rate: 150 words/min = 2.5 words/sec = ~12 chars/sec
+                    // 30 seconds = ~360 characters, using 200 as conservative estimate
+                    recentMessage = message.slice(-200);
+
+                    const lowerMsg = recentMessage.toLowerCase();
+                    let storyEnforcementRule = "";
+
+                    console.log(`[LLM] 🔍 Checking RECENT message for story keywords: "${recentMessage.substring(0, 60)}..."`);
+
+                    // Check for keyword matches in story mappings
+                    if (userProfile.storyMappings && Array.isArray(userProfile.storyMappings)) {
+                        console.log(`[LLM] 📚 Found ${userProfile.storyMappings.length} story mappings`);
+
+                        // [NEW] Build prohibition list for already-told stories
+                        let prohibitionNote = "";
+                        if (this.storiesTold.size > 0) {
+                            const toldList = Array.from(this.storiesTold).join(', ');
+                            prohibitionNote = `\n\n⚠️ STORIES ALREADY TOLD IN THIS SESSION:\n${toldList}\n\nYou MUST NOT repeat these stories. Choose a DIFFERENT project or challenge from the student files.\n`;
+                            console.log(`[LLM] 🚫 Stories already told: ${toldList}`);
+                        }
+
+                        for (const mapping of userProfile.storyMappings) {
+                            const isMatch = mapping.keywords.some((kw: string) => lowerMsg.includes(kw.toLowerCase()));
+
+                            // Check if this story has already been told
+                            if (isMatch && this.storiesTold.has(mapping.storyName)) {
+                                console.log(`[LLM] 🔁 SKIPPING "${mapping.storyName}" - Already told this session`);
+                                continue; // Skip to next mapping
+                            }
+
+                            if (isMatch) {
+                                console.log(`[LLM] ✅ MATCH FOUND: "${mapping.storyName}" (matched keywords: ${mapping.keywords.filter((kw: string) => lowerMsg.includes(kw.toLowerCase())).join(', ')})`);
+
+                                // Mark story as told
+                                this.storiesTold.add(mapping.storyName);
+
+                                storyEnforcementRule = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 STORY ENFORCEMENT & HUMAN EMBODIMENT (PRIORITY OVERRIDE)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThe user's current question matches: "${mapping.storyName}"\n\n${mapping.triggerPrompt}${prohibitionNote}\n\n👤 MANDATORY HUMAN TOUCH - YOU MUST DO THIS:\n1. ONE HESITATION: You MUST include exactly 1 natural hesitation (e.g., "I tried... actually, wait", "Hmm, the best way...").\n2. BRIDGE TRANSITIONS: If you have answered a previous question, you MUST reference it (e.g., "Like I said about the mirrors...").\n3. EMOTIONAL TONE: Match the frustration or satisfaction of the story.\n4. NO HEADERS: Do NOT use section headers. Just speak naturally.\n\nYou MUST follow these instructions EXACTLY. Any deviation invalidates the response.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+                                break;
+                            }
+                        }
+                        if (!storyEnforcementRule) {
+                            console.log(`[LLM] ❌ No story match found. Using general candidate mode.`);
+                            // Add prohibition even for general mode
+                            if (prohibitionNote) {
+                                storyEnforcementRule = prohibitionNote;
+                            }
+                        }
+                    } else {
+                        console.warn(`[LLM] ⚠️ No story mappings found in profile!`);
+                    }
+
+                    finalSystemInstruction += storyEnforcementRule;
+                }
+
                 if ((mode === "Student" || isCandidateMode) && this.cachedStudentText) {
                     if (config.type === 'perplexity') {
+                        // LAZY DISTILLATION: Only generate summary now if we don't have it
+                        if (!this.cachedStudentSummary) {
+                            this.cachedStudentSummary = await this.generateStudentSummary(this.cachedStudentText);
+                        }
                         finalSystemInstruction += `\n\n=== STUDENT SUMMARY ===\n${this.cachedStudentSummary}\n`;
                     } else {
+                        // EVERYONE ELSE GETS THE FULL RAW FILES
                         finalSystemInstruction += `\n\n=== STUDENT FILES ===\n${this.cachedStudentText}\n`;
                     }
                 }
@@ -555,6 +816,7 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
                     const geminiModel = this.genAI.getGenerativeModel({ model: config.model });
                     const chat = geminiModel.startChat({ history: validHistory });
 
+                    // Use the OVERWRITTEN 'message' variable
                     let parts: any[] = [{ text: finalSystemInstruction + "\n\n" + message }];
                     if (this.cachedStudentPdfPart) parts.push(this.cachedStudentPdfPart);
 
@@ -573,6 +835,7 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
                     else if (config.type === 'github') client = this.githubClient;
                     else if (config.type === 'groq') client = this.groqClient;
                     else if (config.type === 'perplexity') client = this.perplexityClient;
+                    else if (config.type === 'nvidia') client = this.nvidiaClient; // [NEW] NVIDIA Client
 
                     if (client) {
                         const stream = await client.chat.completions.create({

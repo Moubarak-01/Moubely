@@ -42,6 +42,7 @@ We have shifted from a static, premium-first architecture to a universal, open-m
 | **AI Positioning** | Premium First (Gemini Pro/Claude Opus) | **Open Efficiency First** (Llama 3.3 70B, Nemotron 12B, GLM 4.5 Air) |
 | **Story Engine** | Hardcoded Stories in TypeScript | **Universal Story Editor** (Dynamic JSON Injection) |
 | **Persona Logic** | "Prompt-Only" Suggestions | **Mandatory Human Embodiment** (Hesitations, Emotion, No Jargon) |
+| **Solve Engine** | Standard Code Output | **S.T.A.R. Method Enforced** (Situation, Task, Action, Result) |
 | **Smart Mode** | Fixed Timer (2.5s) | **Variance-Based Selection** (Wait for >3s Silence) |
 
 ---
@@ -74,19 +75,19 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 
 | Tier | Models |
 | :--- | :--- |
-| **Tier 1: Open Elite** | **Llama 3.3 70B**, Nvidia Nemotron 12B VL, GLM 4.5 Air (9B), Qwen 2.5 VL |
-| **Tier 2: Open Efficiency** | Gemma 3 Family (27B, 12B, 4B), Gemini 2.0 Flash (Free) |
+| **Tier 1: Open Elite** | **Llama 3.3 70B**, Nvidia Cosmos Nemotron 34B |
+| **Tier 2: Open Efficiency** | Gemma 3 27B, Gemini 2.0 Flash (Free) |
 | **Tier 3: Google Premium** | Gemini 3.0 Pro, Gemini 3 Flash, Gemini 2.5 Flash |
 | **Tier 4: Specialized** | Claude 4.5 Haiku, Mistral Small 3.1, Claude 3.7 Sonnet (Thinking) |
-| **Tier 5: Research** | Perplexity Sonar (Reasoning Pro) - Live Web Search |
+| **Tier 5: Research** | Perplexity Sonar (Reasoning), Mistral Large 2 (Nvidia) |
 
 ### The "Eyes" (Vision) 👁️
 
 | Tier | Models |
 | :--- | :--- |
-| **Tier 1: Elite Vision** | Gemini 3 Pro Image, Claude 4.5 Opus, Qwen 2.5 VL 7B |
+| **Tier 1: Elite Vision** | **Gemini 3 Pro Image**, Claude 4.5 Opus, Qwen 2.5 VL 72B |
 | **Tier 2: Fast & Reliable** | Gemini 3 Flash, Claude 3.5 Sonnet |
-| **Tier 3: Backups** | GPT-4o, Perplexity Vision |
+| **Tier 3: Backups** | Mistral Large 2 (Nvidia), GPT-4o, Perplexity Vision |
 
 ### The "Ears" (Audio) 👂
 
@@ -220,6 +221,7 @@ npm install
 | **Groq** | `GROQ_API_KEY` | [Get Key](https://console.groq.com/keys) |
 | **Perplexity** | `PERPLEXITY_API_KEY` | [Get Key](https://www.perplexity.ai/settings/api) |
 | **OpenRouter** | `OPENROUTER_API_KEY` | [Get Key](https://openrouter.ai/keys) |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | [Get Key](https://build.nvidia.com) |
 | **OCR Space** | `OCR_SPACE_API_KEY` | [Get Key](https://ocr.space/ocrapi) |
 
 Create a `.env` file in the root directory and paste the following:
@@ -238,7 +240,10 @@ GROQ_API_KEY=gsk...
 PERPLEXITY_API_KEY=pplx-...
 OPENROUTER_API_KEY=sk-or-v1-...
 
-# 5. PDF RECOVERY (Scanned Docs)
+# 5. NVIDIA NIM (New Tier 1)
+NVIDIA_API_KEY=nvapi-...
+
+# 6. PDF RECOVERY (Scanned Docs)
 OCR_SPACE_API_KEY=K8...
 ```
 
