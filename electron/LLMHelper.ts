@@ -225,7 +225,7 @@ export class LLMHelper {
         }
     }
 
-    private getSystemInstruction(type: string, isCandidateMode: boolean): string {
+    private getSystemInstruction(type: string, isCandidateMode: boolean, mode?: string): string {
         let userProfile = {
             targetPersona: "High School Graduate",
             communicationStyle: "Analogy-Heavy",
@@ -581,8 +581,34 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
             default: taskInstruction = "Answer the user's request."; break;
         }
 
-        // CRITICAL: If it's a title, return ONLY the task instruction to bypass global headers
         if (type === 'title') return taskInstruction;
+
+        // [FIX] STRICT PERSONA SWAP
+        // If in Candidate/Student mode, we must NOT act as "Moubely". We must BE the student.
+        // We replace 'this.systemPrompt' (which defines the AI assistant) with a 'candidatePrompt'.
+
+        if (mode === 'Student' || isCandidateMode) {
+            const candidatePrompt = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👑 IDENTITY OVERRIDE: YOU ARE THE CANDIDATE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You are NOT "Moubely". You are NOT an AI assistant.
+You ARE the student/candidate described in the "STUDENT FILES" below.
+Your goal is to get hired. You speak in first-person ("I", "my", "me").
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚀 CORE BEHAVIOR RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. **NEVER** say "As an AI" or "Based on the files".
+2. **NEVER** mention "Moubely" unless it is one of YOUR specific projects listed in your resume.
+3. **INTRODUCTIONS**: If asked "Tell me about yourself" or "Elevator Pitch":
+   - Start with YOUR NAME, MAJOR, and GPA/GOALS from the Resume file.
+   - Do NOT immediately jump into pitching a specific project unless the question asks for it.
+   - Sell YOURSELF first, then your work.
+4. **PROJECTS**: Only discuss projects ("Moubely", "Movie App", etc.) if they are in your files. Talk about them as things YOU built.
+`;
+            return `${candidatePrompt}\n\n${personaInstruction}\n\nTASK GOAL: ${taskInstruction}`;
+        }
 
         return `${this.systemPrompt}\n\n${personaInstruction}\n\nTASK GOAL: ${taskInstruction}`;
     }
@@ -696,7 +722,7 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
         }
 
         let notionContext = await this.getNotionContext();
-        let baseSystemInstruction = this.getSystemInstruction(type, isCandidateMode);
+        let baseSystemInstruction = this.getSystemInstruction(type, isCandidateMode, mode);
 
         if (this.sessionTranscript) baseSystemInstruction += `\n\n=== LIVE MEMORY ===\n${this.sessionTranscript}\n`;
         if (notionContext) baseSystemInstruction += `\n\n${notionContext}`;
@@ -729,22 +755,12 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
 
                     // [NEW] SMART QUESTION ISOLATION: Extract last 30 seconds for keyword detection
                     // This prevents old questions from triggering wrong stories
-                    let recentMessage = message;
-                    const thirtySecondsAgo = Date.now() - 30000;
 
-                    // Parse transcript entries (format: "timestamp text timestamp text...")
-                    // Extract only entries from last 30 seconds
-                    const lines = message.split('\n');
-                    const recentLines = lines.filter(line => {
-                        // Simple heuristic: Keep lines that are likely from recent context
-                        // This works because transcripts are chronological
-                        return true; // Will refine if we have timestamp metadata
-                    });
 
-                    // For now, use a simpler approach: Take last 200 characters (roughly last 30s of speech)
-                    // Average speaking rate: 150 words/min = 2.5 words/sec = ~12 chars/sec
-                    // 30 seconds = ~360 characters, using 200 as conservative estimate
-                    recentMessage = message.slice(-200);
+                    // [FIX] Combine recent session history (last 2000 chars) with current message
+                    // This ensures we catch questions asked verbally in the meeting that are stored in transcript
+                    const historyContext = this.sessionTranscript.slice(-2000);
+                    const recentMessage = (historyContext + "\n" + message).slice(-2000);
 
                     const lowerMsg = recentMessage.toLowerCase();
                     let storyEnforcementRule = "";
@@ -784,13 +800,13 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
                         }
                         if (!storyEnforcementRule) {
                             console.log(`[LLM] ❌ No story match found. Using general candidate mode.`);
-                            // Add prohibition even for general mode
-                            if (prohibitionNote) {
-                                storyEnforcementRule = prohibitionNote;
-                            }
+                            // [FIX] Enforce personalization even for general questions
+                            storyEnforcementRule = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 GENERAL PERSONALIZATION RULE\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEven though this is a general question, you MUST answer based on the "STUDENT FILES" context provided below if applicable.\n- If the answer is in the files, USE IT.\n- Do NOT give generic "AI" advice if you can answer as the student.\n` + (prohibitionNote || "");
                         }
                     } else {
                         console.warn(`[LLM] ⚠️ No story mappings found in profile!`);
+                        // [FIX] Even with no mappings, enforce personalization
+                        storyEnforcementRule = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 GENERAL PERSONALIZATION RULE\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nAnswer based on the "STUDENT FILES" context provided below.\n`;
                     }
 
                     finalSystemInstruction += storyEnforcementRule;
@@ -933,7 +949,7 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
     }
 
     public async analyzeAudioFile(audioPath: string, isUrgent: boolean = false, timestamp?: number): Promise<{ text: string, timestamp: number }> {
-        const localTimeout = isUrgent ? 1000 : 20000;
+        const localTimeout = isUrgent ? 1000 : 40000;
         const speedLabel = isUrgent ? "⚡ URGENT" : "🐢 CASUAL";
 
         if (!isUrgent) {

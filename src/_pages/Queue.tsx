@@ -864,7 +864,7 @@ const Queue: React.FC<any> = () => {
         // Trigger AI generation manually
         setIsThinking(true);
         setThinkingStep("Regenerating response...");
-        const aiMsgId = (Date.now() + 1).toString();
+        const aiMsgId = `${Date.now()}-ai`;
 
         setMessages(prev => [...prev, { id: aiMsgId, role: "ai", text: "", timestamp: Date.now(), isStreaming: true }]);
 
@@ -947,12 +947,14 @@ const Queue: React.FC<any> = () => {
 
         if (!textToSend.trim() && !hasImages) return
 
-        const aiMsgId = (Date.now() + 1).toString();
+        const now = Date.now();
+        const aiMsgId = `${now}-ai`;
+        const userId = `${now}-user`;
 
         const newMessages: Message[] = [
             ...messages,
             {
-                id: Date.now().toString(),
+                id: userId,
                 role: "user",
                 text: textToSend || (hasImages ? `Analyze ${imagesToSend.length} screens.` : ""),
                 queuedScreenshots: hasImages ? imagesToSend : undefined,
@@ -1068,10 +1070,9 @@ const Queue: React.FC<any> = () => {
             case "recap": userDisplayMessage = "Recap the discussion."; break;
         }
 
-        // FIX: Freeze time to prevent ID collision
         const now = Date.now();
-        const userId = now.toString();
-        const aiMsgId = (now + 1).toString();
+        const userId = `${now}-user`;
+        const aiMsgId = `${now}-ai`;
 
         setMessages(prev => [
             ...prev,
@@ -1131,13 +1132,14 @@ const Queue: React.FC<any> = () => {
 
         // 4. Add User Message
         const now = Date.now();
-        const aiMsgId = (now + 1).toString();
+        const aiMsgId = `${now}-ai`;
+        const userId = `${now}-user`;
         const userDisplayMessage = hasImages ? "Solve this coding problem (Screenshots attached)." : "Solve this coding problem based on the discussion.";
 
         setMessages(prev => [
             ...prev,
             {
-                id: now.toString(),
+                id: userId,
                 role: "user",
                 text: userDisplayMessage,
                 queuedScreenshots: hasImages ? queuedScreenshots : undefined,

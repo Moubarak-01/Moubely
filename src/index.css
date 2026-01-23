@@ -2,7 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body {
+/* ... existing styles ... */
+
+/* [FIX] Chat Overflow & Wrapping */
+.markdown-content {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.markdown-content pre,
+.markdown-content code {
+  white-space: pre-wrap !important;
+  /* Wrap code lines */
+  word-break: break-all !important;
+  /* Break long words/tokens if needed */
+  overflow-x: auto;
+  /* Allow scroll if absolutely necessary, but wrapping is preferred */
+}
+
+/* Ensure images don't overflow */
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+html,
+body {
   background-color: transparent !important;
   margin: 0;
   padding: 0;
@@ -20,10 +47,14 @@ html, body {
 
 /* When the timer hits 10s, fade the UI to be less obtrusive */
 .app-collapsed {
-  opacity: 0.25; /* Very transparent */
-  transform: scale(0.99); /* Slight subtle shrink */
-  filter: grayscale(0.8); /* Desaturate colors to minimize distraction */
-  pointer-events: none; /* Clicks go through the window until you hover back */
+  opacity: 0.25;
+  /* Very transparent */
+  transform: scale(0.99);
+  /* Slight subtle shrink */
+  filter: grayscale(0.8);
+  /* Desaturate colors to minimize distraction */
+  pointer-events: none;
+  /* Clicks go through the window until you hover back */
 }
 
 /* Instant wake-up on hover */
@@ -36,7 +67,7 @@ html, body {
 
 /* --- EXISTING CURSOR & INTERACTION --- */
 .cursor-deep-stealth {
-  cursor: none !important; 
+  cursor: none !important;
 }
 
 /* --- MAIN WINDOW --- */
@@ -44,7 +75,7 @@ html, body {
   display: flex;
   flex-direction: column;
   width: 100vw;
-  height: fit-content; 
+  height: fit-content;
   transition: opacity 0.2s ease;
   background: transparent;
 }
@@ -52,7 +83,7 @@ html, body {
 /* EXPANDED: 75% Opacity */
 .moubely-window.expanded {
   height: 100vh;
-  background: rgba(15, 15, 20, 0.75); 
+  background: rgba(15, 15, 20, 0.75);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
@@ -72,12 +103,12 @@ html, body {
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
   width: fit-content;
   margin-bottom: 10px;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* TOP BAR: Matches 75% Opacity */
 .compact-bar {
-  background: rgba(26, 26, 26, 0.75); 
+  background: rgba(26, 26, 26, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
   padding: 10px 16px;
@@ -93,7 +124,7 @@ html, body {
   gap: 20px;
   padding: 0 20px;
   margin-top: 8px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .tab-btn {
@@ -107,8 +138,14 @@ html, body {
   white-space: nowrap;
 }
 
-.tab-btn:hover { color: #e5e7eb; }
-.tab-btn.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+.tab-btn:hover {
+  color: #e5e7eb;
+}
+
+.tab-btn.active {
+  color: #60a5fa;
+  border-bottom-color: #60a5fa;
+}
 
 .content-area {
   flex: 1;
@@ -125,16 +162,16 @@ html, body {
   border-radius: 18px;
   border-top-right-radius: 4px;
   padding: 10px 18px;
-  font-size: clamp(12px, 2.5vmin, 14px); 
+  font-size: clamp(12px, 2.5vmin, 14px);
   line-height: 1.5;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   max-width: 85%;
 }
 
 /* AI Message */
 .ai-message {
   color: #f3f4f6;
-  font-size: clamp(13px, 2.5vmin, 15px); 
+  font-size: clamp(13px, 2.5vmin, 15px);
   line-height: 1.6;
   padding: 4px 0;
   max-width: 65ch;
@@ -144,27 +181,52 @@ html, body {
 .icon-btn {
   @apply p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer text-gray-400 hover:text-white flex items-center justify-center;
 }
+
 .control-btn {
   @apply px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition-all flex items-center gap-2 border border-white/10 hover:bg-white/10 bg-white/5 text-gray-300 whitespace-nowrap;
 }
+
 .control-btn.active {
   @apply bg-blue-500/20 text-blue-300 border-blue-500/30;
 }
 
 /* Drag & Interaction */
-.interactive { cursor: default; -webkit-app-region: no-drag; pointer-events: auto; }
-.draggable { -webkit-app-region: drag; cursor: grab; }
+.interactive {
+  cursor: default;
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+}
+
+.draggable {
+  -webkit-app-region: drag;
+  cursor: grab;
+}
 
 /* Existing Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 20px; }
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+}
+
 /* --- STEALTH CURSOR MODE --- */
 /* Forces the cursor to always be an arrow, hiding interaction from screen recordings */
 * {
-    cursor: default !important;
+  cursor: default !important;
 }
 
-button, a, [role="button"], .icon-btn, .control-btn, .cursor-pointer {
-    cursor: default !important;
+button,
+a,
+[role="button"],
+.icon-btn,
+.control-btn,
+.cursor-pointer {
+  cursor: default !important;
 }
