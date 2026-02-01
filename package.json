@@ -12,7 +12,7 @@
     "postinstall": "cross-env SHARP_IGNORE_GLOBAL_LIBVIPS=1 npm rebuild sharp",
     "electron:dev": "tsc -p electron/tsconfig.json && cross-env NODE_ENV=development electron .",
     "electron:build": "tsc -p electron/tsconfig.json && cross-env NODE_ENV=production electron .",
-    "app:dev": "concurrently \"npm run dev -- --port 5180\" \"wait-on http://localhost:5180 && npm run electron:dev\"",
+    "app:dev": "concurrently \"npm run dev -- --port 5180\" \"wait-on http://localhost:5180 && npm run electron:dev\" \"node local-whisper-server.mjs\"",
     "app:build": "npm run build && electron-builder",
     "watch": "tsc -p electron/tsconfig.json --watch",
     "start": "npm run app:dev",

@@ -2,7 +2,7 @@
 
 # Moubely ✨
 
-![Version](https://img.shields.io/badge/Version-2.3-yellow?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.4-yellow?style=for-the-badge)
 ![Electron](https://img.shields.io/badge/Electron-33-47848F?style=for-the-badge&logo=electron)
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript)
@@ -62,6 +62,12 @@ Our Expanded AI engine supports 18+ models. If one model hits a rate limit or AP
 - **Local-First Transcription** - Powered by a custom **Local Whisper Server** (Tiny.en) running directly on your machine
 - **Cloud Fallback** - Automatically switches to **Groq** if the local server gets too busy or if **Smart Mode** is enabled
 - **Universal Digital Twin** - Uses the **STAR method** to provide spoken-word answers based on *your* specific profile data
+- **Automated Workflow** - Single command (`npm start`) launches Frontend, Backend, and Local Whisper Server simultaneously
+
+### 🎭 Strict Personalization (Student Mode)
+- **Identity Override** - When in "Student Mode", the AI strictly enforces the user's persona (First-person "I/Me", Name, Major)
+- **Mandatory File Usage** -  Forces the AI to ALWAYS check "STUDENT FILES" for answers, even for general questions, preventing generic AI responses
+
 
 ---
 
@@ -75,7 +81,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 
 | Tier | Models |
 | :--- | :--- |
-| **Tier 1: Open Elite** | **Llama 3.3 70B**, Nvidia Cosmos Nemotron 34B |
+| **Tier 1: Open Elite** | **Llama 3.3 70B**, Arcee Trinity Large, Nvidia Nemotron 3 Nano, Cosmos Nemotron 34B |
 | **Tier 2: Open Efficiency** | Gemma 3 27B, Gemini 2.0 Flash (Free) |
 | **Tier 3: Google Premium** | Gemini 3.0 Pro, Gemini 3 Flash, Gemini 2.5 Flash |
 | **Tier 4: Specialized** | Claude 4.5 Haiku, Mistral Small 3.1, Claude 3.7 Sonnet (Thinking) |
@@ -188,6 +194,15 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Solution:** Architecture refactor to use **Dynamic Profile Loading**. The prompt in code is just a template; the content is loaded from `user_profile.json` at runtime.
 </details>
 
+<details>
+<summary><strong>12. The Multi-Process Startup</strong></summary>
+
+**Problem:** Developers had to manually open multiple terminals to start the Vite server, Electron app, and Local Whisper server.
+
+**Solution:** Automated the workflow in `package.json` using `concurrently`. Now, a single `npm start` command launches all three services in parallel.
+</details>
+</details>
+
 ---
 
 ## 📦 Installation & Setup
@@ -247,17 +262,13 @@ NVIDIA_API_KEY=nvapi-...
 OCR_SPACE_API_KEY=K8...
 ```
 
-### 4. Run the Local Whisper Server
-
-```bash
-node local-whisper-server.mjs
-```
-
-### 5. Start the Application
+### 4. Start the Application
 
 ```bash
 npm start
 ```
+*This command automatically launches the Vite Dev Server, Electron Backend, and Local Whisper Server.*
+
 
 ---
 

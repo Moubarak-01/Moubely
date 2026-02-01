@@ -38,6 +38,8 @@ const CHAT_MODELS = [
 
     // --- TIER 1 ---
     { type: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B' },
+    { type: 'openrouter', model: 'arcee-ai/trinity-large-preview:free', name: 'Arcee Trinity Large Preview' },
+    { type: 'openrouter', model: 'nvidia/nemotron-3-nano:free', name: 'Nvidia Nemotron 3 Nano' },
     { type: 'nvidia', model: 'nvidia/cosmos-nemotron-34b', name: 'Nvidia Cosmos Nemotron 34B' },
 
     // --- TIER 2 : OPEN MULTIMODAL (Gemma 3 Family) ---
