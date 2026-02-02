@@ -104,7 +104,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 
 ---
 
-## 🐛 Solved Engineering Challenges (11 Total)
+## 🐛 Solved Engineering Challenges
 
 <details>
 <summary><strong>1. The "First Message" API Crash (Gemini/Perplexity)</strong></summary>
