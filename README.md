@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="renderer/public/Moubely_icon.png" width="200" alt="Moubely Logo" />
+  <img src="renderer/public/Moubely_icon.png" width="120" alt="Moubely Logo" />
 </p>
 
 <h1 align="center">Moubely ✨</h1>
@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-2.4-yellow?style=for-the-badge" alt="Version" />
+  <img src="https://img.shields.io/badge/Version-2.3-yellow?style=for-the-badge" alt="Version" />
   <img src="https://img.shields.io/badge/Electron-33-47848F?style=for-the-badge&logo=electron" alt="Electron" />
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react" alt="React" />
   <img src="https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript" alt="TypeScript" />
