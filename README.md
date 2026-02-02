@@ -1,14 +1,22 @@
+<p align="center">
+  <img src="renderer/public/Moubely_icon.png" width="200" alt="Moubely Logo" />
+</p>
+
+<h1 align="center">Moubely ✨</h1>
+
+<p align="center">
+  <i>An intelligent, stealthy, always-on-top AI assistant for your desktop</i>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-2.4-yellow?style=for-the-badge" alt="Version" />
+  <img src="https://img.shields.io/badge/Electron-33-47848F?style=for-the-badge&logo=electron" alt="Electron" />
+  <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Vite-7.2-646CFF?style=for-the-badge&logo=vite" alt="Vite" />
+</p>
+
 <div align="center">
-
-# Moubely <img src="renderer/public/Moubely_icon.png" width="50" style="vertical-align: middle; margin-bottom: 8px;" alt="Moubely Logo" /> ✨ <br />
-
-![Version](https://img.shields.io/badge/Version-2.4-yellow?style=for-the-badge)
-![Electron](https://img.shields.io/badge/Electron-33-47848F?style=for-the-badge&logo=electron)
-![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript)
-![Vite](https://img.shields.io/badge/Vite-7.2-646CFF?style=for-the-badge&logo=vite)
-
-**An intelligent, stealthy, always-on-top AI assistant for your desktop**
 
 [Features](#-core-features) • [Architecture](#️-engineering-architecture-the-waterfall-system) • [Tech Stack](#-tech-stack) • [Installation](#-how-to-run-locally) • [Contributing](#-contributing)
 
