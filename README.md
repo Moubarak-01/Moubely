@@ -1,6 +1,6 @@
 <div align="center">
 
-# Moubely ✨
+# Moubely <img src="renderer/public/Moubely_icon.png" width="50" style="vertical-align: middle; margin-bottom: 8px;" alt="Moubely Logo" /> ✨ <br />
 
 ![Version](https://img.shields.io/badge/Version-2.4-yellow?style=for-the-badge)
 ![Electron](https://img.shields.io/badge/Electron-33-47848F?style=for-the-badge&logo=electron)
