@@ -243,23 +243,23 @@ Create a `.env` file in the root directory and paste the following:
 
 ```env
 # 1. THE BRAINS & EYES (Primary Chat + Vision)
-GEMINI_API_KEY=AIza...
+GEMINI_API_KEY=your_key_here
 
 # 2. THE LOGIC & BACKUP (DeepSeek + GPT-4o)
-GITHUB_TOKEN=github_p...
+GITHUB_TOKEN=your_token_here
 
 # 3. THE CLOUD EARS (Audio Backup)
-GROQ_API_KEY=gsk...
+GROQ_API_KEY=your_key_here
 
 # 4. THE RESEARCHER & REASONER (Search + Claude)
-PERPLEXITY_API_KEY=pplx-...
-OPENROUTER_API_KEY=sk-or-v1-...
+PERPLEXITY_API_KEY=your_key_here
+OPENROUTER_API_KEY=your_key_here
 
 # 5. NVIDIA NIM (New Tier 1)
-NVIDIA_API_KEY=nvapi-...
+NVIDIA_API_KEY=your_key_here
 
 # 6. PDF RECOVERY (Scanned Docs)
-OCR_SPACE_API_KEY=K8...
+OCR_SPACE_API_KEY=your_key_here
 ```
 
 ### 4. Start the Application
