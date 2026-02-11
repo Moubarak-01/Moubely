@@ -44,6 +44,10 @@ const CHAT_MODELS = [
 
     // --- TIER 2 : OPEN MULTIMODAL (Gemma 3 Family) ---
     { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B' },
+    { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B' },
+    { type: 'gemini', model: 'gemma-3-4b-it', name: 'Gemma 3 4B' },
+    { type: 'gemini', model: 'gemma-3-2b-it', name: 'Gemma 3 2B' },
+    { type: 'gemini', model: 'gemma-3-1b-it', name: 'Gemma 3 1B' },
     { type: 'openrouter', model: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash (Free)' },
 
 

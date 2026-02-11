@@ -90,7 +90,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 | Tier | Models |
 | :--- | :--- |
 | **Tier 1: Open Elite** | **Llama 3.3 70B**, Arcee Trinity Large, Nvidia Nemotron 3 Nano, Cosmos Nemotron 34B |
-| **Tier 2: Open Efficiency** | Gemma 3 27B, Gemini 2.0 Flash (Free) |
+| **Tier 2: Open Efficiency** | Gemma 3 27B, **Gemma 3 12B/4B/2B/1B**, Gemini 2.0 Flash (Free) |
 | **Tier 3: Google Premium** | Gemini 3.0 Pro, Gemini 3 Flash, Gemini 2.5 Flash |
 | **Tier 4: Specialized** | Claude 4.5 Haiku, Mistral Small 3.1, Claude 3.7 Sonnet (Thinking) |
 | **Tier 5: Research** | Perplexity Sonar (Reasoning), Mistral Large 2 (Nvidia) |
