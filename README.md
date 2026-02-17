@@ -5,7 +5,7 @@
 <h1 align="center">Moubely ✨</h1>
 
 <p align="center">
-  <i>An intelligent, unobtrusive, high-performance AI assistant for your desktop</i>
+  <i>A privacy-first, always-on-top AI orchestrator for high-performance workflows</i>
 </p>
 
 <p align="center">
@@ -28,15 +28,15 @@
 
 ## 📖 Overview
 
-Moubely is an advanced, always-on-top AI assistant designed for seamless desktop integration. It provides real-time meeting assistance, high-fidelity screen analysis, and context-aware chat capabilities in a sleek, non-intrusive interface.
+Moubely is an advanced, always-on-top AI productivity hub designed for seamless desktop integration. It provides real-time meeting assistance, high-fidelity screen analysis, and secure local-first context management in a sleek, non-intrusive interface.
 
 ### Key Highlights
 
-- 👁️ **Zero-Distraction Interface** - Toggle between background mode and standard window for optimal focus
+- 👁️ **Privacy-Centric Workspace** - Minimized background processing with deep system tray integration
 - 📸 **Contextual Vision (Multi-Shot)** - Queue up to **12 screenshots** (`Ctrl + H`) for deep multi-context analysis
-- 🧠 **18-Model AI Waterfall** - Highly resilient architecture granting 99.9% uptime by prioritizing open models with premium fallbacks
-- 🎙️ **Hybrid Meeting Copilot** - Privacy-first Local Whisper + Cloud Groq redundancy
-- ⚡ **Adaptive Persona Engine** - Context-aware responses that adapt to your specific professional profile
+- 🧠 **Resilient LLM Controller** - Multi-provider architecture ensuring 99.9% uptime by orchestrating open models and premium fallbacks
+- 🎙️ **Local-First Meeting Copilot** - Privacy-first Local Whisper usage with optional Cloud redundancy
+- ⚡ **RAG-based Personal Knowledge Management** - Context-aware responses grounded in your specific professional documentation
 
 ---
 
@@ -48,8 +48,8 @@ We have shifted from a static, premium-first architecture to a universal, open-m
 | :--- | :--- | :--- |
 | **Screenshot Engine** | Limited to 6 Screens | **Expanded to 12 Screens** (Deep Context) |
 | **AI Positioning** | Premium First (Gemini Pro/Claude Opus) | **Open Efficiency First** (Llama 3.3 70B, Nemotron 12B, GLM 4.5 Air) |
-| **Context Engine** | Hardcoded Context in TypeScript | **Dynamic Profile Loader** (JSON-based Context Injection) |
-| **Persona Logic** | "Prompt-Only" Suggestions | **Adaptive NLP Layer** (Natural Language Processing for human-like tone) |
+| **Context Engine** | Hardcoded Context in TypeScript | **Dynamic Profile Loader** (JSON-based RAG Injection) |
+| **NLP Controller** | "Prompt-Only" Suggestions | **Adaptive NLP Layer** (Natural Language Processing for professional tone) |
 | **Response Engine** | Standard Text Output | **Structured Output Enforced** (Situation, Task, Action, Result) |
 | **Smart Mode** | Fixed Timer (2.5s) | **Variance-Based Selection** (Wait for >3s Silence) |
 
@@ -57,14 +57,14 @@ We have shifted from a static, premium-first architecture to a universal, open-m
 
 ## 🚀 Core Features
 
-### 👁️ Zero-Distraction Interface
-Toggle instantly between **Background Mode** (minimized/unobtrusive) and **Active Mode** (standard window) directly from the UI, ensuring the assistant is available when needed but out of the way when not.
+### 👁️ Privacy-Centric Workspace
+Toggle instantly between **Background Mode** (system tray/minimized) and **Active Workspace** (standard window), ensuring the tool is available for high-velocity workflows but strictly non-intrusive when focus is required.
 
 ### 📸 Contextual Vision (Multi-Shot)
 Instantly snap screenshots (`Ctrl + H`). Repeated presses **queue up to 12 screenshots** for multi-context analysis. Moubely "sees" your screen using a multi-model approach.
 
-### 🧠 Robust AI Waterfall
-Our Expanded AI engine supports 18+ models. If one model hits a rate limit or API error (e.g., 402 or 429), Moubely automatically switches to the next available one.
+### 🧠 Resilient Multi-Provider LLM Controller
+Our custom orchestration engine manages 18+ models. If one provider hits a rate limit or API error (e.g., 402 or 429), the controller automatically routes the request to the next available tier, ensuring business continuity.
 
 ### 🎙️ Hybrid Meeting Copilot
 - **Local-First Transcription** - Powered by a custom **Local Whisper Server** (Tiny.en) running directly on your machine
@@ -72,14 +72,14 @@ Our Expanded AI engine supports 18+ models. If one model hits a rate limit or AP
 - **Universal Digital Twin** - Uses the **STAR method** to provide spoken-word answers based on *your* specific profile data
 - **Automated Workflow** - Single command (`npm start`) launches Frontend, Backend, and Local Whisper Server simultaneously
 
-### 🎭 Adaptive Persona Engine
-- **Identity Consistency** - The AI strictly adheres to the user's professional profile (First-person "I/Me", Role, Expertise).
-- **Context-Grounded Responses** -  Forces the AI to ALWAYS validate answers against your provided context files (RAG), significantly reducing hallucinations and generic AI responses.
+### ⚡ RAG-based Personal Knowledge Management
+- **Context Grounding** - The system strictly adheres to the user's provided knowledge base (Technical Documentation, Project Notes).
+- **Hallucination Reduction** -  Forces the AI to ALWAYS validate answers against your provided context files (RAG), significantly reducing generic AI responses in favor of project-specific accuracy.
 
 
 ---
 
-## 🛠️ Engineering Architecture: The "Waterfall" System
+## 🛠️ System Architecture: The "Resilient Controller"
 
 Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioritizes elite reasoning models before falling back to faster or local resources.
 
@@ -131,11 +131,11 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 </details>
 
 <details>
-<summary><strong>3. Advanced Window Event Handling</strong></summary>
+<summary><strong>3. Advanced Window Layering (UX)</strong></summary>
 
 **Problem:** Standard Electron windows capture mouse events even when transparent, interfering with underlying applications.
 
-**Solution:** Implemented synchronized, time-gated control with `win.setIgnoreMouseEvents` to allow "click-through" capability while maintaining visual presence.
+**Solution:** Implemented synchronized, time-gated control with `win.setIgnoreMouseEvents` to allow seamless interaction with the desktop while maintaining the assistant's visual presence.
 </details>
 
 <details>
@@ -147,11 +147,11 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 </details>
 
 <details>
-<summary><strong>5. Consolidating Profile Consistency</strong></summary>
+<summary><strong>5. Consolidating Context Consistency</strong></summary>
 
-**Problem:** Large Language Models often drift into generic or hallucinated personas when asked behavioral questions.
+**Problem:** Large Language Models often drift into generic or hallucinated answers when asked specific domain questions.
 
-**Solution:** Added a **"Pivot Rule" RAG Layer** that forces the model to ground its answers in the user's provided experience files.
+**Solution:** Added a **"Pivot Rule" RAG Layer** that forces the model to ground its answers in the provided knowledge base files.
 </details>
 
 <details>
@@ -179,9 +179,9 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 </details>
 
 <details>
-<summary><strong>9. Addressing "Persona Drift"</strong></summary>
+<summary><strong>9. Addressing "Context Drift"</strong></summary>
 
-**Problem:** Models would ignore "soft" instructions to be natural and revert to "Standard AI Assistant mode".
+**Problem:** Models would ignore "soft" instructions to use specific formatting and revert to standard outputs.
 
 **Solution:** Injected **5 Contextual Anchors** (Tone, References, Format) directly into the `systemContext` block, making them strictly adhered to by the model.
 </details>
@@ -324,7 +324,7 @@ This project is licensed under the **MIT License**.
 
 ### 🛡️ Mandatory Attribution
 
-If you clone, fork, or use any logic from this repository (especially the **Waterfall Routing** or **Window Management Systems**), you are **legally required** to:
+If you clone, fork, or use any logic from this repository (especially the **Resilient Controller** or **Window Management Systems**), you are **legally required** to:
 - Retain the original copyright notice in the `LICENSE` file
 - Provide a visible link back to this [Moubely Repository](https://github.com/Moubarak-01/Moubely)
 - Acknowledge **Moubarak-01** as the original author
