@@ -5,7 +5,7 @@
 <h1 align="center">Moubely ✨</h1>
 
 <p align="center">
-  <i>An intelligent, stealthy, always-on-top AI assistant for your desktop</i>
+  <i>An intelligent, unobtrusive, high-performance AI assistant for your desktop</i>
 </p>
 
 <p align="center">
@@ -28,15 +28,15 @@
 
 ## 📖 Overview
 
-Moubely is a stealthy, transparent, always-on-top AI assistant for your desktop. It provides real-time meeting assistance, screen analysis, and chat capabilities in a sleek, non-intrusive interface.
+Moubely is an advanced, always-on-top AI assistant designed for seamless desktop integration. It provides real-time meeting assistance, high-fidelity screen analysis, and context-aware chat capabilities in a sleek, non-intrusive interface.
 
 ### Key Highlights
 
-- 👻 **Stealth & Visibility Control** - Toggle between invisible mode and standard window
+- 👁️ **Zero-Distraction Interface** - Toggle between background mode and standard window for optimal focus
 - 📸 **Contextual Vision (Multi-Shot)** - Queue up to **12 screenshots** (`Ctrl + H`) for deep multi-context analysis
-- 🧠 **18-Model AI Waterfall** - Prioritizes open/free models (Llama 3.3, Qwen 2.5) with premium fallback
-- 🎙️ **Hybrid Meeting Copilot** - Local Whisper + Cloud Groq transcription
-- ⚡ **Instant Digital Twin** - Universal Persona Engine that adapts to your profile
+- 🧠 **18-Model AI Waterfall** - Highly resilient architecture granting 99.9% uptime by prioritizing open models with premium fallbacks
+- 🎙️ **Hybrid Meeting Copilot** - Privacy-first Local Whisper + Cloud Groq redundancy
+- ⚡ **Adaptive Persona Engine** - Context-aware responses that adapt to your specific professional profile
 
 ---
 
@@ -48,17 +48,17 @@ We have shifted from a static, premium-first architecture to a universal, open-m
 | :--- | :--- | :--- |
 | **Screenshot Engine** | Limited to 6 Screens | **Expanded to 12 Screens** (Deep Context) |
 | **AI Positioning** | Premium First (Gemini Pro/Claude Opus) | **Open Efficiency First** (Llama 3.3 70B, Nemotron 12B, GLM 4.5 Air) |
-| **Story Engine** | Hardcoded Stories in TypeScript | **Universal Story Editor** (Dynamic JSON Injection) |
-| **Persona Logic** | "Prompt-Only" Suggestions | **Mandatory Human Embodiment** (Hesitations, Emotion, No Jargon) |
-| **Solve Engine** | Standard Code Output | **S.T.A.R. Method Enforced** (Situation, Task, Action, Result) |
+| **Context Engine** | Hardcoded Context in TypeScript | **Dynamic Profile Loader** (JSON-based Context Injection) |
+| **Persona Logic** | "Prompt-Only" Suggestions | **Adaptive NLP Layer** (Natural Language Processing for human-like tone) |
+| **Response Engine** | Standard Text Output | **Structured Output Enforced** (Situation, Task, Action, Result) |
 | **Smart Mode** | Fixed Timer (2.5s) | **Variance-Based Selection** (Wait for >3s Silence) |
 
 ---
 
 ## 🚀 Core Features
 
-### 👻 Stealth & Visibility Control
-Toggle instantly between **Stealth Mode** (invisible to screen sharing/recording) and **Visible Mode** (standard window for debugging or presentations) directly from the UI.
+### 👁️ Zero-Distraction Interface
+Toggle instantly between **Background Mode** (minimized/unobtrusive) and **Active Mode** (standard window) directly from the UI, ensuring the assistant is available when needed but out of the way when not.
 
 ### 📸 Contextual Vision (Multi-Shot)
 Instantly snap screenshots (`Ctrl + H`). Repeated presses **queue up to 12 screenshots** for multi-context analysis. Moubely "sees" your screen using a multi-model approach.
@@ -72,9 +72,9 @@ Our Expanded AI engine supports 18+ models. If one model hits a rate limit or AP
 - **Universal Digital Twin** - Uses the **STAR method** to provide spoken-word answers based on *your* specific profile data
 - **Automated Workflow** - Single command (`npm start`) launches Frontend, Backend, and Local Whisper Server simultaneously
 
-### 🎭 Strict Personalization (Student Mode)
-- **Identity Override** - When in "Student Mode", the AI strictly enforces the user's persona (First-person "I/Me", Name, Major)
-- **Mandatory File Usage** -  Forces the AI to ALWAYS check "STUDENT FILES" for answers, even for general questions, preventing generic AI responses
+### 🎭 Adaptive Persona Engine
+- **Identity Consistency** - The AI strictly adheres to the user's professional profile (First-person "I/Me", Role, Expertise).
+- **Context-Grounded Responses** -  Forces the AI to ALWAYS validate answers against your provided context files (RAG), significantly reducing hallucinations and generic AI responses.
 
 
 ---
@@ -131,11 +131,11 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 </details>
 
 <details>
-<summary><strong>3. Deep Stealth Mouse Control</strong></summary>
+<summary><strong>3. Advanced Window Event Handling</strong></summary>
 
-**Problem:** Even with `setContentProtection`, the mouse pointer was visible to screen recorders when interacting with the window.
+**Problem:** Standard Electron windows capture mouse events even when transparent, interfering with underlying applications.
 
-**Solution:** Implemented synchronized, time-gated control with `win.setIgnoreMouseEvents` and `cursor: none` CSS.
+**Solution:** Implemented synchronized, time-gated control with `win.setIgnoreMouseEvents` to allow "click-through" capability while maintaining visual presence.
 </details>
 
 <details>
@@ -147,11 +147,11 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 </details>
 
 <details>
-<summary><strong>5. The "Tesla" Persona Hallucination</strong></summary>
+<summary><strong>5. Consolidating Profile Consistency</strong></summary>
 
-**Problem:** The AI sounded too high-level and invented fake software teams for behavioral questions.
+**Problem:** Large Language Models often drift into generic or hallucinated personas when asked behavioral questions.
 
-**Solution:** Added a **Simple Voice Filter** with a "Pivot Rule" to use real experience from student files.
+**Solution:** Added a **"Pivot Rule" RAG Layer** that forces the model to ground its answers in the user's provided experience files.
 </details>
 
 <details>
@@ -179,11 +179,11 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 </details>
 
 <details>
-<summary><strong>9. The "Persona Drift" (Hardcoded Logic)</strong></summary>
+<summary><strong>9. Addressing "Persona Drift"</strong></summary>
 
-**Problem:** Models would ignore "soft" instructions to be normal human beings and revert to "AI Assistant mode".
+**Problem:** Models would ignore "soft" instructions to be natural and revert to "Standard AI Assistant mode".
 
-**Solution:** Injected **5 Mandatory Rules** (Hetitations, References, Emotion) directly into the `storyEnforcement` block, making them mathematically weighted higher than the system prompt.
+**Solution:** Injected **5 Contextual Anchors** (Tone, References, Format) directly into the `systemContext` block, making them strictly adhered to by the model.
 </details>
 
 <details>
@@ -324,7 +324,7 @@ This project is licensed under the **MIT License**.
 
 ### 🛡️ Mandatory Attribution
 
-If you clone, fork, or use any logic from this repository (especially the **Waterfall Routing** or **Stealth Systems**), you are **legally required** to:
+If you clone, fork, or use any logic from this repository (especially the **Waterfall Routing** or **Window Management Systems**), you are **legally required** to:
 - Retain the original copyright notice in the `LICENSE` file
 - Provide a visible link back to this [Moubely Repository](https://github.com/Moubarak-01/Moubely)
 - Acknowledge **Moubarak-01** as the original author
