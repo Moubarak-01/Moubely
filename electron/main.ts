@@ -17,7 +17,7 @@ export class AppState {
   private tray: Tray | null = null
 
   private view: "queue" | "solutions" = "queue"
-  private isStealthMode: boolean = true
+  private isStealthMode: boolean = false
   private liveModeInterval: NodeJS.Timeout | null = null;
   private problemInfo: any = null
   private hasDebugged: boolean = false

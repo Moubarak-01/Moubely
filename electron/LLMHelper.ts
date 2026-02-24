@@ -36,11 +36,11 @@ async function safePdfParse(buffer: Buffer) {
 // --- 1. THE EXPANDED WATERFALL BRAINS ---
 const CHAT_MODELS = [
 
-    // --- TIER 1 ---
+    // --- TIER 1: THE HEAVY LIFTERS (Advanced Reasoning & Logic) ---
+    { type: 'openrouter', model: 'nousresearch/hermes-3-llama-3.1-405b:free', name: 'Hermes 3 Llama 405B' },
     { type: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B' },
-    { type: 'openrouter', model: 'arcee-ai/trinity-large-preview:free', name: 'Arcee Trinity Large Preview' },
-    { type: 'openrouter', model: 'nvidia/nemotron-3-nano:free', name: 'Nvidia Nemotron 3 Nano' },
-    { type: 'nvidia', model: 'nvidia/cosmos-nemotron-34b', name: 'Nvidia Cosmos Nemotron 34B' },
+    { type: 'openrouter', model: 'openai/gpt-oss-120b:free', name: 'GPT-OSS 120B' },
+    { type: 'openrouter', model: 'qwen/qwen3-next-80b-a3b-instruct:free', name: 'Qwen 3 Next 80B' },
 
     // --- TIER 2 : OPEN MULTIMODAL (Gemma 3 Family) ---
     { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B' },
@@ -48,28 +48,32 @@ const CHAT_MODELS = [
     { type: 'gemini', model: 'gemma-3-4b-it', name: 'Gemma 3 4B' },
     { type: 'gemini', model: 'gemma-3-2b-it', name: 'Gemma 3 2B' },
     { type: 'gemini', model: 'gemma-3-1b-it', name: 'Gemma 3 1B' },
-    { type: 'openrouter', model: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash (Free)' },
-
 
     // --- TIER 3: Gemini ---
-    { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro' },
-    { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3.0 Flash' },
+    { type: 'gemini', model: 'gemini-3-pro', name: 'Gemini 3.0 Pro' },
+    { type: 'gemini', model: 'gemini-3-flash', name: 'Gemini 3.0 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-
+    { type: 'openrouter', model: 'nvidia/nemotron-3-nano-30b-a3b:free', name: 'Nvidia Nemotron 3 Nano' },
 
     // --- TIER 4: EFFICIENCY & SPECIALIZED ---
+    { type: 'openrouter', model: 'stepfun/step-3.5-flash:free', name: 'Step 3.5 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-2.5-flash-native', name: 'Gemini 2.5 Flash Native' },
     { type: 'gemini', model: 'gemini-robotics-er-1.5-preview', name: 'Gemini Robotics' },
+    { type: 'openrouter', model: 'upstage/solar-pro-3:free', name: 'Solar Pro 3' },
     { type: 'openrouter', model: 'anthropic/claude-haiku-4.5', name: 'Claude 4.5 Haiku' },
     { type: 'openrouter', model: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small 3.1' },
     { type: 'openrouter', model: 'anthropic/claude-opus-4.5', name: 'Claude 4.5 Opus' },
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Thinking)' },
-    { type: 'openrouter', model: 'tngtech/deepseek-r1t-chimera:free', name: 'DeepSeek R1T (Reasoning)' },
     { type: 'openrouter', model: 'anthropic/claude-sonnet-4.5', name: 'Claude 4.5 Sonnet' },
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet' },
 
     // --- TIER 5: RESEARCH & SEARCH (Perplexity, Groq and Git) ---
+    { type: 'openrouter', model: 'meta-llama/llama-3.2-3b-instruct:free', name: 'Llama 3.2 3B Instruct' },
+    { type: 'openrouter', model: 'arcee-ai/trinity-mini:free', name: 'Trinity Mini 1.2B' },
+    { type: 'openrouter', model: 'liquid/lfm-2.5-1.2b-instruct:free', name: 'Liquid LFM 1.2B' },
+    { type: 'openrouter', model: 'arcee-ai/trinity-large-preview:free', name: 'Arcee Trinity Large Preview' },
+
     // [NEW] MISTRAL LARGE (Backup)
     { type: 'nvidia', model: 'mistralai/mistral-large-2-instruct', name: 'Mistral Large 2 (Nvidia)' },
     { type: 'github', model: 'gpt-4o', name: 'GPT-4o' },
@@ -82,17 +86,13 @@ const CHAT_MODELS = [
 // --- 2. THE EYES (Vision Waterfall) ---
 const VISION_MODELS = [
     // --- TIER 1: ELITE VISION ---
-
-    { type: 'gemini', model: 'gemini-3-pro-image-preview' }, // Nano Banana Pro
+    { type: 'gemini', model: 'gemini-3-pro', name: 'Gemini 3.0 Pro' },
     { type: 'openrouter', model: 'anthropic/claude-opus-4.5', name: 'Claude 4.5 Opus (Vision)' },
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Reasoning Vision)' },
-    { type: 'openrouter', model: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash (Vision)' },
-
-
 
     // --- TIER 2: FAST & RELIABLE ---
-    { type: 'gemini', model: 'gemini-3-flash-preview' },
-    { type: 'gemini', model: 'gemini-2.5-flash' },
+    { type: 'gemini', model: 'gemini-3-flash', name: 'Gemini 3.0 Flash' },
+    { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'openrouter', model: 'anthropic/claude-sonnet-4.5', name: 'Claude 4.5 Sonnet (Vision)' },
     { type: 'openrouter', model: 'anthropic/claude-haiku-4.5', name: 'Claude 4.5 Haiku (Fast Vision)' },
     { type: 'openrouter', model: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small Vision' },
@@ -104,7 +104,6 @@ const VISION_MODELS = [
     { type: 'github', model: 'gpt-4o' },
     { type: 'openrouter', model: 'anthropic/claude-3.5-sonnet' },
     { type: 'perplexity', model: 'sonar-reasoning-pro' },
-
 ];
 
 export class LLMHelper {
@@ -130,7 +129,10 @@ export class LLMHelper {
   
   CORE RULES:
   1. Use '###' Headers for main topics.
-  2. Use **bold** to highlight key variables, terms, and important numbers.
+  2. STRICT HIGHLIGHTING: You MUST use **bold** marks to highlight key variables, terms, important nouns, numbers, and technologies.
+  [ONE-SHOT HIGHLIGHT EXAMPLE]: 
+  User: "What is React?"
+  You: "**React** is a popular **JavaScript** library used for building **user interfaces**. It is used by over **80%** of developers."
   3. Use provided "STUDENT CONTEXT" or "NOTION CONTEXT" silently.
   4. ALWAYS use Markdown code blocks with language tags for ANY code or commands (e.g. \`\`\`python).
   5. NO UNPROMPTED CODE: Do NOT provide code examples for general definitions, math, or history unless explicitly asked. Only provide code if the USER asks for it or if the task is a coding problem.
@@ -198,7 +200,21 @@ export class LLMHelper {
             }
 
             // If it's normal text, remove the citations [1], [2], etc.
-            return segment.replace(/\[\d+\]/g, "");
+            let cleanText = segment.replace(/\[\d+\]/g, "");
+
+            // [NEW] AUTO-HIGHLIGHTER REGEX FALLBACK
+            // Gently bold known key project words if they aren't already bolded
+            const keywordsToHighlight = ["Moubely", "Llama", "Gemini", "Harrison", "Cengage", "React", "Node\\.js", "Electron"];
+            keywordsToHighlight.forEach(kw => {
+                const regex = new RegExp(`(?<!\\*\\*)\\b(${kw})\\b(?!\\*\\*)`, "gi");
+                cleanText = cleanText.replace(regex, '**$1**');
+            });
+            // Also boldly highlight any number with a percentage (e.g., 100%, 95.5%)
+            cleanText = cleanText.replace(/(?<!\*\*)\b(\d+(?:\.\d+)?%)(?!\*\*)/g, '**$1**');
+            // Clean up overlapping bold strings just in case
+            cleanText = cleanText.replace(/\*\*\*\*(.*?)\*\*\*\*/g, '**$1**');
+
+            return cleanText;
         });
 
         return cleanedSegments.join("").trim();
