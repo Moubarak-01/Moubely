@@ -34,24 +34,25 @@ Moubely is an advanced, always-on-top AI productivity hub designed for seamless 
 
 - 👁️ **Privacy-Centric Workspace** - Minimized background processing with deep system tray integration
 - 📸 **Contextual Vision (Multi-Shot)** - Queue up to **12 screenshots** (`Ctrl + H`) for deep multi-context analysis
-- 🧠 **Resilient LLM Controller** - Multi-provider architecture ensuring 99.9% uptime by orchestrating open models and premium fallbacks
+- 🧠 **Resilient LLM Controller** - Multi-provider architecture ensuring 99.9% uptime by orchestrating **20+ local and cloud models**
 - 🎙️ **Local-First Meeting Copilot** - Privacy-first Local Whisper usage with optional Cloud redundancy
+- ✨ **Dynamic Highlighting Engine** - Automated formatting that boldens and highlights key professional terms for high scannability
 - ⚡ **RAG-based Personal Knowledge Management** - Context-aware responses grounded in your specific professional documentation
 
 ---
 
 ## ✅ Version Comparison: What's New in v2.3?
 
-We have shifted from a static, premium-first architecture to a universal, open-model-first engine.
+We have shifted from a static, premium-first architecture to a universal, open-model-first engine with enhanced visual output.
 
 | Feature | v2.2 (Old) | **v2.3 (Current)** |
 | :--- | :--- | :--- |
-| **Screenshot Engine** | Limited to 6 Screens | **Expanded to 12 Screens** (Deep Context) |
-| **AI Positioning** | Premium First (Gemini Pro/Claude Opus) | **Open Efficiency First** (Llama 3.3 70B, Nemotron 12B, GLM 4.5 Air) |
-| **Context Engine** | Hardcoded Context in TypeScript | **Dynamic Profile Loader** (JSON-based RAG Injection) |
-| **NLP Controller** | "Prompt-Only" Suggestions | **Adaptive NLP Layer** (Natural Language Processing for professional tone) |
-| **Response Engine** | Standard Text Output | **Structured Output Enforced** (Situation, Task, Action, Result) |
-| **Smart Mode** | Fixed Timer (2.5s) | **Variance-Based Selection** (Wait for >3s Silence) |
+| **Model Roster** | 18-Model Waterfall | **20+ Model Waterfall** (Llama 405B, GPT-OSS 120B) |
+| **Output Style** | Standard Markdown | **Dynamic Auto-Highlighting** (Yellow Stroke emphasis) |
+| **Initial Boot** | Stealth Mode (Invisible) | **Interactive Mode (Visible)** |
+| **AI Positioning** | Open Efficiency First | **Intelligence First** (405B Heavy Lifters prioritized) |
+| **Context Engine** | Dynamic Profile Loader | **Direct RAG Injection fallback** |
+| **Smart Mode** | Variance-Based Selection | **Enhanced Waveform Analysis** |
 
 ---
 
@@ -85,22 +86,22 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 
 ### The "Brains" (Chat & Logic) 🧠
 
-**New in v2.3:** We now prioritize high-performance free/open models in Tier 1 to reduce costs while maintaining 70B+ parameter intelligence.
+**New in v2.3:** We now prioritize elite, massive-parameter reasoning models (405B+) to ensure the highest possible logical accuracy before falling back to fast efficiency models.
 
 | Tier | Models |
 | :--- | :--- |
-| **Tier 1: Open Elite** | **Llama 3.3 70B**, Arcee Trinity Large, Nvidia Nemotron 3 Nano, Cosmos Nemotron 34B |
-| **Tier 2: Open Efficiency** | Gemma 3 27B, **Gemma 3 12B/4B/2B/1B**, Gemini 2.0 Flash (Free) |
-| **Tier 3: Google Premium** | Gemini 3.0 Pro, Gemini 3 Flash, Gemini 2.5 Flash |
-| **Tier 4: Specialized** | Claude 4.5 Haiku, Mistral Small 3.1, Claude 3.7 Sonnet (Thinking) |
-| **Tier 5: Research** | Perplexity Sonar (Reasoning), Mistral Large 2 (Nvidia) |
+| **Tier 1: Heavy Lifters** | **Hermes 3 Llama 405B**, Llama 3.3 70B, **GPT-OSS 120B**, **Qwen 3 Next 80B**, Cosmos Nemotron 34B |
+| **Tier 2: Fast Multi-Model** | **Gemma 3 Family (27B - 1B)** |
+| **Tier 3: Google Performance** | Gemini 3.0 Pro, Gemini 3 Flash, Gemini 2.5 Flash, Nemotron 3 Nano |
+| **Tier 4: Specialized Tiers** | **Step 3.5 Flash**, Solar Pro 3, Claude 4.5 Haiku, Claude 3.7 Sonnet (Thinking) |
+| **Tier 5: Deep Safety Net** | Llama 3.2 3B, Trinity Mini, Liquid LFM 1.2B, Perplexity Sonar |
 
 ### The "Eyes" (Vision) 👁️
 
 | Tier | Models |
 | :--- | :--- |
-| **Tier 1: Elite Vision** | **Gemini 3 Pro Image**, Claude 4.5 Opus, Qwen 2.5 VL 72B |
-| **Tier 2: Fast & Reliable** | Gemini 3 Flash, Claude 3.5 Sonnet |
+| **Tier 1: Elite Vision** | **Gemini 3 Pro**, Claude 4.5 Opus, Claude 3.7 Sonnet (Reasoning) |
+| **Tier 2: Fast & Reliable** | Gemini 3 Flash, Gemini 2.5 Flash, Claude 4.5 Haiku, Mistral Small Vision |
 | **Tier 3: Backups** | Mistral Large 2 (Nvidia), GPT-4o, Perplexity Vision |
 
 ### The "Ears" (Audio) 👂
@@ -203,11 +204,19 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 </details>
 
 <details>
-<summary><strong>12. The Multi-Process Startup</strong></summary>
+<summary><strong>13. The Output Formatting Fade</strong></summary>
 
-**Problem:** Developers had to manually open multiple terminals to start the Vite server, Electron app, and Local Whisper server.
+**Problem:** Smaller models often ignore "soft" instructions to use specific markdown bolding for Scannability, leading to plain, "blank-looking" answers.
 
-**Solution:** Automated the workflow in `package.json` using `concurrently`. Now, a single `npm start` command launches all three services in parallel.
+**Solution:** Implemented a **Regex-Based Auto-Highlighter** fallback. The system now post-processes every response, automatically wrapping project keywords, technical terms, and percentage values in `**` if the model fails to do so.
+</details>
+
+<details>
+<summary><strong>14. Startup "Ghosting" vs. Visibility</strong></summary>
+
+**Problem:** To prioritize stealth, the app used to boot invisibly, which often led users to believe the application had failed to launch.
+
+**Solution:** Inverted the initial boot logic. Moubely now spawns in a **Visible State** by default, allowing the user to confirm system readiness before manually toggling into **Stealth Mode** using the integrated hotkey.
 </details>
 </details>
 
