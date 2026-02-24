@@ -42,7 +42,7 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
           {isCopied ? "Copied!" : "Copy"}
         </button>
       </div>
-      
+
       <div className="p-4 overflow-x-auto">
         <code className={`!bg-transparent !p-0 text-sm font-mono ${className}`} {...props}>
           {children}
@@ -67,13 +67,13 @@ const preprocessContent = (content: string) => {
     .replace(/\\\]/g, '$$')
     .replace(/\\\(/g, '$')
     .replace(/\\\)/g, '$');
-  
+
   // FORCE DISPLAY MATH
   processed = processed.replace(/(\$\$[\s\S]*?\$\$)/g, '\n\n$1\n\n');
-  
+
   // AUTO-HEADER PROMOTION
   processed = processed.replace(/^([A-Z][a-zA-Z0-9\s\-\(\)]{2,50}):?$/gm, '\n### $1\n');
-  
+
   return processed;
 };
 
@@ -90,7 +90,14 @@ const AIResponse = ({ content }: { content: string }) => {
         ]}
         components={{
           code: CodeBlock,
-          p: ({children}) => <p className="mb-4 leading-7 text-gray-300 last:mb-0 relative">{children}</p>,
+          p: ({ children }) => <p className="mb-4 leading-7 text-gray-300 last:mb-0 relative">{children}</p>,
+          strong: ({ children, ...props }) => {
+            const text = String(children);
+            if (text === 'Say:' || text === 'Type:') {
+              return <strong className="bg-yellow-500/20 text-yellow-500 px-1.5 py-0.5 rounded font-bold" {...props}>{children}</strong>;
+            }
+            return <strong {...props}>{children}</strong>;
+          },
         }}
         className="prose prose-invert prose-sm max-w-none
           [&_.katex-mathml]:hidden

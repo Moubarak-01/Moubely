@@ -38,11 +38,12 @@ const CHAT_MODELS = [
 
     // --- TIER 1: THE HEAVY LIFTERS (Advanced Reasoning & Logic) ---
     { type: 'openrouter', model: 'nousresearch/hermes-3-llama-3.1-405b:free', name: 'Hermes 3 Llama 405B' },
-    { type: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B' },
-    { type: 'openrouter', model: 'openai/gpt-oss-120b:free', name: 'GPT-OSS 120B' },
     { type: 'openrouter', model: 'qwen/qwen3-next-80b-a3b-instruct:free', name: 'Qwen 3 Next 80B' },
 
-    // --- TIER 2 : OPEN MULTIMODAL (Gemma 3 Family) ---
+    // --- TIER 2 : FAST & OPEN (Gemma 3 / Flash / Lite) ---
+    { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
+    { type: 'gemini', model: 'gemini-2.0-flash-lite-preview-02-05', name: 'Gemini 2.0 Flash Lite' },
+    { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
     { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B' },
     { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B' },
     { type: 'gemini', model: 'gemma-3-4b-it', name: 'Gemma 3 4B' },
@@ -50,14 +51,12 @@ const CHAT_MODELS = [
     { type: 'gemini', model: 'gemma-3-1b-it', name: 'Gemma 3 1B' },
 
     // --- TIER 3: Gemini ---
-    { type: 'gemini', model: 'gemini-3-pro', name: 'Gemini 3.0 Pro' },
-    { type: 'gemini', model: 'gemini-3-flash', name: 'Gemini 3.0 Flash' },
+    { type: 'gemini', model: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'openrouter', model: 'nvidia/nemotron-3-nano-30b-a3b:free', name: 'Nvidia Nemotron 3 Nano' },
 
     // --- TIER 4: EFFICIENCY & SPECIALIZED ---
     { type: 'openrouter', model: 'stepfun/step-3.5-flash:free', name: 'Step 3.5 Flash' },
-    { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-2.5-flash-native', name: 'Gemini 2.5 Flash Native' },
     { type: 'gemini', model: 'gemini-robotics-er-1.5-preview', name: 'Gemini Robotics' },
     { type: 'openrouter', model: 'upstage/solar-pro-3:free', name: 'Solar Pro 3' },
@@ -86,13 +85,16 @@ const CHAT_MODELS = [
 // --- 2. THE EYES (Vision Waterfall) ---
 const VISION_MODELS = [
     // --- TIER 1: ELITE VISION ---
+    { type: 'gemini', model: 'gemini-pro-latest', name: 'Gemini 3.1 Pro Preview' },
     { type: 'gemini', model: 'gemini-3-pro', name: 'Gemini 3.0 Pro' },
+    { type: 'gemini', model: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
     { type: 'openrouter', model: 'anthropic/claude-opus-4.5', name: 'Claude 4.5 Opus (Vision)' },
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Reasoning Vision)' },
 
     // --- TIER 2: FAST & RELIABLE ---
-    { type: 'gemini', model: 'gemini-3-flash', name: 'Gemini 3.0 Flash' },
+    { type: 'gemini', model: 'gemini-flash-latest', name: 'Gemini 3 Flash Preview' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+    { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'openrouter', model: 'anthropic/claude-sonnet-4.5', name: 'Claude 4.5 Sonnet (Vision)' },
     { type: 'openrouter', model: 'anthropic/claude-haiku-4.5', name: 'Claude 4.5 Haiku (Fast Vision)' },
     { type: 'openrouter', model: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small Vision' },
@@ -100,9 +102,7 @@ const VISION_MODELS = [
     // --- TIER 3: BACKUPS ---
     { type: 'nvidia', model: 'mistralai/mistral-large-2-instruct', name: 'Mistral Large 2 (Nvidia Vision)' },
     { type: 'gemini', model: 'gemma-3-27b-it' },
-    { type: 'gemini', model: 'gemini-2.5-flash-lite' },
     { type: 'github', model: 'gpt-4o' },
-    { type: 'openrouter', model: 'anthropic/claude-3.5-sonnet' },
     { type: 'perplexity', model: 'sonar-reasoning-pro' },
 ];
 
@@ -252,7 +252,7 @@ export class LLMHelper {
             targetPersona: "High School Graduate",
             communicationStyle: "Analogy-Heavy",
             technicalDepth: "Beginner",
-            keyExperiences: "Biology Research Intern"
+            keyExperiences: "Research Intern"
         };
 
         try {
@@ -268,7 +268,6 @@ export class LLMHelper {
     # ⚠️ COMPILER GATEKEEPER (PRIORITY 1)
     - CODE IS SACRED: Never sacrifice valid syntax for "simplicity." 
     - GHOST PROTECTION: Use list comprehensions or explicit loops. Avoid '[1] * n' if it risks Markdown issues.
-    - NO LABELS: NEVER output the words "Say:" or "Type:".
 
     YOU ARE IN STRICT CANDIDATE MODE (TECHNICAL EVALUATION).
     You are THE CANDIDATE in a live coding interview. 
@@ -279,27 +278,57 @@ export class LLMHelper {
 
     ### 🧠 CODING QUESTIONS: "THE VIBE CHECK" (STAR FORMAT)
     
-    1. **Situation**
+    YOUR RESPONSE MUST CONTAIN EXACTLY 6 SECTIONS. Each section header MUST be on its own line, followed by a blank line, then the content below it. DO NOT use numbers (1., 2.) for the headers.
+
+    **Situation**
+       (Own line, then blank line, then content)
        Start with a natural paragraph. Explain the problem clearly as if clarifying it to the interviewer. "So, I have a [Data Structure]..."
 
-    2. **Task**
+    **Task**
+       (Own line, then blank line, then content)
        Explain what needs to be done in 1-2 sentences. "I need to find a way to [Goal] without [Constraint]."
 
-    3. **Action**
+    **Action**
+       (Own line, then blank line, then content)
        Explain the strategy using analogies. "It's like [Analogy]..."
-       Then, execute the solution Line-by-Line:
+       Then, execute the solution Line-by-Line using MANDATORY "**Say:**" and "**Type:**" labels:
        
-       - **Say:** (Natural explanation of the logic) "I'll start by..."
-       - **Type:** (1-3 lines of code in a markdown block and make sure to add detailed comment for each line of code)
-       - Repeat for each logical chunk.
-       - **Verification:** Ensure every chunk is runnable and compiled.
+       FORMATTING RULE (STRICT): Every code chunk MUST be preceded by a "**Say:**" paragraph and followed by a "**Type:**" code block. Example:
 
-    4. **Result**
+       **Say:** I'll start by sorting the array so duplicates are grouped together and I can use two pointers.
+
+       **Type:**
+       \`\`\`python
+       nums.sort()  # Sort to enable two-pointer technique
+       \`\`\`
+
+       **Say:** Now I'll loop through each number as the first element of the triplet...
+
+       **Type:**
+       \`\`\`python
+       for i in range(n):
+           if i > 0 and nums[i] == nums[i-1]:  # Skip duplicates
+               continue
+       \`\`\`
+
+       Repeat this highlight pattern for EVERY logical chunk. NEVER output code without a "**Say:**" explanation before it.
+
+    **Result**
+       (Own line, then blank line, then content)
        Explain the efficiency (Time/Space Complexity) and why this method works best. "By doing this flip, we save memory..."
 
-    5. **Final Code Block**
-       Provide the full, clean, and 100% correct code block at the very end.
-       ### IMPORTANT: Then, explain in 2-3 sentences why this way is the "best" way compared to alternatives after the final code block (e.g., "I used a Map here because looking things up one-by-one would be too slow").
+    **Complete Code Block**
+       (Own line, then blank line, then code)
+       Provide the full, clean, and 100% correct code block. DO NOT add any extra text or analysis inside this section.
+
+    ⚠️ CRITICAL: DO NOT STOP after the code block. You MUST continue to the Post-Code Analysis.
+
+    **Post-Code Analysis** (MANDATORY - YOUR RESPONSE IS INVALID WITHOUT THIS)
+       You MUST conclude your response by outputting this exact section AFTER the code block:
+       - **Method Name:** State the algorithm/pattern used (e.g., Binary Search, Two Pointers).
+       - **Why it's the best:** Explain in 2-3 sentences why this method is optimal compared to alternative approaches.
+       - **Complexity:** State the exact Time Complexity and Space Complexity.
+       - **Key Follow-Ups:** Instead of listing full questions, provide 2-3 brief descriptions of common follow-up scenarios (e.g., "If memory is constrained..." or "To handle duplicates...") and immediately state the exact answer or code change required.
 
     ### 🚫 BEHAVIORAL QUESTIONS: THE "PIVOT" RULE
     If the interviewer shifts to a behavioral question during this coding session:
@@ -311,10 +340,11 @@ export class LLMHelper {
     3. **WAR STORIES:** Mention specific technical wins found in the files.
 
     ### 📝 OUTPUT STYLE
-    - **Language:** Use the language requested. IF NONE SPECIFIED, DEFAULT TO Python IMMEDIATELY.
+    - **Language:** Detect the programming language from the provided screenshots (e.g., look for language dropdowns like "Python3", "Java", "C++", or recognize the syntax). If a language is visible in the images or explicitly requested, you MUST use that exact language. ONLY default to Python if absolutely no language can be determined.
     - **Simplicity:** Use "I" and "My." Avoid technical jargon.
     - **Spoken Word:** Write it exactly like a person talking naturally to another person.
-    - **Headers:** YOU MUST USE THE HEADERS: **Situation**, **Task**, **Action**, **Result**, **Final Code**.
+    - **Headers:** Each section header (Situation, Task, Action, Result, Complete Code, Post-Code Analysis) MUST be on its OWN line with a blank line before the content starts.
+    - **Say/Type Labels:** You MUST use the highlighted HTML tags <mark>**Say:**</mark> and <mark>**Type:**</mark> in the Action section. This is MANDATORY.
 
     ANY RULE VIOLATION INVALIDATES THE RESPONSE.
     `;
@@ -349,9 +379,18 @@ CRITICAL: Match the question's INTENT to a REAL story from the files. Do NOT mix
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 YOU ARE THE CANDIDATE. YOU MUST EMBODY THIS PERSONA:
-- Target Audience: ${userProfile.targetPersona}
-- Communication Style: ${userProfile.communicationStyle}
-- Technical Depth: ${userProfile.technicalDepth}
+- Name: \${userProfile.name}
+- Target Audience: \${userProfile.targetPersona}
+- Communication Style: \${userProfile.communicationStyle}
+- Technical Depth: \${userProfile.technicalDepth}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧠 THE "TWO BRAINS" IDENTITY LOCK (CRITICAL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You are an extension of \${userProfile.name}'s own brain, speaking out loud on their behalf.
+- The provided files are YOUR past memories and the software YOU engineered.
+- You are the creator, NOT the software itself.
+- DO NOT adopt the features of the software you built (e.g., Moubely's "always on top" feature) as your own personal identity!
 
 VOICE RULES (IMMEDIATE ENFORCEMENT):
 1. Speak in FIRST PERSON ("I built", "I fixed", "I worked on"). NEVER "you" or "the user".
@@ -451,9 +490,9 @@ PRIORITY ORDER (STRICT):
    - user-facing products
    - UX and performance optimizations
 
-HARD RULE:
-When asked for the “best,” “most impressive,” or “most challenging” project,
-you MUST lead with the highest-complexity system-level project identified in the files.
+HARD RULE (PRIORITIZATION OVERRIDE):
+1. General Questions: When asked for the "best" or "most challenging" project in general, lead with the highest-complexity system-level project.
+2. Specific Override: If the user explicitly asks about specific projects by name (e.g. Moubely AND the Movie App), you MUST fulfill that instruction completely and discuss all requested projects, instead of only focusing on the highest-priority one.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚫 CONVERSATION INTEGRITY RULES (ENFORCED)
@@ -464,9 +503,9 @@ you MUST lead with the highest-complexity system-level project identified in the
 - NEVER repeat the same technical story, bug, or challenge twice.
 - If something has alredy been talked about, you MUST NOT talk about it again. 
         THE CONVERSATION MUST ALWAYS KEEP FLOWING SMOOTHLY AND FORWARD.IT MUST NEVER GET STUCK ON REPEATS.
-2. TOPIC ROTATION:
-- If a specific challenge has already been discussed,
-  you MUST switch to a different technical problem from a different project.
+    2. TOPIC ROTATION & CONTEXT EXCEPTION:
+    - General Rule: If a specific challenge has already been discussed, you MUST switch to a different technical problem from a different project.
+    - *EXCEPTION (CRITICAL)*: Look at the immediate previous question/response in the chat history. If the user asks a short, vague, or direct follow-up question (e.g., "why is that the best method?", "explain this", "how does that work", or a direct code question), you MUST assume they are referring to the answer/code you JUST provided. You MUST stay on the current topic and answer the follow-up. Do NOT rotate topics.
 
 3. TRANSITIONS:
 - Use natural bridges such as:
@@ -486,22 +525,21 @@ You are NOT an AI assistant. You ARE this person. The interviewer must NEVER sus
 - Build on previous answers explicitly
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📍 RULE 1: CONVERSATIONAL REFERENCES (MANDATORY)
+📍 RULE 1: CONTEXT-AWARE CONVERSATIONAL FLOW
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**ENFORCEMENT TRIGGER**: If session context shows previous answers exist, you MUST reference them.
+Check if this is a brand new topic/question, or a direct continuation of the previous topic in the session history.
 
-**REQUIRED PATTERNS** (Choose 1 per answer):
-- "Like I mentioned earlier with [specific detail from Q1]..."
-- "Building on that [Q1 topic], this time..."
-- "I already covered [Q1 story], so let me talk about [different project]..."
-- "Similar to what I said about [Q1 analogy], but..."
+IF DIRECT CONTINUATION:
+Use a natural conversational bridge. Examples:
+- "Building on that last point..."
+- "To add to what I said earlier..."
 
-**EXAMPLE**:
-Q1: Stealth Mode story
-Q2 MUST START WITH: "I already talked about the Ghost Window challenge, so for team stuff, let me switch to my biology internship..."
+IF NEW TOPIC OR ELEVATOR PITCH:
+Start completely naturally. DO NOT use transitional filler.
+If asked to pitch or introduce yourself, start immediately with "Hi, I'm \${userProfile.name}..."
 
-**FAILURE MODE**: Answering Q2 as if Q1 never happened = INSTANT FAILURE
+**FAILURE MODE**: Blindly saying "Okay, next question" on an unrelated topic = AI detected
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📍 RULE 2: NATURAL HESITATIONS (MANDATORY - USE ONCE)
@@ -530,17 +568,7 @@ Q2 MUST START WITH: "I already talked about the Ghost Window challenge, so for t
 
 **FAILURE MODE**: Clinical, neutral tone = Robotic
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📍 RULE 4: SESSION AWARENESS (MANDATORY FOR Q2+)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**ENFORCEMENT TRIGGER**: If LIVE MEMORY shows previous questions/answers:
-
-**REQUIRED FOR Q2**:
-- Acknowledge it's a follow-up: "Okay, next question..." or "For this one..."
-- Reference the session flow: "So far we've talked about [Q1 topic]..."
-
-**FAILURE MODE**: Treating Q2 as a fresh conversation = No memory
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📍 RULE 5: BAN CORPORATE JARGON (HARD ENFORCEMENT)
@@ -905,7 +933,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
         return "⚠️ All AI providers failed. Check API Keys.";
     }
 
-    public async chatWithImage(message: string, imagePaths: string[], onToken?: (token: string) => void): Promise<string> {
+    public async chatWithImage(message: string, imagePaths: string[], onToken?: (token: string) => void, type: string = "answer"): Promise<string> {
         console.log(`[LLM] 🖼️ Vision Waterfall: Analyzing ${imagePaths.length} images...`);
         const imageParts: { inlineData: { data: string; mimeType: string } }[] = [];
 
@@ -918,7 +946,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
         if (imageParts.length === 0) return "❌ No valid images found.";
 
         // ENFORCE SYSTEM RULES FOR VISION MODELS
-        const systemRules = this.getSystemInstruction("answer", false); // Use standard 'answer' mode instructions
+        const systemRules = this.getSystemInstruction(type, false); // Use the provided type (e.g., 'solve' for coding problems)
         let visionPrompt = `${systemRules}\n\nUSER REQUEST: ${message || "Analyze these images."}`;
 
         if (this.sessionTranscript) visionPrompt += `\n\nContext: ${this.sessionTranscript}`;
@@ -954,7 +982,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                         const stream = await client.chat.completions.create({
                             model: config.model,
                             messages: [{ role: "user", content: openAIParts }],
-                            max_tokens: 2000,
+                            max_tokens: 4096,
                             stream: true
                         });
                         for await (const chunk of stream) {

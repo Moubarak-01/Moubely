@@ -119,16 +119,16 @@ export function initializeIpcHandlers(appState: AppState) {
   });
 
   // --- 3. VISION HANDLER ---
-  ipcMain.handle("chat-with-image", async (event, { message, imagePaths }) => {
+  ipcMain.handle("chat-with-image", async (event, { message, imagePaths, type }) => {
     try {
-      logIPC("chat-with-image", `Images: ${imagePaths?.length || 0}`);
+      logIPC("chat-with-image", `Images: ${imagePaths?.length || 0} | Type: ${type || "answer"}`);
       if (!llmHelper) throw new Error("LLM Helper not initialized");
 
       return await llmHelper.chatWithImage(message, imagePaths, (token: string) => {
         if (!event.sender.isDestroyed()) {
           event.sender.send("llm-token", token);
         }
-      });
+      }, type);
     } catch (error: any) {
       console.error(`[IPC ⚡] ❌ Vision Error:`, error);
       return `Vision Error: ${error.message}`;

@@ -1154,29 +1154,13 @@ const Queue: React.FC<any> = () => {
 
             if (hasImages) {
                 // --- PATH A: VISION BRAIN (Screenshots Attached) ---
-                const solvePersona = `
-    You are THE CANDIDATE (Moubarak). You are in a high-stakes technical interview. 
-    Your goal is to sound like a smart, natural human—specifically like a high school graduate. Use simple, clear words. Explain WHY you are making each move using analogies (like "hitting a wall") so it's easy to follow.
-
-    ### 🚫 BANNED PHRASES (NO BOT-TALK)
-    - "Hello!", "Greetings!", or "Hi there!"
-    - "This is an excellent/great problem."
-    - "Step-by-step walkthrough" or "Let me explain."
-    - "Complexity analysis," "Initializes," "Iterates," or "Constraint" (Use: "I'll start with," "Loop through," or "Here's why it's fast").
-
-    ### 🧠 CODING QUESTIONS: "THE SCRIPT & TYPE"
-    1. **THE VIBE CHECK:** Start with a natural paragraph. Explain the "Why" in simple terms.
-    2. **LINE-BY-LINE EXECUTION:** Provide the solution in chunks.
-       - **Say:** What you would actually say while typing.
-       - **Type:** 1-3 lines of code. **EVERY CHUNK MUST HAVE COMMENTS**.
-    3. **PASSED TEST CASES:** The code must be 100% correct.
-    4. **FINAL BLOCK:** Provide the full, clean code block.
-
-    USER QUESTION: Solve the problem in these images.
-              `;
-
+                // Pass "solve" type so the backend uses the 6-section STAR prompt with Post-Code Analysis
                 const imagePaths = queuedScreenshots.map(i => i.path);
-                response = await window.electronAPI.chatWithImage(solvePersona, imagePaths);
+                response = await window.electronAPI.chatWithImage(
+                    "Solve the coding problem shown in these images.",
+                    imagePaths,
+                    "solve"
+                );
                 handleClearQueue();
 
             } else {

@@ -68,7 +68,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setIgnoreMouseEvents: (i: boolean, o: any) => ipcRenderer.invoke("set-ignore-mouse-events", i, o),
   toggleMouseIgnore: (i: boolean) => ipcRenderer.send("toggle-mouse-ignore", i),
 
-  chatWithImage: (m: string, i: string[]) => ipcRenderer.invoke("chat-with-image", { message: m, imagePaths: i }),
+  chatWithImage: (m: string, i: string[], t?: string) => ipcRenderer.invoke("chat-with-image", { message: m, imagePaths: i, type: t }),
   checkProfileExists: () => ipcRenderer.invoke("check-profile-exists"),
   saveStudentFiles: (f: any[]) => ipcRenderer.invoke("save-student-files", f),
 

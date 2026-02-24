@@ -39,7 +39,7 @@ export interface ElectronAPI {
 
   // Chat / Vision
   // Note: Updated imagePath to string[] to match usage in Queue.tsx
-  chatWithImage: (message: string, imagePaths: string[]) => Promise<string>
+  chatWithImage: (message: string, imagePaths: string[], type?: string) => Promise<string>
 
   // Settings & Modes
   toggleStealthMode: () => Promise<boolean>
