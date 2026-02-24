@@ -33,10 +33,11 @@ Moubely is an advanced, always-on-top AI productivity hub designed for seamless 
 ### Key Highlights
 
 - 👁️ **Privacy-Centric Workspace** - Minimized background processing with deep system tray integration
+- 📸 **Visual Language Detection** - Automatically detects programming languages from screenshots (LeetCode, IDEs) or defaults to Python
+- 🧠 **6-Section STAR Reasoning** - Standardized 6-part output format (Situation, Task, Action, Result, Complete Code, Post-Code Analysis)
 - 📸 **Contextual Vision (Multi-Shot)** - Queue up to **12 screenshots** (`Ctrl + H`) for deep multi-context analysis
-- 🧠 **Resilient LLM Controller** - Multi-provider architecture ensuring 99.9% uptime by orchestrating **20+ local and cloud models**
 - 🎙️ **Local-First Meeting Copilot** - Privacy-first Local Whisper usage with optional Cloud redundancy
-- ✨ **Dynamic Highlighting Engine** - Automated formatting that boldens and highlights key professional terms for high scannability
+- ✨ **Dynamic Highlighting Engine** - Native UI highlighting for `Say:` and `Type:` labels for high technical scannability
 - ⚡ **RAG-based Personal Knowledge Management** - Context-aware responses grounded in your specific professional documentation
 
 ---
@@ -48,9 +49,9 @@ We have shifted from a static, premium-first architecture to a universal, open-m
 | Feature | v2.2 (Old) | **v2.3 (Current)** |
 | :--- | :--- | :--- |
 | **Model Roster** | 18-Model Waterfall | **20+ Model Waterfall** (Llama 405B, GPT-OSS 120B) |
-| **Output Style** | Standard Markdown | **Dynamic Auto-Highlighting** (Yellow Stroke emphasis) |
+| **Output Style** | Standard Markdown | **6-Section STAR Reasoning** + Yellow Highlights |
+| **Vision Logic** | Hardcoded Python | **Visual Context Language Detection** |
 | **Initial Boot** | Stealth Mode (Invisible) | **Interactive Mode (Visible)** |
-| **AI Positioning** | Open Efficiency First | **Intelligence First** (405B Heavy Lifters prioritized) |
 | **Context Engine** | Dynamic Profile Loader | **Direct RAG Injection fallback** |
 | **Smart Mode** | Variance-Based Selection | **Enhanced Waveform Analysis** |
 
@@ -116,7 +117,31 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 ## 🐛 Solved Engineering Challenges
 
 <details>
-<summary><strong>1. The "First Message" API Crash (Gemini/Perplexity)</strong></summary>
+<summary><strong>1. The Missing "Post-Code Analysis" (Prompt Routing)</strong></summary>
+
+**Problem:** The AI was reliably generating code but skipping the crucial final analysis step for image-based submissions because the "Solve" system prompt was never actually being sent to the vision endpoint.
+
+**Solution:** Updated the IPC pipeline and `LLMHelper.ts` to explicitly route a `type='solve'` parameter for screenshot-based coding problems, mapping it to a strict 6-section STAR prompt.
+</details>
+
+<details>
+<summary><strong>2. Markdown Rendering vs. Raw HTML Tags</strong></summary>
+
+**Problem:** Strict prompt instructions to output `<mark>` tags for yellow highlighting were being neutralized by React Markdown's secure sanitization, resulting in literal, unstyled HTML tags appearing on the UI.
+
+**Solution:** Built a **Custom Render Interceptor** in `AIResponse.tsx` that identifies specific target phrases (e.g., `**Say:**`, `**Type:**`) at the DOM generation level and dynamically wraps them in custom Tailwind background utility classes (`bg-yellow-500/20`), preserving strict XSS security while achieving native aesthetic highlighting.
+</details>
+
+<details>
+<summary><strong>3. The "Python First" Monolingual Myth</strong></summary>
+
+**Problem:** By defaulting all output to Python, users submitting Java, C++, or TypeScript screenshots experienced high friction having to manually translate the solution.
+
+**Solution:** Implemented **Visual Context Language Detection**. The vision prompt now instructs the model to scan the UI (e.g., dropdowns, syntax structures) in the provided screenshot to automatically infer the target language, falling back to Python only when fully ambiguous.
+</details>
+
+<details>
+<summary><strong>4. The "First Message" API Crash (Gemini/Perplexity)</strong></summary>
 
 **Problem:** Gemini 3.0 and Perplexity APIs strictly require the first message in the chat history to be from the `user`. Our app sometimes started history with an AI greeting (`role: model`), causing 100% failure rates.
 
@@ -124,7 +149,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 </details>
 
 <details>
-<summary><strong>2. The "Blind" Solve Button</strong></summary>
+<summary><strong>5. The "Blind" Solve Button</strong></summary>
 
 **Problem:** The "Solve" button was blindly sending requests to the `gemini-chat` (Text) endpoint, even when screenshots were attached.
 
