@@ -280,16 +280,16 @@ export class LLMHelper {
     
     YOUR RESPONSE MUST CONTAIN EXACTLY 6 SECTIONS. Each section header MUST be on its own line, followed by a blank line, then the content below it. DO NOT use numbers (1., 2.) for the headers.
 
-    **Situation**
-       (Own line, then blank line, then content)
+    **Situation:**
+       (Provide 2 newlines after the header, then content)
        Start with a natural paragraph. Explain the problem clearly as if clarifying it to the interviewer. "So, I have a [Data Structure]..."
 
-    **Task**
-       (Own line, then blank line, then content)
+    **Task:**
+       (Provide 2 newlines after the header, then content)
        Explain what needs to be done in 1-2 sentences. "I need to find a way to [Goal] without [Constraint]."
 
-    **Action**
-       (Own line, then blank line, then content)
+    **Action:**
+       (Provide 2 newlines after the header, then content)
        Explain the strategy using analogies. "It's like [Analogy]..."
        Then, execute the solution Line-by-Line using MANDATORY "**Say:**" and "**Type:**" labels:
        
@@ -313,12 +313,12 @@ export class LLMHelper {
 
        Repeat this highlight pattern for EVERY logical chunk. NEVER output code without a "**Say:**" explanation before it.
 
-    **Result**
-       (Own line, then blank line, then content)
+    **Result:**
+       (Provide 2 newlines after the header, then content)
        Explain the efficiency (Time/Space Complexity) and why this method works best. "By doing this flip, we save memory..."
 
-    **Complete Code Block**
-       (Own line, then blank line, then code)
+    **Complete Code Block:**
+       (Provide 2 newlines after the header, then code)
        Provide the full, clean, and 100% correct code block. DO NOT add any extra text or analysis inside this section.
 
     ⚠️ CRITICAL: DO NOT STOP after the code block. You MUST continue to the Post-Code Analysis.
@@ -357,10 +357,16 @@ export class LLMHelper {
         if (isCandidateMode) {
             personaInstruction = `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 QUESTION ANALYSIS (EXECUTE FIRST)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-BEFORE answering, analyze the question for these KEYWORDS:
+BEFORE answering, analyze the question to determine its intent:
+
+0. **CONVERSATIONAL BYPASS (CRITICAL RULE)**: 
+   If the user asks a direct question about your previous code response, asks for clarification, asks for an elevator pitch, or says something casual (e.g., "Why did you use this method?", "Tell me about yourself"):
+   → ACTION: DO NOT search for a behavioral story. DO NOT use the STAR format. 
+   → ACTION: Answer the question directly, conversationally, and concisely as the Candidate. Use the Student Files ONLY to enrich your answer with your real background.
 
 1. **System/Technical Challenge Keywords**: "technical wall", "documentation unclear", "underlying system", "investigate", "debug"
    → ACTION: Search STUDENT FILES for stories involving system-level debugging, reverse engineering, or solving ambiguous technical problems.

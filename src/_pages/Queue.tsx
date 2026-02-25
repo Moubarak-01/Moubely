@@ -6,7 +6,7 @@ import {
     GripHorizontal, HelpCircle, MessageCircleQuestion, FileText,
     Scaling, Copy, Check, Trash2, Mail,
     Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
-    Eye, EyeOff, MessageCircle, Terminal, Edit2
+    Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw
 } from "lucide-react"
 
 // --- IMPORTS FOR FORMULAS & HIGHLIGHTING ---
@@ -781,15 +781,15 @@ const Queue: React.FC<any> = () => {
                 let generatedTitle = `Meeting ${new Date().toLocaleDateString()}`;
                 try {
                     const [emailResponse, titleResponse] = await Promise.all([
-                        // FIX 4: Force Student Persona for Emails
                         window.electronAPI.invoke("gemini-chat", {
                             message: `Based on this transcript, draft a professional follow-up email:\n\n${fullTranscript}`,
-                            mode: "Student",
-                            isCandidateMode: true
+                            type: "general",
+                            isCandidateMode: false
                         }),
                         window.electronAPI.invoke("gemini-chat", {
                             message: `Based on this transcript, generate a very short, concise title (under 6 words) for this meeting. No quotes, no markdown:\n\n${fullTranscript}`,
-                            type: "title"
+                            type: "title",
+                            isCandidateMode: false
                         })
                     ]);
 
@@ -813,6 +813,71 @@ const Queue: React.FC<any> = () => {
         };
         generateEmailAfterFinalize();
     }, [isFinalizing, showPostMeeting]);
+
+    // --- INTERACTION FEEDBACK STATES ---
+    const [isCopied, setIsCopied] = useState(false);
+    const [isRegeneratingEmail, setIsRegeneratingEmail] = useState(false);
+
+    const handleCopyEmail = () => {
+        if (!emailDraft) return;
+        navigator.clipboard.writeText(emailDraft);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+    };
+
+    const handleRegenerateEmail = async () => {
+        if (!transcriptLogs.length || !window.electronAPI || isRegeneratingEmail) return;
+
+        setIsRegeneratingEmail(true);
+        // We do NOT clear emailDraft here so the user can still read the old one while waiting.
+
+        try {
+            const fullTranscript = transcriptLogs.map(t => t.text).join(" ");
+            const emailResponse = await window.electronAPI.invoke("gemini-chat", {
+                message: `Based on this transcript, draft a professional follow-up email:\n\n${fullTranscript}`,
+                type: "general",
+                isCandidateMode: false
+            });
+
+            setEmailDraft(emailResponse);
+
+            // Update the matching history entry so the new email persists
+            if (pastMeetings.length > 0) {
+                // Determine the currently active meeting ID (assume the most recent one if actively viewing a post-meeting)
+                // If the user loaded an old meeting, it's matching the current transcript.
+                // It's safer to identify the meeting by comparing transcripts or ensuring we have an activeId state.
+                // Assuming the first meeting in pastMeetings is the current one for newly finished sessions,
+                // or we find by matching the exact transcript logs (which is robust enough for this UI).
+
+                const currentTranscriptText = transcriptLogs.map(t => t.text).join(" ");
+                const updatedHistory = pastMeetings.map(meeting => {
+                    const meetingTranscriptText = meeting.transcript.map(t => t.text).join(" ");
+                    if (meetingTranscriptText === currentTranscriptText) {
+                        return { ...meeting, emailDraft: emailResponse };
+                    }
+                    return meeting;
+                });
+
+                setPastMeetings(updatedHistory);
+                localStorage.setItem('moubely_meetings', JSON.stringify(updatedHistory));
+            }
+
+        } catch (e) {
+            // Only show error if we completely failed
+            // setEmailDraft("Failed to generate content."); 
+        } finally {
+            setIsRegeneratingEmail(false);
+        }
+    };
+
+    const handleCloseMeeting = () => {
+        setTranscriptLogs([]);
+        setMessages([]);
+        setEmailDraft("");
+        setShowPostMeeting(false);
+        setActiveTab("Chat");
+    };
+
     // --- EDITING STATE ---
     const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
     const [editText, setEditText] = useState("");
@@ -937,6 +1002,32 @@ const Queue: React.FC<any> = () => {
     const stopResize = () => { resizeRef.current = null; document.removeEventListener('mousemove', doResize); document.removeEventListener('mouseup', stopResize); }
     const loadMeeting = (m: MeetingSession) => { setTranscriptLogs(m.transcript); setEmailDraft(m.emailDraft); setShowPostMeeting(true); setActiveTab("Transcript"); setMessages([{ id: Date.now().toString(), role: "ai", text: `Loaded meeting: ${new Date(m.date).toLocaleString()}`, timestamp: Date.now() }]); }
     const deleteMeeting = (id: string, e: React.MouseEvent) => { e.stopPropagation(); const u = pastMeetings.filter(m => m.id !== id); setPastMeetings(u); localStorage.setItem('moubely_meetings', JSON.stringify(u)); }
+
+    const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+    const [editingTitleText, setEditingTitleText] = useState("");
+
+    const handleStartEditTitle = (m: MeetingSession, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditingTitleId(m.id);
+        setEditingTitleText(m.title || new Date(m.date).toLocaleDateString());
+    };
+
+    const handleSaveTitle = (m: MeetingSession, e: React.MouseEvent | React.KeyboardEvent) => {
+        e.stopPropagation();
+        if (!editingTitleText.trim()) return;
+
+        const updatedHistory = pastMeetings.map((meeting) =>
+            meeting.id === m.id ? { ...meeting, title: editingTitleText.trim() } : meeting
+        );
+        setPastMeetings(updatedHistory);
+        localStorage.setItem('moubely_meetings', JSON.stringify(updatedHistory));
+        setEditingTitleId(null);
+    };
+
+    const handleCancelEditTitle = (e: React.MouseEvent | React.KeyboardEvent) => {
+        e.stopPropagation();
+        setEditingTitleId(null);
+    };
 
     const handleSend = async (overrideText?: string) => {
         if (!window.electronAPI) return;
@@ -1241,13 +1332,28 @@ const Queue: React.FC<any> = () => {
             {isExpanded && (
                 <div className="flex-1 flex flex-col min-h-0 interactive animate-in fade-in slide-in-from-top-4 duration-500 delay-75">
 
-                    <div className="tab-nav justify-start overflow-x-auto no-scrollbar shrink-0 border-b border-white/5">
+                    <div className="tab-nav justify-start overflow-x-auto no-scrollbar shrink-0 border-b border-white/5 relative">
                         <button onClick={() => setActiveTab("Chat")} className={`tab-btn ${activeTab === 'Chat' ? 'active' : ''}`}>Chat</button>
                         <button onClick={() => setActiveTab("Transcript")} className={`tab-btn ${activeTab === 'Transcript' ? 'active' : ''}`}>Transcript</button>
 
                         {showPostMeeting && <button onClick={() => setActiveTab("Email")} className={`tab-btn flex items-center gap-1.5 ${activeTab === 'Email' ? 'active' : ''}`}><Mail size={14} /> Email</button>}
                         <button onClick={() => setActiveTab("History")} className={`tab-btn flex items-center gap-1.5 ${activeTab === 'History' ? 'active' : ''}`}><History size={14} /> History</button>
                     </div>
+
+                    {showPostMeeting && (
+                        <div className="flex items-center justify-between px-4 py-2 bg-blue-500/10 border-b border-white/5 shrink-0">
+                            <div className="text-xs text-blue-300 font-medium flex items-center gap-2">
+                                <History size={14} className="text-blue-400" />
+                                <span>Viewing Loaded Meeting</span>
+                            </div>
+                            <button
+                                onClick={handleCloseMeeting}
+                                className="flex items-center gap-1.5 px-3 py-1 bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-gray-400 text-xs rounded transition-colors"
+                            >
+                                <X size={12} /> Close Meeting
+                            </button>
+                        </div>
+                    )}
 
                     {!showPostMeeting && (
                         <div className="flex justify-center items-center gap-3 px-3 py-3 border-b border-white/5 bg-black/20 shrink-0 overflow-x-auto no-scrollbar">
@@ -1379,12 +1485,91 @@ const Queue: React.FC<any> = () => {
                         )}
                         {activeTab === "Email" && showPostMeeting && (
                             <div className="flex-1 overflow-y-auto p-2">
-                                {emailDraft ? (<div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-2xl"> <div className="flex justify-between items-center mb-4 pb-4 border-b border-white/10"> <h3 className="text-white font-medium flex items-center gap-2"><Mail size={16} /> Generated Follow-up</h3> <button onClick={() => navigator.clipboard.writeText(emailDraft)} className="text-xs flex items-center gap-1 hover:text-white text-gray-400"><Copy size={12} /> Copy Draft</button> </div> <MessageContent text={emailDraft} /> </div>) : (<div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3"> <Loader2 size={24} className="animate-spin text-blue-400" /> <span>Drafting email...</span> </div>)}
+                                {emailDraft ? (
+                                    <div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-2xl">
+                                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-white/10">
+                                            <h3 className="text-white font-medium flex items-center gap-2">
+                                                <Mail size={16} /> Generated Follow-up
+                                            </h3>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={handleRegenerateEmail}
+                                                    disabled={isRegeneratingEmail}
+                                                    className={`text-xs flex items-center gap-1 transition-colors ${isRegeneratingEmail ? 'text-blue-400 cursor-not-allowed opacity-80' : 'hover:text-blue-400 text-gray-400'}`}
+                                                >
+                                                    <RefreshCw size={12} className={isRegeneratingEmail ? 'animate-spin' : ''} />
+                                                    {isRegeneratingEmail ? 'Regenerating...' : 'Regenerate'}
+                                                </button>
+                                                <button
+                                                    onClick={handleCopyEmail}
+                                                    className={`text-xs flex items-center gap-1 transition-colors ${isCopied ? 'text-green-400' : 'hover:text-white text-gray-400'}`}
+                                                >
+                                                    {isCopied ? <Check size={12} /> : <Copy size={12} />}
+                                                    {isCopied ? 'Copied!' : 'Copy Draft'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <MessageContent text={emailDraft} />
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
+                                        <Loader2 size={24} className="animate-spin text-blue-400" />
+                                        <span>Drafting email...</span>
+                                    </div>
+                                )}
                             </div>
                         )}
                         {activeTab === "History" && (
                             <div className="flex-1 overflow-y-auto p-2 space-y-3">
-                                {pastMeetings.length === 0 ? (<div className="text-gray-500 text-center mt-10 text-sm">No recorded meetings yet.</div>) : (pastMeetings.map((meeting) => (<div key={meeting.id} onClick={() => loadMeeting(meeting)} className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-4 cursor-pointer transition-colors group"> <div className="flex justify-between items-start mb-2"> <div className="flex items-center gap-2 text-blue-300 font-medium"> <Calendar size={14} /> <span>{meeting.title || new Date(meeting.date).toLocaleDateString()}</span> <span className="text-gray-500">•</span> <Clock size={14} /> <span>{new Date(meeting.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> </div> <button onClick={(e) => deleteMeeting(meeting.id, e)} className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"><Trash2 size={14} /></button> </div> <div className="text-sm text-gray-400 line-clamp-2 mb-3"> {meeting.transcript.map(t => t.text).join(' ').slice(0, 150)}... </div> <div className="flex items-center gap-2 text-xs text-blue-400 font-medium group-hover:text-blue-300"> <span>View Details</span> <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" /> </div> </div>)))}
+                                {pastMeetings.length === 0 ? (
+                                    <div className="text-gray-500 text-center mt-10 text-sm">No recorded meetings yet.</div>
+                                ) : (
+                                    pastMeetings.map((meeting) => (
+                                        <div key={meeting.id} onClick={() => loadMeeting(meeting)} className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-4 cursor-pointer transition-colors group">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex items-center gap-2 text-blue-300 font-medium flex-1">
+                                                    <Calendar size={14} className="shrink-0" />
+                                                    {editingTitleId === meeting.id ? (
+                                                        <div className="flex items-center gap-2 w-full pr-4 relative" onClick={(e) => e.stopPropagation()}>
+                                                            <input
+                                                                type="text"
+                                                                autoFocus
+                                                                value={editingTitleText}
+                                                                onChange={(e) => setEditingTitleText(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') handleSaveTitle(meeting, e);
+                                                                    if (e.key === 'Escape') handleCancelEditTitle(e);
+                                                                }}
+                                                                className="bg-black/40 text-blue-300 text-sm px-2 py-1 rounded w-full border border-blue-500/50 outline-none"
+                                                            />
+                                                            <button onClick={(e) => handleSaveTitle(meeting, e)} className="p-1 hover:text-green-400 transition-colors cursor-pointer"><Check size={14} /></button>
+                                                            <button onClick={(e) => handleCancelEditTitle(e)} className="p-1 hover:text-red-400 transition-colors cursor-pointer"><X size={14} /></button>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <span className="whitespace-normal break-words">{meeting.title || new Date(meeting.date).toLocaleDateString()}</span>
+                                                            <span className="text-gray-500 shrink-0">•</span>
+                                                            <Clock size={14} className="shrink-0" />
+                                                            <span className="shrink-0">{new Date(meeting.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                {editingTitleId !== meeting.id && (
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={(e) => handleStartEditTitle(meeting, e)} className="p-1.5 text-gray-500 hover:text-blue-400 hover:bg-blue-400/10 rounded transition-colors"><Edit2 size={14} /></button>
+                                                        <button onClick={(e) => deleteMeeting(meeting.id, e)} className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"><Trash2 size={14} /></button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="text-sm text-gray-400 line-clamp-2 mb-3">
+                                                {meeting.transcript.map(t => t.text).join(' ').slice(0, 150)}...
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs text-blue-400 font-medium group-hover:text-blue-300">
+                                                <span>View Details</span> <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         )}
                     </div>

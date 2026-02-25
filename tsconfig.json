@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "lib": ["DOM", "DOM.Iterable", "ESNext"], // Browser APIs
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ESNext"
+    ], // Browser APIs
     "module": "ESNext", // For Vite/Modern browsers
     "moduleResolution": "bundler", // For Vite
     "jsx": "react-jsx", // React specific
@@ -15,6 +19,7 @@
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true
   },
-  "include": ["src"], // Only React source files
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": [
+    "src"
+  ], // Only React source files
 }
