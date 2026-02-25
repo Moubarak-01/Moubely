@@ -1319,7 +1319,7 @@ const Queue: React.FC<any> = () => {
                         <button
                             onClick={handleToggleStealth}
                             className={`icon-btn ${isStealth ? 'text-gray-500 hover:text-white' : 'text-yellow-500 hover:text-yellow-400'}`}
-                            title={isStealth ? "Stealth Mode ON (Hidden)" : "Stealth Mode OFF (Visible)"}
+                            title={isStealth ? undefined : "Stealth Mode OFF (Visible)"}
                         >
                             {isStealth ? <EyeOff size={20} /> : <Eye size={20} />}
                         </button>
@@ -1611,7 +1611,7 @@ const Queue: React.FC<any> = () => {
                                 <div className="flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     <button onClick={handleUseScreen} className="control-btn hover:bg-white/15 py-2 px-3"><Monitor size={14} className="text-blue-400" /><span>Queue Screen</span></button>
                                     <button onClick={() => setIsSmartMode(!isSmartMode)} className={`control-btn py-2 px-3 ${isSmartMode ? 'active' : ''}`}><Zap size={14} className={isSmartMode ? 'fill-current' : ''} /><span>Smart</span></button>
-                                    <button onClick={() => window.location.hash = "#/settings"} className="control-btn py-2 px-3 text-white/60 hover:text-white/90 hover:bg-white/10 transition-all" title="Persona Settings"><UserCog size={14} /><span>Persona</span></button>
+                                    <button onClick={() => window.location.hash = "#/settings"} className="control-btn py-2 px-3 text-white/60 hover:text-white/90 hover:bg-white/10 transition-all" title={isStealth ? undefined : "Persona Settings"}><UserCog size={14} /><span>Persona</span></button>
                                     <div className="relative"> <button onClick={() => setShowModeMenu(!showModeMenu)} className="control-btn hover:bg-white/15 py-2 px-3"><span>{mode}</span><ChevronDown size={12} /></button> {showModeMenu && (<div className="absolute bottom-full left-0 mb-2 w-32 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"> {['General', 'Developer', 'Student'].map((m) => (<button key={m} onClick={() => handleModeSelect(m)} className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 ${mode === m ? 'text-blue-400 bg-white/5' : 'text-gray-300'}`}> {m} </button>))} </div>)} </div>
                                     {mode === "Student" && (<button onClick={() => setShowStudentModal(true)} className="control-btn hover:bg-white/15 py-2 px-3 text-blue-300"> <UserCog size={14} /> <span>Update Profile</span> </button>)}
                                 </div>
@@ -1624,7 +1624,7 @@ const Queue: React.FC<any> = () => {
             <div
                 onMouseDown={startResize}
                 className="absolute bottom-0 right-0 w-10 h-10 cursor-se-resize flex items-end justify-end p-2 interactive hover:bg-blue-500/20 rounded-tl-xl transition-all z-[70] group"
-                title="Drag to resize window"
+                title={isStealth ? undefined : "Drag to resize window"}
             >
                 <Scaling size={16} className="text-gray-500 group-hover:text-blue-400 transition-colors" />
             </div>

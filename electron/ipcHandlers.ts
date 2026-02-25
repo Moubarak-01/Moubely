@@ -59,6 +59,21 @@ export function initializeIpcHandlers(appState: AppState) {
     return true;
   });
 
+  // --- MOUSE CLICK-THROUGH HANDLERS ---
+  ipcMain.handle("set-ignore-mouse-events", (event, ignore: boolean, options: any) => {
+    const win = appState.getMainWindow();
+    if (win) {
+      win.setIgnoreMouseEvents(ignore, options);
+    }
+  });
+
+  ipcMain.on("toggle-mouse-ignore", (event, ignore: boolean) => {
+    const win = appState.getMainWindow();
+    if (win) {
+      win.setIgnoreMouseEvents(ignore, { forward: true });
+    }
+  });
+
   ipcMain.handle("move-window-right", () => {
     appState.moveWindowRight();
     return true;

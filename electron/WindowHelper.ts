@@ -16,7 +16,23 @@ export class WindowHelper {
   // --- UNLOCKED RESIZING ---
   public setWindowDimensions(width: number, height: number): void {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return
-    this.mainWindow.setSize(Math.round(width), Math.round(height))
+    const w = Math.round(width)
+    const h = Math.round(height)
+
+    // Explicit bounds calculation for DWM hit-test bug on transparent Windows apps
+    const bounds = this.mainWindow.getBounds()
+    this.mainWindow.setBounds({ x: bounds.x, y: bounds.y, width: w, height: h })
+
+    // Force a minimal opacity flutter to ensure the compositor updates the hit-region
+    if (process.platform === "win32") {
+      const op = this.mainWindow.getOpacity()
+      this.mainWindow.setOpacity(op > 0.99 ? 0.99 : 1.0)
+      setTimeout(() => {
+        if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+          this.mainWindow.setOpacity(op)
+        }
+      }, 50)
+    }
   }
 
   public createWindow(): void {
