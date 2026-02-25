@@ -85,14 +85,14 @@ const CHAT_MODELS = [
 // --- 2. THE EYES (Vision Waterfall) ---
 const VISION_MODELS = [
     // --- TIER 1: ELITE VISION ---
-    { type: 'gemini', model: 'gemini-pro-latest', name: 'Gemini 3.1 Pro Preview' },
-    { type: 'gemini', model: 'gemini-3-pro', name: 'Gemini 3.0 Pro' },
+    { type: 'gemini', model: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview' },
+    { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro' },
+    { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
     { type: 'gemini', model: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
     { type: 'openrouter', model: 'anthropic/claude-opus-4.5', name: 'Claude 4.5 Opus (Vision)' },
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Reasoning Vision)' },
 
     // --- TIER 2: FAST & RELIABLE ---
-    { type: 'gemini', model: 'gemini-flash-latest', name: 'Gemini 3 Flash Preview' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'openrouter', model: 'anthropic/claude-sonnet-4.5', name: 'Claude 4.5 Sonnet (Vision)' },
@@ -343,8 +343,8 @@ export class LLMHelper {
     - **Language:** Detect the programming language from the provided screenshots (e.g., look for language dropdowns like "Python3", "Java", "C++", or recognize the syntax). If a language is visible in the images or explicitly requested, you MUST use that exact language. ONLY default to Python if absolutely no language can be determined.
     - **Simplicity:** Use "I" and "My." Avoid technical jargon.
     - **Spoken Word:** Write it exactly like a person talking naturally to another person.
-    - **Headers:** Each section header (Situation, Task, Action, Result, Complete Code, Post-Code Analysis) MUST be on its OWN line with a blank line before the content starts.
-    - **Say/Type Labels:** You MUST use the highlighted HTML tags <mark>**Say:**</mark> and <mark>**Type:**</mark> in the Action section. This is MANDATORY.
+    - **Headers:** Each section header (Situation, Task, Action, Result, Complete Code, Post-Code Analysis) MUST be bolded (e.g. **Situation:**) on its OWN line with a blank line before the content starts.
+    - **Say/Type Labels:** You MUST use the exact markdown tokens **Say:** and **Type:** in the Action section. This is MANDATORY. Do NOT use HTML <mark> tags.
 
     ANY RULE VIOLATION INVALIDATES THE RESPONSE.
     `;

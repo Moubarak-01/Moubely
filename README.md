@@ -101,7 +101,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 
 | Tier | Models |
 | :--- | :--- |
-| **Tier 1: Elite Vision** | **Gemini 3 Pro**, Claude 4.5 Opus, Claude 3.7 Sonnet (Reasoning) |
+| **Tier 1: Elite Vision** | **Gemini 3.1 Pro**, Gemini 3.0 Pro, Claude 4.5 Opus, Claude 3.7 Sonnet (Reasoning) |
 | **Tier 2: Fast & Reliable** | Gemini 3 Flash, Gemini 2.5 Flash, Claude 4.5 Haiku, Mistral Small Vision |
 | **Tier 3: Backups** | Mistral Large 2 (Nvidia), GPT-4o, Perplexity Vision |
 
@@ -129,7 +129,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 
 **Problem:** Strict prompt instructions to output `<mark>` tags for yellow highlighting were being neutralized by React Markdown's secure sanitization, resulting in literal, unstyled HTML tags appearing on the UI.
 
-**Solution:** Built a **Custom Render Interceptor** in `AIResponse.tsx` that identifies specific target phrases (e.g., `**Say:**`, `**Type:**`) at the DOM generation level and dynamically wraps them in custom Tailwind background utility classes (`bg-yellow-500/20`), preserving strict XSS security while achieving native aesthetic highlighting.
+**Solution:** Built a **Custom Render Interceptor** in `AIResponse.tsx` that intercepts the standard Markdown AST (Abstract Syntax Tree). It identifies specific target phrases (e.g., `**Say:**`, `**Type:**`, `**Situation:**`) at the DOM generation level and dynamically wraps them in custom Tailwind background utility classes (`bg-yellow-500/20`). This preserves strict XSS security while achieving native, color-coded aesthetic highlighting across all models.
 </details>
 
 <details>
@@ -159,9 +159,9 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 <details>
 <summary><strong>3. Advanced Window Layering (UX)</strong></summary>
 
-**Problem:** Standard Electron windows capture mouse events even when transparent, interfering with underlying applications.
+**Problem:** Standard Electron windows capture mouse events even when entirely transparent, creating "ghost bounds" that interfere with underlying desktop applications and block clicks.
 
-**Solution:** Implemented synchronized, time-gated control with `win.setIgnoreMouseEvents` to allow seamless interaction with the desktop while maintaining the assistant's visual presence.
+**Solution:** Engineered a robust DWM (Desktop Window Manager) hit-test workaround leveraging explicit `setBounds` recalculations paired with synchronized opacity flutters (`win.setOpacity`). Combined with dynamic `win.setIgnoreMouseEvents` fallback handlers, this guarantees a zero-latency seamless cross-application experience.
 </details>
 
 <details>
