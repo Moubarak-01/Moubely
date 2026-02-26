@@ -7,7 +7,7 @@ const Header: React.FC = () => {
   const toggleLiveMode = async () => {
     const newState = !isLiveMode;
     setIsLiveMode(newState);
-    
+
     if (newState) {
       await window.electronAPI.invoke('start-live-mode');
     } else {
@@ -18,7 +18,7 @@ const Header: React.FC = () => {
   return (
     // The Container
     <div className="flex items-center justify-between px-4 py-3 select-none">
-      
+
       {/* Left: Status Badge */}
       <div className="flex items-center gap-2 no-drag">
         <div className="flex items-center gap-1.5 px-2 py-1 bg-white/5 rounded-full border border-white/5">
@@ -30,7 +30,7 @@ const Header: React.FC = () => {
       </div>
 
       {/* Center: DRAG HANDLE (Critical!) */}
-      <div 
+      <div
         className="draggable cursor-move active:cursor-grabbing p-2 hover:bg-white/5 rounded-lg transition-colors group"
       >
         <GripVertical size={16} className="text-white/20 group-hover:text-white/50 transition-colors" />
@@ -41,12 +41,10 @@ const Header: React.FC = () => {
         {/* LIVE MODE TOGGLE */}
         <button
           onClick={toggleLiveMode}
-          className={`group flex items-center gap-1.5 px-2 py-1 rounded-md border transition-all ${
-            isLiveMode 
-              ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' 
+          className={`group flex items-center gap-1.5 px-2 py-1 rounded-md border transition-all ${isLiveMode
+              ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
               : 'bg-white/5 border-white/5 text-white/40 hover:text-white/60'
-          }`}
-          title="Toggle Live Assist"
+            }`}
         >
           {isLiveMode ? <Zap size={12} className="fill-current" /> : <ZapOff size={12} />}
           <span className="text-[10px] font-medium uppercase tracking-wider">
@@ -54,7 +52,7 @@ const Header: React.FC = () => {
           </span>
         </button>
 
-        <button 
+        <button
           onClick={() => window.electronAPI.quitApp()}
           className="p-1.5 hover:bg-red-500/10 hover:text-red-400 rounded-md text-white/20 transition-all"
         >

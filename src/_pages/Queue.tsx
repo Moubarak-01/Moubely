@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react"
 import {
-    Play, Pause, Square, ChevronDown, ChevronUp,
+    Play, Pause, Square, ChevronDown, ChevronUp, ChevronRight,
     X, Mic, Monitor, Zap, Send,
     Loader2, Sparkles, MessageSquare, History,
     GripHorizontal, HelpCircle, MessageCircleQuestion, FileText,
@@ -47,12 +47,28 @@ interface MeetingSession {
     title?: string
 }
 
+interface ChatSession {
+    id: string;
+    date: number;
+    prompt: string;
+    response: string;
+    messages?: Message[];
+    images?: ScreenshotData[];
+}
+
 interface ChatContext {
     isInMeeting: boolean;
     uploadedFilesContent: string;
     meetingTranscript: string;
     userImage?: string;
 }
+
+// --- HELPERS ---
+const truncateToWords = (text: string, limit: number) => {
+    const words = text.split(/\s+/).filter(w => w.length > 0);
+    if (words.length <= limit) return text;
+    return words.slice(0, limit).join(' ') + '...';
+};
 
 // --- TITLE CLEANER UTILITY ---
 const cleanMeetingTitle = (rawTitle: string): string => {
@@ -298,6 +314,12 @@ const Queue: React.FC<any> = () => {
     const [meetingStartTime, setMeetingStartTime] = useState<number>(0)
 
     const [pastMeetings, setPastMeetings] = useState<MeetingSession[]>([])
+    const [pastChats, setPastChats] = useState<ChatSession[]>([])
+
+    // --- HISTORY MODAL STATE ---
+    const [historyTab, setHistoryTab] = useState<"Chats" | "Meetings">("Chats");
+    const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
+    const [loadedSessionType, setLoadedSessionType] = useState<"Chat" | "Meeting" | null>(null);
 
     const [showStudentModal, setShowStudentModal] = useState(false);
     const [isFinalizing, setIsFinalizing] = useState(false);
@@ -411,9 +433,14 @@ const Queue: React.FC<any> = () => {
             window.electronAPI.getStealthMode().then(setIsStealth).catch(console.error);
         }
 
-        const saved = localStorage.getItem('moubely_meetings')
-        if (saved) {
-            try { setPastMeetings(JSON.parse(saved)) } catch (e) { }
+        const savedMeetings = localStorage.getItem('moubely_meetings')
+        if (savedMeetings) {
+            try { setPastMeetings(JSON.parse(savedMeetings)) } catch (e) { }
+        }
+
+        const savedChats = localStorage.getItem('moubely_chats')
+        if (savedChats) {
+            try { setPastChats(JSON.parse(savedChats)) } catch (e) { }
         }
 
         let cleanupStream = () => { };
@@ -773,7 +800,8 @@ const Queue: React.FC<any> = () => {
 
     useEffect(() => {
         const generateEmailAfterFinalize = async () => {
-            if (!isFinalizing && showPostMeeting && !emailDraft && transcriptLogs.length > 0 && window.electronAPI) {
+            // FIX: Ensure this ONLY runs for NEW meetings, not loaded historical ones
+            if (!isFinalizing && showPostMeeting && !emailDraft && transcriptLogs.length > 0 && window.electronAPI && !loadedSessionId) {
                 setIsThinking(true);
                 setThinkingStep("Drafting summary...");
                 const fullTranscript = transcriptLogs.map(t => t.text).join(" ");
@@ -812,7 +840,7 @@ const Queue: React.FC<any> = () => {
             }
         };
         generateEmailAfterFinalize();
-    }, [isFinalizing, showPostMeeting]);
+    }, [isFinalizing, showPostMeeting, loadedSessionId]);
 
     // --- INTERACTION FEEDBACK STATES ---
     const [isCopied, setIsCopied] = useState(false);
@@ -871,6 +899,8 @@ const Queue: React.FC<any> = () => {
     };
 
     const handleCloseMeeting = () => {
+        setLoadedSessionId(null);
+        setLoadedSessionType(null);
         setTranscriptLogs([]);
         setMessages([]);
         setEmailDraft("");
@@ -890,48 +920,23 @@ const Queue: React.FC<any> = () => {
     const handleSaveEdit = async (msgId: string) => {
         if (!editText.trim()) return;
 
-        // 1. Update UI immediately
-        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, text: editText } : m));
         setEditingMsgId(null);
 
-        // 2. Resend to AI (Optional: if we want to re-trigger the AI response, we'd need to clear the next AI msg)
-        // For now, just editing the text for record. If user wants to "Re-ask", they usually edit and hit send nicely? 
-        // Actually, "Editable Prompts" usually implies "Edit and Retry".
-        // Let's implement robust "Edit and Retry":
-
-        // Find the index of the edited message
         const msgIndex = messages.findIndex(m => m.id === msgId);
         if (msgIndex === -1) return;
 
-        // Remove everything AFTER this message (the old AI response)
-        const newHistory = messages.slice(0, msgIndex + 1).map(m =>
+        // Strip everything after the edited message
+        const initialMessages: Message[] = messages.slice(0, msgIndex + 1).map(m =>
             m.id === msgId ? { ...m, text: editText } : m
         );
 
-        setMessages(newHistory);
+        const aiMsgId = `${Date.now()}-ai`;
+        initialMessages.push({ id: aiMsgId, role: "ai", text: "", timestamp: Date.now(), isStreaming: true });
 
-        // Trigger re-send logic with the new text
-        // We reuse handleSend but need to be careful about not duplicating
-        // Actually, easiest is to just call handleSend with the new text, but we need to act like it's a new request?
-        // Better pattern: Update state, then call a "retry" helper.
-        // Let's just strip the old AI response and call handleSend(editText) but that would add a new user bubble?
-        // No, handleSend adds a NEW user bubble.
-        // We want to KEEP this user bubble but regenerate the AI response.
+        setMessages(initialMessages);
 
-        // IMPLEMENTATION: Update text, remove next AI response, trigger generation.
-        setMessages(prev => {
-            const idx = prev.findIndex(m => m.id === msgId);
-            if (idx === -1) return prev;
-            // Return history up to this message (inclusive) with updated text
-            return prev.slice(0, idx + 1).map(m => m.id === msgId ? { ...m, text: editText } : m);
-        });
-
-        // Trigger AI generation manually
         setIsThinking(true);
         setThinkingStep("Regenerating response...");
-        const aiMsgId = `${Date.now()}-ai`;
-
-        setMessages(prev => [...prev, { id: aiMsgId, role: "ai", text: "", timestamp: Date.now(), isStreaming: true }]);
 
         // Prepare context similar to handleSend
         const contextData = {
@@ -943,15 +948,16 @@ const Queue: React.FC<any> = () => {
         const finalPrompt = preparePayload(editText, contextData);
 
         try {
-            // Basic re-ask logic
             const response = await window.electronAPI.invoke("gemini-chat", {
                 message: finalPrompt,
                 mode: mode,
-                history: messages.slice(0, msgIndex).map(m => ({ role: m.role, text: m.text })), // History BEFORE this msg
+                history: messages.slice(0, msgIndex).map(m => ({ role: m.role, text: m.text })),
                 type: "general",
                 isCandidateMode: mode === 'Student'
             });
-            setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m));
+            const finalMessages = initialMessages.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m);
+            setMessages(finalMessages);
+            saveChatToHistory(finalMessages);
         } catch (e: any) {
             setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: "Error: " + e.message, isStreaming: false } : m));
         } finally {
@@ -1003,6 +1009,73 @@ const Queue: React.FC<any> = () => {
     const loadMeeting = (m: MeetingSession) => { setTranscriptLogs(m.transcript); setEmailDraft(m.emailDraft); setShowPostMeeting(true); setActiveTab("Transcript"); setMessages([{ id: Date.now().toString(), role: "ai", text: `Loaded meeting: ${new Date(m.date).toLocaleString()}`, timestamp: Date.now() }]); }
     const deleteMeeting = (id: string, e: React.MouseEvent) => { e.stopPropagation(); const u = pastMeetings.filter(m => m.id !== id); setPastMeetings(u); localStorage.setItem('moubely_meetings', JSON.stringify(u)); }
 
+    const deleteChat = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const u = pastChats.filter(c => c.id !== id);
+        setPastChats(u);
+        localStorage.setItem('moubely_chats', JSON.stringify(u));
+    };
+
+    const handleClearLoadedSession = () => {
+        setLoadedSessionId(null);
+        setLoadedSessionType(null);
+        resetChat();
+        setTranscriptLogs([]);
+        setShowPostMeeting(false);
+        setActiveTab("Chat");
+    };
+
+    const handleLoadPastChat = (chat: ChatSession, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setLoadedSessionId(chat.id);
+        setLoadedSessionType("Chat");
+
+        if (chat.messages && chat.messages.length > 0) {
+            setMessages(chat.messages);
+        } else {
+            setMessages([
+                { id: "prompt_" + chat.id, role: "user", text: chat.prompt, timestamp: chat.date },
+                { id: "resp_" + chat.id, role: "ai", text: chat.response, timestamp: chat.date + 1 }
+            ]);
+        }
+
+        setShowPostMeeting(false); // Essential! Keeps Action Buttons visible.
+        setActiveTab("Chat");
+    };
+
+    const handleLoadPastMeeting = (meeting: MeetingSession, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setLoadedSessionId(meeting.id);
+        setLoadedSessionType("Meeting");
+        const title = meeting.title || new Date(meeting.date).toLocaleDateString();
+
+        setTranscriptLogs(meeting.transcript);
+        setEmailDraft(meeting.emailDraft);
+
+        setMessages([{ id: Date.now().toString(), role: "ai", text: `Loaded meeting: ${title}`, timestamp: Date.now() }]);
+
+        setShowPostMeeting(true);
+        setActiveTab("Transcript");
+    };
+
+    const [copiedTranscriptId, setCopiedTranscriptId] = useState<string | null>(null);
+    const [copiedEmailId, setCopiedEmailId] = useState<string | null>(null);
+
+    const handleCopyHistoryTranscript = (meetingId: string, transcript: TranscriptItem[], e: React.MouseEvent) => {
+        e.stopPropagation();
+        const text = transcript.map(t => t.text).join(" ");
+        navigator.clipboard.writeText(text);
+        setCopiedTranscriptId(meetingId);
+        setTimeout(() => setCopiedTranscriptId(null), 2000);
+    }
+
+    const handleCopyHistoryEmail = (meetingId: string, email: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(email);
+        setCopiedEmailId(meetingId);
+        setTimeout(() => setCopiedEmailId(null), 2000);
+    }
+
     const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
     const [editingTitleText, setEditingTitleText] = useState("");
 
@@ -1027,6 +1100,68 @@ const Queue: React.FC<any> = () => {
     const handleCancelEditTitle = (e: React.MouseEvent | React.KeyboardEvent) => {
         e.stopPropagation();
         setEditingTitleId(null);
+    };
+
+    const [expandedChats, setExpandedChats] = useState<Record<string, boolean>>({});
+    const [expandedMeetings, setExpandedMeetings] = useState<Record<string, boolean>>({});
+    const [expandedEmails, setExpandedEmails] = useState<Record<string, boolean>>({});
+
+    const toggleChat = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setExpandedChats(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const toggleMeeting = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setExpandedMeetings(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const toggleEmail = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setExpandedEmails(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const saveChatToHistory = (messagesToSave: Message[], sessionIdArg?: string | null) => {
+        if (!messagesToSave || messagesToSave.length === 0) return;
+
+        const firstUserMessage = messagesToSave.find(m => m.role === 'user')?.text || "Chat Session";
+        const lastAiMessage = messagesToSave.filter(m => m.role === 'ai').pop()?.text || "";
+
+        let activeSessionId = sessionIdArg !== undefined ? sessionIdArg : loadedSessionId;
+
+        // If not loaded from history, create a new session
+        if (!activeSessionId) {
+            activeSessionId = Date.now().toString();
+            setLoadedSessionId(activeSessionId);
+            setLoadedSessionType("Chat");
+        }
+
+        setPastChats(prev => {
+            const existingIndex = prev.findIndex(c => c.id === activeSessionId);
+            if (existingIndex >= 0) {
+                // Update existing
+                const updated = [...prev];
+                updated[existingIndex] = {
+                    ...updated[existingIndex],
+                    response: lastAiMessage,
+                    messages: messagesToSave
+                };
+                localStorage.setItem('moubely_chats', JSON.stringify(updated));
+                return updated;
+            } else {
+                // Create new
+                const newChat: ChatSession = {
+                    id: activeSessionId,
+                    date: parseInt(activeSessionId) || Date.now(),
+                    prompt: firstUserMessage,
+                    response: lastAiMessage,
+                    messages: messagesToSave
+                };
+                const updated = [newChat, ...prev];
+                localStorage.setItem('moubely_chats', JSON.stringify(updated));
+                return updated;
+            }
+        });
     };
 
     const handleSend = async (overrideText?: string) => {
@@ -1100,9 +1235,13 @@ const Queue: React.FC<any> = () => {
                 fullResponse = await window.electronAPI.invoke("gemini-chat", args)
             }
 
-            setMessages(prev => prev.map(m =>
+            const finalMessages = newMessages.map(m =>
                 m.id === aiMsgId ? { ...m, text: fullResponse, isStreaming: false } : m
-            ));
+            );
+            setMessages(finalMessages);
+
+            // Save to Local History
+            saveChatToHistory(finalMessages);
 
         } catch (error: any) {
             setMessages(prev => prev.map(m =>
@@ -1165,11 +1304,12 @@ const Queue: React.FC<any> = () => {
         const userId = `${now}-user`;
         const aiMsgId = `${now}-ai`;
 
-        setMessages(prev => [
-            ...prev,
+        const initialMessages: Message[] = [
+            ...messages,
             { id: userId, role: "user", text: userDisplayMessage, timestamp: now },
             { id: aiMsgId, role: "ai", text: "", timestamp: now, isStreaming: true }
-        ]);
+        ];
+        setMessages(initialMessages);
 
         // 4. Call AI
         try {
@@ -1184,7 +1324,9 @@ const Queue: React.FC<any> = () => {
                 isCandidateMode: isCandidateMode
             });
 
-            setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m));
+            const finalMessages = initialMessages.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m);
+            setMessages(finalMessages);
+            saveChatToHistory(finalMessages);
         } catch (e: any) {
             console.error(e);
             setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: "Error: " + e.message, isStreaming: false } : m));
@@ -1227,8 +1369,8 @@ const Queue: React.FC<any> = () => {
         const userId = `${now}-user`;
         const userDisplayMessage = hasImages ? "Solve this coding problem (Screenshots attached)." : "Solve this coding problem based on the discussion.";
 
-        setMessages(prev => [
-            ...prev,
+        const initialMessages: Message[] = [
+            ...messages,
             {
                 id: userId,
                 role: "user",
@@ -1237,7 +1379,8 @@ const Queue: React.FC<any> = () => {
                 timestamp: now
             },
             { id: aiMsgId, role: "ai", text: "", timestamp: now, isStreaming: true }
-        ]);
+        ];
+        setMessages(initialMessages);
 
         // 5. Call API
         try {
@@ -1265,7 +1408,9 @@ const Queue: React.FC<any> = () => {
                 });
             }
 
-            setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m));
+            const finalMessages = initialMessages.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m);
+            setMessages(finalMessages);
+            saveChatToHistory(finalMessages);
 
         } catch (e: any) {
             setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: "Error: " + e.message, isStreaming: false } : m));
@@ -1340,17 +1485,17 @@ const Queue: React.FC<any> = () => {
                         <button onClick={() => setActiveTab("History")} className={`tab-btn flex items-center gap-1.5 ${activeTab === 'History' ? 'active' : ''}`}><History size={14} /> History</button>
                     </div>
 
-                    {showPostMeeting && (
+                    {(showPostMeeting || loadedSessionType === "Chat") && (
                         <div className="flex items-center justify-between px-4 py-2 bg-blue-500/10 border-b border-white/5 shrink-0">
                             <div className="text-xs text-blue-300 font-medium flex items-center gap-2">
                                 <History size={14} className="text-blue-400" />
-                                <span>Viewing Loaded Meeting</span>
+                                <span>{loadedSessionType === "Chat" ? "Viewing Chat Session" : "Viewing Loaded Meeting"}</span>
                             </div>
                             <button
-                                onClick={handleCloseMeeting}
-                                className="flex items-center gap-1.5 px-3 py-1 bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-gray-400 text-xs rounded transition-colors"
+                                onClick={loadedSessionType === "Chat" ? handleClearLoadedSession : handleCloseMeeting}
+                                className="flex items-center gap-1.5 px-3 py-1 bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-gray-400 text-xs rounded transition-colors shrink-0 outline-none"
                             >
-                                <X size={12} /> Close Meeting
+                                <X size={12} /> {loadedSessionType === "Chat" ? "Close Loaded Chat" : "Close Meeting"}
                             </button>
                         </div>
                     )}
@@ -1441,17 +1586,13 @@ const Queue: React.FC<any> = () => {
                                                         </div>
                                                     ) : (
                                                         <>
-                                                            <div className="user-bubble text-left pr-8 relative">
+                                                            <div className="user-bubble text-left relative">
                                                                 {msg.text}
-                                                                <button
-                                                                    onClick={() => handleStartEdit(msg)}
-                                                                    className="absolute top-1 right-1 p-1 opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-white"
-                                                                    title="Edit Message"
-                                                                >
-                                                                    <Edit2 size={12} />
-                                                                </button>
                                                             </div>
-                                                            <button onClick={() => handleCopyUserMessage(msg.text)} className="absolute top-1/2 -left-8 -translate-y-1/2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-white bg-black/40 rounded-full"><Copy size={12} /></button>
+                                                            <div className="absolute top-1/2 -left-16 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button onClick={() => handleCopyUserMessage(msg.text)} className="p-1.5 text-gray-500 hover:text-white bg-black/40 rounded-full"><Copy size={12} /></button>
+                                                                <button onClick={() => handleStartEdit(msg)} className="p-1.5 text-gray-400 hover:text-white bg-black/40 rounded-full"><Edit2 size={12} /></button>
+                                                            </div>
                                                         </>
                                                     )}
                                                 </div>
@@ -1520,56 +1661,148 @@ const Queue: React.FC<any> = () => {
                             </div>
                         )}
                         {activeTab === "History" && (
-                            <div className="flex-1 overflow-y-auto p-2 space-y-3">
-                                {pastMeetings.length === 0 ? (
-                                    <div className="text-gray-500 text-center mt-10 text-sm">No recorded meetings yet.</div>
-                                ) : (
-                                    pastMeetings.map((meeting) => (
-                                        <div key={meeting.id} onClick={() => loadMeeting(meeting)} className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-4 cursor-pointer transition-colors group">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="flex items-center gap-2 text-blue-300 font-medium flex-1">
-                                                    <Calendar size={14} className="shrink-0" />
-                                                    {editingTitleId === meeting.id ? (
-                                                        <div className="flex items-center gap-2 w-full pr-4 relative" onClick={(e) => e.stopPropagation()}>
-                                                            <input
-                                                                type="text"
-                                                                autoFocus
-                                                                value={editingTitleText}
-                                                                onChange={(e) => setEditingTitleText(e.target.value)}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter') handleSaveTitle(meeting, e);
-                                                                    if (e.key === 'Escape') handleCancelEditTitle(e);
+                            <div className="flex-1 flex flex-col min-h-0 interactive">
+                                <div className="flex justify-center p-3 shrink-0 border-b border-white/5">
+                                    <div className="flex bg-white/5 p-1 rounded-lg border border-white/10 scale-90">
+                                        <button onClick={() => setHistoryTab("Chats")} className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${historyTab === "Chats" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}>💬 Chat Sessions</button>
+                                        <button onClick={() => setHistoryTab("Meetings")} className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${historyTab === "Meetings" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}>🎙️ Meeting Transcripts</button>
+                                    </div>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+                                    {historyTab === "Chats" ? (
+                                        pastChats.length === 0 ? (
+                                            <div className="text-center text-gray-500 mt-10 text-sm">No saved chats yet.</div>
+                                        ) : (
+                                            pastChats.map(chat => (
+                                                <div key={chat.id} className="bg-white/5 border border-white/10 rounded-xl p-3 hover:border-blue-500/50 transition-all group relative">
+                                                    <div className="flex justify-between items-center">
+                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                            <button
+                                                                onClick={(e) => toggleChat(chat.id, e)}
+                                                                className="flex items-center gap-1.5 text-xs text-gray-200 font-medium hover:text-blue-400 transition-colors p-1 rounded hover:bg-white/5 flex-1 min-w-0"
+                                                                onMouseEnter={(e) => {
+                                                                    const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
+                                                                    if (span && span.scrollWidth > span.clientWidth) {
+                                                                        span.style.setProperty('--scroll-dist', `-${span.scrollWidth - span.clientWidth + 20}px`);
+                                                                        span.classList.add('can-marquee');
+                                                                    }
                                                                 }}
-                                                                className="bg-black/40 text-blue-300 text-sm px-2 py-1 rounded w-full border border-blue-500/50 outline-none"
-                                                            />
-                                                            <button onClick={(e) => handleSaveTitle(meeting, e)} className="p-1 hover:text-green-400 transition-colors cursor-pointer"><Check size={14} /></button>
-                                                            <button onClick={(e) => handleCancelEditTitle(e)} className="p-1 hover:text-red-400 transition-colors cursor-pointer"><X size={14} /></button>
+                                                                onMouseLeave={(e) => {
+                                                                    const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
+                                                                    if (span) span.classList.remove('can-marquee');
+                                                                }}
+                                                            >
+                                                                {expandedChats[chat.id] ? <ChevronDown size={14} className="shrink-0 text-blue-400" /> : <ChevronRight size={14} className="shrink-0 text-gray-500" />}
+                                                                <div className="marquee-container">
+                                                                    <span className="marquee-content">{chat.prompt}</span>
+                                                                </div>
+                                                            </button>
+                                                            <span className="text-gray-500 shrink-0 mx-1">•</span>
+                                                            <div className="text-[10px] text-blue-400/70 shrink-0">{new Date(chat.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                                         </div>
-                                                    ) : (
-                                                        <>
-                                                            <span className="whitespace-normal break-words">{meeting.title || new Date(meeting.date).toLocaleDateString()}</span>
-                                                            <span className="text-gray-500 shrink-0">•</span>
-                                                            <Clock size={14} className="shrink-0" />
-                                                            <span className="shrink-0">{new Date(meeting.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                                        </>
+                                                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
+                                                            <button onClick={(e) => handleLoadPastChat(chat, e)} className="px-2 py-0.5 bg-blue-600/20 text-blue-400 hover:bg-blue-500/40 hover:text-white rounded text-[9px] uppercase tracking-wider font-bold border border-blue-500/20 transition-all flex items-center gap-1"><ArrowRight size={10} /> Open</button>
+                                                            <button onClick={(e) => deleteChat(chat.id, e)} className="p-1 px-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"><Trash2 size={12} /></button>
+                                                        </div>
+                                                    </div>
+                                                    {expandedChats[chat.id] && (
+                                                        <div className="mt-4 pt-4 border-t border-white/10 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                            <div className="bg-black/40 rounded-lg p-4 border border-white/5 text-sm overflow-x-auto">
+                                                                <MessageContent text={chat.response} />
+                                                            </div>
+                                                        </div>
                                                     )}
                                                 </div>
-                                                {editingTitleId !== meeting.id && (
-                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button onClick={(e) => handleStartEditTitle(meeting, e)} className="p-1.5 text-gray-500 hover:text-blue-400 hover:bg-blue-400/10 rounded transition-colors"><Edit2 size={14} /></button>
-                                                        <button onClick={(e) => deleteMeeting(meeting.id, e)} className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"><Trash2 size={14} /></button>
+                                            ))
+                                        )
+                                    ) : (
+                                        pastMeetings.length === 0 ? (
+                                            <div className="text-center text-gray-500 mt-10 text-sm">No recorded meetings yet.</div>
+                                        ) : (
+                                            pastMeetings.map((meeting) => (
+                                                <div key={meeting.id} className="bg-white/5 border border-white/10 rounded-xl p-3 mb-2 hover:border-blue-500/50 transition-all group relative">
+                                                    <div className="flex justify-between items-center mb-3">
+                                                        <div className="flex items-center gap-1.5 text-blue-300 font-bold text-sm flex-1 min-w-0">
+                                                            <Calendar size={14} className="shrink-0 text-blue-400" />
+                                                            {editingTitleId === meeting.id ? (
+                                                                <div className="flex items-center gap-1.5 w-full relative" onClick={(e) => e.stopPropagation()}>
+                                                                    <input type="text" autoFocus value={editingTitleText} onChange={(e) => setEditingTitleText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTitle(meeting, e); if (e.key === 'Escape') handleCancelEditTitle(e); }} className="bg-black/40 text-blue-300 text-xs px-2 py-1 rounded w-full border border-blue-500/50 outline-none" />
+                                                                    <button onClick={(e) => handleSaveTitle(meeting, e)} className="p-1 hover:text-green-400 transition-colors"><Check size={14} /></button>
+                                                                    <button onClick={(e) => handleCancelEditTitle(e)} className="p-1 hover:text-red-400 transition-colors"><X size={14} /></button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center min-w-0 flex-1">
+                                                                    <div
+                                                                        className="marquee-container"
+                                                                        onMouseEnter={(e) => {
+                                                                            const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
+                                                                            if (span && span.scrollWidth > span.clientWidth) {
+                                                                                span.style.setProperty('--scroll-dist', `-${span.scrollWidth - span.clientWidth + 20}px`);
+                                                                                span.classList.add('can-marquee');
+                                                                            }
+                                                                        }}
+                                                                        onMouseLeave={(e) => {
+                                                                            const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
+                                                                            if (span) span.classList.remove('can-marquee');
+                                                                        }}
+                                                                    >
+                                                                        <span className="marquee-content">{meeting.title || new Date(meeting.date).toLocaleDateString()}</span>
+                                                                    </div>
+                                                                    <span className="text-gray-500 shrink-0 mx-1">•</span>
+                                                                    <Clock size={12} className="shrink-0 text-gray-400" />
+                                                                    <span className="shrink-0 text-gray-400 font-medium text-[10px] ml-0.5">{new Date(meeting.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        {editingTitleId !== meeting.id && (
+                                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
+                                                                <button onClick={(e) => handleLoadPastMeeting(meeting, e)} className="px-2 py-0.5 bg-blue-600/20 text-blue-400 hover:bg-blue-500/40 hover:text-white rounded text-[9px] uppercase tracking-wider font-bold border border-blue-500/20 transition-all flex items-center gap-1"><ArrowRight size={10} /> Open</button>
+                                                                <button onClick={(e) => handleStartEditTitle(meeting, e)} className="p-1 px-1.5 text-gray-400 hover:text-blue-400 hover:bg-blue-400/10 rounded transition-colors"><Edit2 size={12} /></button>
+                                                                <button onClick={(e) => deleteMeeting(meeting.id, e)} className="p-1 px-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"><Trash2 size={12} /></button>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
-                                            </div>
-                                            <div className="text-sm text-gray-400 line-clamp-2 mb-3">
-                                                {meeting.transcript.map(t => t.text).join(' ').slice(0, 150)}...
-                                            </div>
-                                            <div className="flex items-center gap-2 text-xs text-blue-400 font-medium group-hover:text-blue-300">
-                                                <span>View Details</span> <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
+                                                    <div className="relative group/transcript text-sm mb-4">
+                                                        <div className="flex justify-between items-center mb-2">
+                                                            <button onClick={(e) => toggleMeeting(meeting.id, e)} className="text-[11px] font-semibold text-blue-400/80 hover:text-blue-300 transition-colors uppercase tracking-wider flex items-center gap-1 focus:outline-none"> {expandedMeetings[meeting.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />} Transcript </button>
+                                                            <button
+                                                                onClick={(e) => handleCopyHistoryTranscript(meeting.id, meeting.transcript, e)}
+                                                                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all border opacity-0 group-hover/transcript:opacity-100 ${copiedTranscriptId === meeting.id ? 'bg-green-500/20 text-green-400 border-green-500/40' : 'bg-black/40 text-gray-500 border-white/5 hover:border-white/20 hover:text-white'}`}
+                                                            >
+                                                                {copiedTranscriptId === meeting.id ? <><Check size={10} /> Copied</> : <><Copy size={10} /> Copy</>}
+                                                            </button>
+                                                        </div>
+                                                        {expandedMeetings[meeting.id] ? (
+                                                            <div className="bg-black/50 rounded-lg p-3 border border-white/5 animate-in fade-in slide-in-from-top-1">
+                                                                <div className="max-h-[200px] overflow-y-auto custom-scrollbar pr-1 text-xs text-gray-200"> {meeting.transcript.map(t => (<div key={t.id} className="mb-2 border-l border-blue-500/40 pl-2"> <span className="text-[9px] text-gray-400 block font-medium">{t.displayTime}</span> {t.text} </div>))} </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="bg-black/40 hover:bg-black/80 hover:border-blue-500/50 transition-all rounded-lg p-3 border border-white/5 text-xs text-gray-300 hover:text-gray-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.1)] line-clamp-2 cursor-pointer shadow-inner" onClick={(e) => toggleMeeting(meeting.id, e)}> {meeting.transcript.map(t => t.text).join(' ').slice(0, 120)}... </div>
+                                                        )}
+                                                    </div>
+                                                    {meeting.emailDraft && (
+                                                        <div className="relative group/email text-sm">
+                                                            <div className="flex justify-between items-center mb-2">
+                                                                <button onClick={(e) => toggleEmail(meeting.id, e)} className="text-[11px] font-semibold text-purple-400/80 hover:text-purple-300 transition-colors uppercase gap-1 flex items-center focus:outline-none"> {expandedEmails[meeting.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />} Email </button>
+                                                                <button
+                                                                    onClick={(e) => handleCopyHistoryEmail(meeting.id, meeting.emailDraft, e)}
+                                                                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all border opacity-0 group-hover/email:opacity-100 ${copiedEmailId === meeting.id ? 'bg-green-500/20 text-green-400 border-green-500/40' : 'bg-black/40 text-gray-500 border-white/5 hover:border-white/20 hover:text-white'}`}
+                                                                >
+                                                                    {copiedEmailId === meeting.id ? <><Check size={10} /> Copied</> : <><Copy size={10} /> Copy</>}
+                                                                </button>
+                                                            </div>
+                                                            {expandedEmails[meeting.id] ? (
+                                                                <div className="bg-black/50 p-3 rounded-lg border border-purple-500/20 animate-in fade-in slide-in-from-top-1 text-xs text-gray-200"> <MessageContent text={meeting.emailDraft} /> </div>
+                                                            ) : (
+                                                                <div className="bg-black/40 hover:bg-black/80 hover:border-purple-500/40 transition-all p-3 rounded-lg border border-transparent text-xs text-gray-300 hover:text-gray-100 hover:shadow-[0_0_15px_rgba(168,85,247,0.1)] line-clamp-2 cursor-pointer shadow-inner" onClick={(e) => toggleEmail(meeting.id, e)}> {meeting.emailDraft.slice(0, 120)}... </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))
+                                        )
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1588,7 +1821,6 @@ const Queue: React.FC<any> = () => {
                                             <button
                                                 onClick={() => handleRemoveQueuedScreenshot(img.path)}
                                                 className="absolute -top-2 -right-2 p-0.5 bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                                title="Remove Image"
                                             >
                                                 <X size={10} className="text-white" />
                                             </button>
@@ -1611,7 +1843,7 @@ const Queue: React.FC<any> = () => {
                                 <div className="flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
                                     <button onClick={handleUseScreen} className="control-btn hover:bg-white/15 py-2 px-3"><Monitor size={14} className="text-blue-400" /><span>Queue Screen</span></button>
                                     <button onClick={() => setIsSmartMode(!isSmartMode)} className={`control-btn py-2 px-3 ${isSmartMode ? 'active' : ''}`}><Zap size={14} className={isSmartMode ? 'fill-current' : ''} /><span>Smart</span></button>
-                                    <button onClick={() => window.location.hash = "#/settings"} className="control-btn py-2 px-3 text-white/60 hover:text-white/90 hover:bg-white/10 transition-all" title={isStealth ? undefined : "Persona Settings"}><UserCog size={14} /><span>Persona</span></button>
+                                    <button onClick={() => window.location.hash = "#/settings"} className="control-btn py-2 px-3 text-white/60 hover:text-white/90 hover:bg-white/10 transition-all"><UserCog size={14} /><span>Persona</span></button>
                                     <div className="relative"> <button onClick={() => setShowModeMenu(!showModeMenu)} className="control-btn hover:bg-white/15 py-2 px-3"><span>{mode}</span><ChevronDown size={12} /></button> {showModeMenu && (<div className="absolute bottom-full left-0 mb-2 w-32 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"> {['General', 'Developer', 'Student'].map((m) => (<button key={m} onClick={() => handleModeSelect(m)} className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 ${mode === m ? 'text-blue-400 bg-white/5' : 'text-gray-300'}`}> {m} </button>))} </div>)} </div>
                                     {mode === "Student" && (<button onClick={() => setShowStudentModal(true)} className="control-btn hover:bg-white/15 py-2 px-3 text-blue-300"> <UserCog size={14} /> <span>Update Profile</span> </button>)}
                                 </div>
@@ -1620,11 +1852,10 @@ const Queue: React.FC<any> = () => {
                     )}
                 </div>
             )}
-            {/* ✨ ALWAYS-VISIBLE RESIZE HANDLE - Works in both collapsed and expanded states */}
+            {/* ✨ ALWAYS-VISIBLE RESIZE HANDLE */}
             <div
                 onMouseDown={startResize}
                 className="absolute bottom-0 right-0 w-10 h-10 cursor-se-resize flex items-end justify-end p-2 interactive hover:bg-blue-500/20 rounded-tl-xl transition-all z-[70] group"
-                title={isStealth ? undefined : "Drag to resize window"}
             >
                 <Scaling size={16} className="text-gray-500 group-hover:text-blue-400 transition-colors" />
             </div>

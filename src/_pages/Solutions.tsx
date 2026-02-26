@@ -508,8 +508,8 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
                     {problemStatementData && !solutionData && (
                       <div className="mt-4 flex">
                         <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
-                          {problemStatementData?.output_format?.subtype === "voice" 
-                            ? "Processing voice input..." 
+                          {problemStatementData?.output_format?.subtype === "voice"
+                            ? "Processing voice input..."
                             : "Generating solutions..."}
                         </p>
                       </div>

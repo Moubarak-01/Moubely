@@ -230,3 +230,48 @@ a,
 .cursor-pointer {
   cursor: default !important;
 }
+
+/* --- HOVER MARQUEE --- */
+.marquee-container {
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  /* Helps bound the text properly */
+}
+
+.marquee-container:hover {
+  mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+}
+
+.marquee-content {
+  display: inline-block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 100%;
+  vertical-align: bottom;
+}
+
+.marquee-container:hover .marquee-content.can-marquee {
+  text-overflow: clip;
+  overflow: visible;
+  animation: marquee-scroll 4s linear infinite alternate;
+  padding-right: 20px;
+  /* Space before it bumps the edge */
+}
+
+@keyframes marquee-scroll {
+
+  0%,
+  15% {
+    transform: translateX(0);
+  }
+
+  85%,
+  100% {
+    transform: translateX(var(--scroll-dist, -20px));
+  }
+}

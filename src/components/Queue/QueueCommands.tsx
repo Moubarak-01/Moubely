@@ -80,14 +80,13 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
   return (
     <div className="w-fit">
       <div className="text-xs text-white/90 liquid-glass-bar py-1 px-3 flex items-center justify-center gap-3 draggable-area border border-white/10 shadow-2xl bg-black/40 backdrop-blur-xl rounded-full">
-        
+
         {/* Voice Recording Button */}
         <div className="flex items-center">
           <button
             className={`transition-colors rounded-full p-1.5 flex items-center justify-center ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
             onClick={handleRecordClick}
             type="button"
-            title={isRecording ? "Stop Recording" : "Record Audio"}
           >
             <span className="text-[10px] mr-1">{isRecording ? "●" : "🎤"}</span>
           </button>
@@ -98,46 +97,41 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
 
         {/* --- NEW 5-BUTTON TOOLBAR (Mini Version) --- */}
         <div className="flex items-center gap-1">
-          <button 
+          <button
             onClick={() => handleAction('assist')}
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-blue-500/20 text-blue-300 transition-colors"
-            title="Assist"
           >
-            <Sparkles size={11}/>
+            <Sparkles size={11} />
           </button>
-          
-          <button 
+
+          <button
             onClick={() => handleAction('reply')}
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-emerald-500/20 text-emerald-300 transition-colors"
-            title="Reply"
           >
-            <MessageCircle size={11}/>
+            <MessageCircle size={11} />
           </button>
-          
+
           {/* Answer Button (Highlighted) */}
-          <button 
+          <button
             onClick={() => handleAction('answer')}
             className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-500/20 hover:bg-purple-500/40 text-purple-200 font-bold transition-all border border-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.2)]"
-            title="Answer as YOU (Digital Twin)"
           >
-            <Zap size={11} className="fill-current"/> <span className="text-[10px]">You</span>
+            <Zap size={11} className="fill-current" /> <span className="text-[10px]">You</span>
           </button>
-          
-          <button 
+
+          <button
             onClick={() => handleAction('ask')}
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-orange-500/20 text-orange-300 transition-colors"
-            title="Ask Questions"
           >
-            <HelpCircle size={11}/>
+            <HelpCircle size={11} />
           </button>
-          
-          <button 
+
+          <button
             onClick={() => handleAction('recap')}
             className="flex items-center gap-1 px-2 py-1 rounded hover:bg-white/10 text-gray-300 transition-colors"
-            title="Recap"
           >
-            <FileText size={11}/>
-          </button> 
+            <FileText size={11} />
+          </button>
         </div>
 
         {/* Separator */}
@@ -172,14 +166,13 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
         {/* Sign Out */}
         <button
           className="text-red-500/50 hover:text-red-500 hover:bg-red-500/10 p-1 rounded-full transition-colors"
-          title="Sign Out"
           // @ts-ignore
           onClick={() => window.electronAPI.quitApp()}
         >
           <IoLogOutOutline className="w-3.5 h-3.5" />
         </button>
       </div>
-      
+
       {/* Audio Result Toast */}
       {audioResult && (
         <div className="absolute top-full mt-2 left-0 right-0 p-2 bg-black/80 backdrop-blur border border-white/10 rounded-lg text-white text-[10px] text-center">
