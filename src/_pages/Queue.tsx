@@ -1369,13 +1369,24 @@ const Queue: React.FC<any> = () => {
             case "recap": userDisplayMessage = "Recap the discussion."; break;
         }
 
+        const hasImages = queuedScreenshots.length > 0;
         const now = Date.now();
         const userId = `${now}-user`;
         const aiMsgId = `${now}-ai`;
 
+        if (hasImages) {
+            userDisplayMessage += " (Screenshots attached)";
+        }
+
         const initialMessages: Message[] = [
             ...messages,
-            { id: userId, role: "user", text: userDisplayMessage, timestamp: now },
+            {
+                id: userId,
+                role: "user",
+                text: userDisplayMessage,
+                queuedScreenshots: hasImages ? [...queuedScreenshots] : undefined,
+                timestamp: now
+            },
             { id: aiMsgId, role: "ai", text: "", timestamp: now, isStreaming: true }
         ];
         setMessages(initialMessages);
@@ -1384,14 +1395,26 @@ const Queue: React.FC<any> = () => {
         try {
             const history = messages.map(m => ({ role: m.role, text: m.text }));
             const isCandidateMode = actionType === 'answer' || mode === 'Student';
+            let response = "";
 
-            const response = await window.electronAPI.invoke("gemini-chat", {
-                message: transcriptText || "Context from files",
-                mode: mode,
-                history: history,
-                type: actionType,
-                isCandidateMode: isCandidateMode
-            });
+            if (hasImages) {
+                const imagePaths = queuedScreenshots.map(i => i.path);
+                // Use chatWithImage for visual context
+                response = await window.electronAPI.chatWithImage(
+                    transcriptText || userDisplayMessage,
+                    imagePaths,
+                    actionType as any
+                );
+                handleClearQueue();
+            } else {
+                response = await window.electronAPI.invoke("gemini-chat", {
+                    message: transcriptText || "Context from files",
+                    mode: mode,
+                    history: history,
+                    type: actionType,
+                    isCandidateMode: isCandidateMode
+                });
+            }
 
             const finalMessages = initialMessages.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m);
             setMessages(finalMessages);
