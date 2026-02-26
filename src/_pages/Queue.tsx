@@ -4,7 +4,7 @@ import {
     X, Mic, Monitor, Zap, Send,
     Loader2, Sparkles, MessageSquare, History,
     GripHorizontal, HelpCircle, MessageCircleQuestion, FileText,
-    Scaling, Copy, Check, Trash2, Mail,
+    Scaling, Copy, Check, CheckCheck, Trash2, Mail,
     Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
     Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw, Plus
 } from "lucide-react"
@@ -228,7 +228,7 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
                                 <div className="bg-white/5 px-3 py-1.5 text-[10px] text-gray-500 border-b border-white/5 flex justify-between items-center uppercase font-mono tracking-wider">
                                     <span>{match?.[1] || 'text'}</span>
                                     <button onClick={handleCopyCode} className="flex items-center gap-1.5 hover:text-white text-gray-400 transition-colors bg-white/5 hover:bg-white/10 px-2 py-1 rounded cursor-pointer">
-                                        {isCopied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                                        {isCopied ? <CheckCheck size={12} className="text-green-400" /> : <Copy size={12} />}
                                         <span>{isCopied ? 'Copied' : 'Copy'}</span>
                                     </button>
                                 </div>
@@ -888,6 +888,7 @@ const Queue: React.FC<any> = () => {
 
     // --- INTERACTION FEEDBACK STATES ---
     const [isCopied, setIsCopied] = useState(false);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
     const [isRegeneratingEmail, setIsRegeneratingEmail] = useState(false);
 
     const handleCopyEmail = () => {
@@ -1039,7 +1040,17 @@ const Queue: React.FC<any> = () => {
     };
 
 
-    const handleCopyUserMessage = (text: string) => { navigator.clipboard.writeText(text); }
+    const handleCopyUserMessage = (id: string, text: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+    }
+
+    const handleCopyAiMessage = (id: string, text: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+    }
     const startResize = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); resizeRef.current = { startX: e.clientX, startY: e.clientY, startW: document.body.offsetWidth, startH: document.body.offsetHeight }; document.addEventListener('mousemove', doResize); document.addEventListener('mouseup', stopResize); }
     const doResize = (e: MouseEvent) => {
         if (!resizeRef.current || !window.electronAPI) return;
@@ -1687,7 +1698,12 @@ const Queue: React.FC<any> = () => {
                                                                 <CollapsibleUserMessage text={msg.text} />
                                                             </div>
                                                             <div className="absolute top-1/2 -left-16 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button onClick={() => handleCopyUserMessage(msg.text)} className="p-1.5 text-gray-500 hover:text-white bg-black/40 rounded-full"><Copy size={12} /></button>
+                                                                <button
+                                                                    onClick={() => handleCopyUserMessage(msg.id, msg.text)}
+                                                                    className={`p-1.5 transition-colors rounded-full ${copiedId === msg.id ? 'text-green-400 bg-green-400/10' : 'text-gray-500 hover:text-white bg-black/40'}`}
+                                                                >
+                                                                    {copiedId === msg.id ? <CheckCheck size={12} /> : <Copy size={12} />}
+                                                                </button>
                                                                 <button onClick={() => handleStartEdit(msg)} className="p-1.5 text-gray-400 hover:text-white bg-black/40 rounded-full"><Edit2 size={12} /></button>
                                                             </div>
                                                         </>
@@ -1695,8 +1711,16 @@ const Queue: React.FC<any> = () => {
                                                 </div>
                                             )}
                                             {msg.role === "ai" && (
-                                                <div className="ai-message max-w-[95%]">
+                                                <div className="ai-message max-w-[95%] group relative">
                                                     <MessageContent text={msg.text} />
+                                                    <div className="absolute top-0 -right-10 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button
+                                                            onClick={() => handleCopyAiMessage(msg.id, msg.text)}
+                                                            className={`p-1.5 transition-colors rounded-full ${copiedId === msg.id ? 'text-green-400 bg-green-400/10' : 'text-gray-500 hover:text-white bg-black/40'}`}
+                                                        >
+                                                            {copiedId === msg.id ? <CheckCheck size={12} /> : <Copy size={12} />}
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -1742,7 +1766,7 @@ const Queue: React.FC<any> = () => {
                                                     onClick={handleCopyEmail}
                                                     className={`text-xs flex items-center gap-1 transition-colors ${isCopied ? 'text-green-400' : 'hover:text-white text-gray-400'}`}
                                                 >
-                                                    {isCopied ? <Check size={12} /> : <Copy size={12} />}
+                                                    {isCopied ? <CheckCheck size={12} /> : <Copy size={12} />}
                                                     {isCopied ? 'Copied!' : 'Copy Draft'}
                                                 </button>
                                             </div>
