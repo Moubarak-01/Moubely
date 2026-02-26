@@ -157,14 +157,16 @@ body {
 
 /* Chat Bubbles */
 .user-bubble {
-  background-color: #3b82f6;
+  background-color: #27272a;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  /* Subtle border for premium feel */
   color: white;
   border-radius: 18px;
   border-top-right-radius: 4px;
   padding: 10px 18px;
   font-size: clamp(12px, 2.5vmin, 14px);
   line-height: 1.5;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   max-width: 85%;
 }
 

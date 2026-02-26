@@ -6,7 +6,7 @@ import {
     GripHorizontal, HelpCircle, MessageCircleQuestion, FileText,
     Scaling, Copy, Check, Trash2, Mail,
     Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
-    Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw
+    Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw, Plus
 } from "lucide-react"
 
 // --- IMPORTS FOR FORMULAS & HIGHLIGHTING ---
@@ -242,6 +242,50 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
             >
                 {text}
             </ReactMarkdown>
+        </div>
+    );
+};
+
+const CollapsibleUserMessage: React.FC<{ text: string }> = ({ text }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [isTruncatable, setIsTruncatable] = useState(false);
+    const contentRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (contentRef.current) {
+            // Check if scrollHeight naturally exceeds ~5 lines threshold (120px)
+            if (contentRef.current.scrollHeight > 120) {
+                setIsTruncatable(true);
+            } else {
+                setIsTruncatable(false);
+            }
+        }
+    }, [text]);
+
+    return (
+        <div className="relative group/collapse pr-6">
+            <div
+                ref={contentRef}
+                className={`whitespace-pre-wrap word-break-words transition-all duration-300 ease-in-out ${!isExpanded && isTruncatable ? 'line-clamp-5' : ''}`}
+            >
+                {text}
+            </div>
+
+            {/* Expand / Collapse Button exactly matching the User Reference Picture */}
+            {isTruncatable && (
+                <div className="absolute top-0 right-0 flex items-center justify-center z-10 mt-1">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+                        className="p-1 text-gray-400 hover:text-white transition-colors cursor-pointer"
+                    >
+                        {isExpanded ? (
+                            <ChevronUp size={16} />
+                        ) : (
+                            <ChevronDown size={16} />
+                        )}
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
@@ -1121,6 +1165,27 @@ const Queue: React.FC<any> = () => {
         setExpandedEmails(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
+    const generateAndSaveTitle = async (sessionId: string, userText: string) => {
+        if (!window.electronAPI) return;
+        try {
+            const title = await window.electronAPI.invoke("gemini-chat", {
+                message: `Create a very short title (max 5 words, no quotes) for this chat prompt. Output only the title. Prompt: ${userText}`,
+                mode: "general",
+                history: [],
+                type: "general",
+                isCandidateMode: false
+            });
+            const cleanTitle = title.replace(/['"]/g, '').trim();
+            setPastChats(prev => {
+                const updated = prev.map(c => c.id === sessionId ? { ...c, prompt: cleanTitle } : c);
+                localStorage.setItem('moubely_chats', JSON.stringify(updated));
+                return updated;
+            });
+        } catch (e) {
+            console.error("Title generation generation failed:", e);
+        }
+    };
+
     const saveChatToHistory = (messagesToSave: Message[], sessionIdArg?: string | null) => {
         if (!messagesToSave || messagesToSave.length === 0) return;
 
@@ -1159,6 +1224,10 @@ const Queue: React.FC<any> = () => {
                 };
                 const updated = [newChat, ...prev];
                 localStorage.setItem('moubely_chats', JSON.stringify(updated));
+
+                // Auto-generate title for the new session
+                generateAndSaveTitle(activeSessionId, firstUserMessage);
+
                 return updated;
             }
         });
@@ -1477,12 +1546,17 @@ const Queue: React.FC<any> = () => {
             {isExpanded && (
                 <div className="flex-1 flex flex-col min-h-0 interactive animate-in fade-in slide-in-from-top-4 duration-500 delay-75">
 
-                    <div className="tab-nav justify-start overflow-x-auto no-scrollbar shrink-0 border-b border-white/5 relative">
+                    <div className="tab-nav justify-start overflow-x-auto no-scrollbar shrink-0 border-b border-white/5 relative flex items-center">
                         <button onClick={() => setActiveTab("Chat")} className={`tab-btn ${activeTab === 'Chat' ? 'active' : ''}`}>Chat</button>
                         <button onClick={() => setActiveTab("Transcript")} className={`tab-btn ${activeTab === 'Transcript' ? 'active' : ''}`}>Transcript</button>
 
                         {showPostMeeting && <button onClick={() => setActiveTab("Email")} className={`tab-btn flex items-center gap-1.5 ${activeTab === 'Email' ? 'active' : ''}`}><Mail size={14} /> Email</button>}
                         <button onClick={() => setActiveTab("History")} className={`tab-btn flex items-center gap-1.5 ${activeTab === 'History' ? 'active' : ''}`}><History size={14} /> History</button>
+
+                        <div className="flex-1" />
+                        <button onClick={handleClearLoadedSession} className="text-xs flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors pr-4 whitespace-nowrap font-medium outline-none">
+                            <Plus size={14} /> New Chat
+                        </button>
                     </div>
 
                     {(showPostMeeting || loadedSessionType === "Chat") && (
@@ -1587,7 +1661,7 @@ const Queue: React.FC<any> = () => {
                                                     ) : (
                                                         <>
                                                             <div className="user-bubble text-left relative">
-                                                                {msg.text}
+                                                                <CollapsibleUserMessage text={msg.text} />
                                                             </div>
                                                             <div className="absolute top-1/2 -left-16 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                 <button onClick={() => handleCopyUserMessage(msg.text)} className="p-1.5 text-gray-500 hover:text-white bg-black/40 rounded-full"><Copy size={12} /></button>
