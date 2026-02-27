@@ -330,14 +330,6 @@ export class LLMHelper {
        - **Complexity:** State the exact Time Complexity and Space Complexity.
        - **Key Follow-Ups:** Instead of listing full questions, provide 2-3 brief descriptions of common follow-up scenarios (e.g., "If memory is constrained..." or "To handle duplicates...") and immediately state the exact answer or code change required.
 
-    ### 🚫 BEHAVIORAL QUESTIONS: THE "PIVOT" RULE
-    If the interviewer shifts to a behavioral question during this coding session:
-    1. **TRUTH ONLY:** Check "STUDENT FILES". Do not lie about software teams. 
-    2. **THE PIVOT:** 
-    - If it's about Teamwork/Pressure: Pivot to [Sports/Team] related experience.
-    - If it's about Process/Detail: Pivot to [Hands-On/Field-Based] experience.
-    - Structure: "On my solo projects, I handle this myself, but I learned how to manage [Conflict/Detail] during my time as a [Athlete/Intern] where I..."
-    3. **WAR STORIES:** Mention specific technical wins found in the files.
 
     ### 📝 OUTPUT STYLE
     - **Language:** Detect the programming language from the provided screenshots (e.g., look for language dropdowns like "Python3", "Java", "C++", or recognize the syntax). If a language is visible in the images or explicitly requested, you MUST use that exact language. ONLY default to Python if absolutely no language can be determined.
@@ -441,6 +433,17 @@ ANALOGY ENFORCEMENT (If Communication Style is "Analogy-Heavy"):
 - Slow/tedious work: "It felt like walking through thick mud."
 - Complex debugging: "It was like trying to find a needle in a haystack."
 - Technical challenges: Use a physical metaphor appropriate to the context.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💬 BEHAVIORAL QUESTIONS: THE "PIVOT" RULE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+If the interviewer asks a behavioral question during this session:
+1. **TRUTH ONLY:** Check "STUDENT FILES". Do not lie about software teams. 
+2. **THE PIVOT:** 
+- If it's about Teamwork/Pressure: Pivot to [Sports/Team] related experience.
+- If it's about Process/Detail: Pivot to [Hands-On/Field-Based] experience.
+- Structure: "On my solo projects, I handle this myself, but I learned how to manage [Conflict/Detail] during my time as a [Athlete/Intern] where I..."
+3. **WAR STORIES:** Mention specific technical wins found in the files.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 � FORMATTING RULES
@@ -622,8 +625,10 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
 `;
         } else {
             personaInstruction = `
-          *** MODE: TECHNICAL ASSISTANT ***
-          You are a helpful coding assistant named 'Moubely'. Speak objectively, concisely and dense.
+          *** MODE: PROFESSIONAL ASSISTANT ***
+          You are a Professional Assistant acting on behalf of a ${userProfile.targetPersona}.
+          Your communication style should be: ${userProfile.communicationStyle}.
+          Speak intelligently regarding their background in: ${userProfile.keyExperiences}.
           `;
         }
 
@@ -793,92 +798,10 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
 
                 let finalSystemInstruction = baseSystemInstruction;
 
-                // [NEW] DYNAMIC STORY INJECTION (SYSTEM-LEVEL)
-                // This ensures ALL models (Gemini, OpenRouter, Groq, etc.) get the same story enforcement
-                if (isCandidateMode) {
-                    let userProfile: any = {};
-                    try {
-                        const profilePath = path.join(app.getPath("userData"), "user_profile.json");
-                        if (fs.existsSync(profilePath)) {
-                            userProfile = JSON.parse(fs.readFileSync(profilePath, 'utf-8'));
-                            console.log(`[LLM] 📖 User Profile Loaded: ${Object.keys(userProfile).join(', ')}`);
-                        } else {
-                            console.warn(`[LLM] ⚠️ Profile not found at: ${profilePath}`);
-                        }
-                    } catch (e: any) {
-                        console.error(`[LLM] ❌ Profile Load Error: ${e.message}`);
-                    }
-
-                    // [NEW] SMART QUESTION ISOLATION: Extract last 30 seconds for keyword detection
-                    // This prevents old questions from triggering wrong stories
-
-
-                    // [FIX] Combine recent session history (last 2000 chars) with current message
-                    // This ensures we catch questions asked verbally in the meeting that are stored in transcript
-                    const historyContext = this.sessionTranscript.slice(-2000);
-                    const recentMessage = (historyContext + "\n" + message).slice(-2000);
-
-                    const lowerMsg = recentMessage.toLowerCase();
-                    let storyEnforcementRule = "";
-
-                    console.log(`[LLM] 🔍 Checking RECENT message for story keywords: "${recentMessage.substring(0, 60)}..."`);
-
-                    // Check for keyword matches in story mappings
-                    if (userProfile.storyMappings && Array.isArray(userProfile.storyMappings)) {
-                        console.log(`[LLM] 📚 Found ${userProfile.storyMappings.length} story mappings`);
-
-                        // [NEW] Build prohibition list for already-told stories
-                        let prohibitionNote = "";
-                        if (this.storiesTold.size > 0) {
-                            const toldList = Array.from(this.storiesTold).join(', ');
-                            prohibitionNote = `\n\n⚠️ STORIES ALREADY TOLD IN THIS SESSION:\n${toldList}\n\nYou MUST NOT repeat these stories. Choose a DIFFERENT project or challenge from the student files.\n`;
-                            console.log(`[LLM] 🚫 Stories already told: ${toldList}`);
-                        }
-
-                        for (const mapping of userProfile.storyMappings) {
-                            const isMatch = mapping.keywords.some((kw: string) => lowerMsg.includes(kw.toLowerCase()));
-
-                            // Check if this story has already been told
-                            if (isMatch && this.storiesTold.has(mapping.storyName)) {
-                                console.log(`[LLM] 🔁 SKIPPING "${mapping.storyName}" - Already told this session`);
-                                continue; // Skip to next mapping
-                            }
-
-                            if (isMatch) {
-                                console.log(`[LLM] ✅ MATCH FOUND: "${mapping.storyName}" (matched keywords: ${mapping.keywords.filter((kw: string) => lowerMsg.includes(kw.toLowerCase())).join(', ')})`);
-
-                                // Mark story as told
-                                this.storiesTold.add(mapping.storyName);
-
-                                storyEnforcementRule = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 STORY ENFORCEMENT & HUMAN EMBODIMENT (PRIORITY OVERRIDE)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThe user's current question matches: "${mapping.storyName}"\n\n${mapping.triggerPrompt}${prohibitionNote}\n\n👤 MANDATORY HUMAN TOUCH - YOU MUST DO THIS:\n1. ONE HESITATION: You MUST include exactly 1 natural hesitation (e.g., "I tried... actually, wait", "Hmm, the best way...").\n2. BRIDGE TRANSITIONS: If you have answered a previous question, you MUST reference it (e.g., "Like I said about the mirrors...").\n3. EMOTIONAL TONE: Match the frustration or satisfaction of the story.\n4. NO HEADERS: Do NOT use section headers. Just speak naturally.\n\nYou MUST follow these instructions EXACTLY. Any deviation invalidates the response.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-                                break;
-                            }
-                        }
-                        if (!storyEnforcementRule) {
-                            console.log(`[LLM] ❌ No story match found. Using general candidate mode.`);
-                            // [FIX] Enforce personalization even for general questions
-                            storyEnforcementRule = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 GENERAL PERSONALIZATION RULE\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nEven though this is a general question, you MUST answer based on the "STUDENT FILES" context provided below if applicable.\n- If the answer is in the files, USE IT.\n- Do NOT give generic "AI" advice if you can answer as the student.\n` + (prohibitionNote || "");
-                        }
-                    } else {
-                        console.warn(`[LLM] ⚠️ No story mappings found in profile!`);
-                        // [FIX] Even with no mappings, enforce personalization
-                        storyEnforcementRule = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 GENERAL PERSONALIZATION RULE\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nAnswer based on the "STUDENT FILES" context provided below.\n`;
-                    }
-
-                    finalSystemInstruction += storyEnforcementRule;
-                }
-
-                if ((mode === "Student" || isCandidateMode) && this.cachedStudentText) {
-                    if (config.type === 'perplexity') {
-                        // LAZY DISTILLATION: Only generate summary now if we don't have it
-                        if (!this.cachedStudentSummary) {
-                            this.cachedStudentSummary = await this.generateStudentSummary(this.cachedStudentText);
-                        }
-                        finalSystemInstruction += `\n\n=== STUDENT SUMMARY ===\n${this.cachedStudentSummary}\n`;
-                    } else {
-                        // EVERYONE ELSE GETS THE FULL RAW FILES
-                        finalSystemInstruction += `\n\n=== STUDENT FILES ===\n${this.cachedStudentText}\n`;
-                    }
+                // [NEW] UNIFIED PERSONA & STORY INJECTION
+                if (isCandidateMode || mode === "Student") {
+                    const studentAugmentation = await this.getStudentAugmentation(message, config.type, type);
+                    finalSystemInstruction += studentAugmentation;
                 }
 
                 let fullResponse = "";
@@ -951,9 +874,15 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
         }
         if (imageParts.length === 0) return "❌ No valid images found.";
 
-        // ENFORCE SYSTEM RULES FOR VISION MODELS
-        const systemRules = this.getSystemInstruction(type, false); // Use the provided type (e.g., 'solve' for coding problems)
+        const isCandidateMode = type === 'answer' || type === 'reply' || type === 'solve';
+        const systemRules = this.getSystemInstruction(type, isCandidateMode);
         let visionPrompt = `${systemRules}\n\nUSER REQUEST: ${message || "Analyze these images."}`;
+
+        // [NEW] AUGMENT VISION MODELS WITH STUDENT CONTEXT
+        if (isCandidateMode) {
+            const studentAugmentation = await this.getStudentAugmentation(message, "gemini", type);
+            visionPrompt += studentAugmentation;
+        }
 
         if (this.sessionTranscript) visionPrompt += `\n\nContext: ${this.sessionTranscript}`;
         const textPart = { type: "text", text: visionPrompt };
@@ -1079,5 +1008,69 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
     public getCurrentProvider() { return "Cloud Waterfall"; }
     public getCurrentModel() { return "auto"; }
     public async switchToOllama() { return { success: false, error: "Ollama removed" }; }
+    private async getStudentAugmentation(message: string, modelType: string, taskType: string = "general"): Promise<string> {
+        let augmentation = "";
+        let userProfile: any = {};
+
+        try {
+            const profilePath = path.join(app.getPath("userData"), "user_profile.json");
+            if (fs.existsSync(profilePath)) {
+                userProfile = JSON.parse(fs.readFileSync(profilePath, 'utf-8'));
+            }
+        } catch (e: any) {
+            console.error(`[LLM] ❌ Persona Load Error: ${e.message}`);
+        }
+
+        // 1. STORY MAPPING & ENFORCEMENT
+        // [PROTECTION] Skip Story Enforcement for 'solve' tasks to preserve the strict 6-section format headers.
+        const isSolveTask = taskType === 'solve';
+        const historyContext = this.sessionTranscript.slice(-2000);
+        const recentMessage = (historyContext + "\n" + message).slice(-2000);
+        const lowerMsg = recentMessage.toLowerCase();
+        let storyEnforcementRule = "";
+
+        if (userProfile.storyMappings && Array.isArray(userProfile.storyMappings)) {
+            let prohibitionNote = "";
+            if (this.storiesTold.size > 0) {
+                const toldList = Array.from(this.storiesTold).join(', ');
+                prohibitionNote = `\n\n⚠️ STORIES ALREADY TOLD IN THIS SESSION:\n${toldList}\n\nYou MUST NOT repeat these stories.\n`;
+            }
+
+            for (const mapping of userProfile.storyMappings) {
+                const isMatch = mapping.keywords.some((kw: string) => lowerMsg.includes(kw.toLowerCase()));
+                if (isMatch && !this.storiesTold.has(mapping.storyName)) {
+                    this.storiesTold.add(mapping.storyName);
+
+                    // Only apply Story Enforcement (Hesitations/No Headers) if it's NOT a solve task.
+                    if (isSolveTask) {
+                        storyEnforcementRule = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 PERSONALIZATION (SOLVE MODE)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThis question relates to your past project: "${mapping.storyName}".\nUse details from that project if helpful, but stick strictly to the **6-section STAR format** and headers required for coding solutions.\n`;
+                    } else {
+                        storyEnforcementRule = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 STORY ENFORCEMENT & HUMAN EMBODIMENT\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nThe user's current question matches: "${mapping.storyName}"\n\n${mapping.triggerPrompt}${prohibitionNote}\n\n👤 MANDATORY HUMAN TOUCH:\n1. ONE HESITATION (e.g., "I tried... actually, wait").\n2. BRIDGE TRANSITIONS (e.g., "Like I said earlier...").\n3. EMOTIONAL TONE: Match the story's feeling.\n4. NO HEADERS.\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+                    }
+                    break;
+                }
+            }
+            if (!storyEnforcementRule) {
+                storyEnforcementRule = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 GENERAL PERSONALIZATION RULE\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nAnswer based on the "STUDENT FILES" context provided below if applicable.\n` + (prohibitionNote || "");
+            }
+        } else {
+            storyEnforcementRule = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🎯 GENERAL PERSONALIZATION RULE\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nAnswer based on the "STUDENT FILES" context provided below.\n`;
+        }
+
+        augmentation += storyEnforcementRule;
+
+        // 2. STUDENT FILE INJECTION
+        if (this.cachedStudentText) {
+            if (modelType === 'perplexity') {
+                if (!this.cachedStudentSummary) this.cachedStudentSummary = await this.generateStudentSummary(this.cachedStudentText);
+                augmentation += `\n\n=== STUDENT SUMMARY ===\n${this.cachedStudentSummary}\n`;
+            } else {
+                augmentation += `\n\n=== STUDENT FILES ===\n${this.cachedStudentText}\n`;
+            }
+        }
+
+        return augmentation;
+    }
+
     public async switchToGemini(apiKey?: string) { if (apiKey) this.initializeProviders(apiKey); }
 }

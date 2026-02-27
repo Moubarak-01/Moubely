@@ -395,6 +395,7 @@ const Queue: React.FC<any> = () => {
 
     const chatContainerRef = useRef<HTMLDivElement>(null)
     const isAtBottomRef = useRef(true)
+    const didJumpRef = useRef(false)
 
     const isExpandedRef = useRef(isExpanded);
     const isRecordingRef = useRef(isRecording);
@@ -559,17 +560,32 @@ const Queue: React.FC<any> = () => {
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
         const distanceToBottom = scrollHeight - scrollTop - clientHeight;
-        isAtBottomRef.current = distanceToBottom < 50;
+        // SMART THRESHOLD: 30px proximity counts as "Bottom"
+        isAtBottomRef.current = distanceToBottom < 30;
     };
 
     useEffect(() => {
-        if (activeTab === "Chat" && isAtBottomRef.current && chatContainerRef.current) {
-            chatContainerRef.current.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: 'smooth' });
+        if (activeTab === "Chat") {
+            if (isThinking && !didJumpRef.current) {
+                // INITIAL JUMP: AI just started thinking/streaming
+                isAtBottomRef.current = true;
+                didJumpRef.current = true;
+                chatContainerRef.current?.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: 'smooth' });
+            } else if (isAtBottomRef.current && chatContainerRef.current) {
+                // STICKY SCROLL: Follow the text as it tokens in
+                chatContainerRef.current.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: 'auto' });
+            }
+
+            // Reset jump trigger when AI is done
+            if (!isThinking && messages.every(m => !m.isStreaming)) {
+                didJumpRef.current = false;
+            }
         }
+
         if (activeTab === "Transcript" && transcriptEndRef.current) {
             transcriptEndRef.current.scrollIntoView({ behavior: "smooth" })
         }
-    }, [messages, transcriptLogs, activeTab, isExpanded])
+    }, [messages, transcriptLogs, activeTab, isExpanded, isThinking])
 
     useEffect(() => {
         if (textareaRef.current) {
@@ -1197,10 +1213,10 @@ const Queue: React.FC<any> = () => {
         }
     };
 
-    const saveChatToHistory = (messagesToSave: Message[], sessionIdArg?: string | null) => {
+    const saveChatToHistory = (messagesToSave: Message[], sessionIdArg?: string | null, presetTitle?: string) => {
         if (!messagesToSave || messagesToSave.length === 0) return;
 
-        const firstUserMessage = messagesToSave.find(m => m.role === 'user')?.text || "Chat Session";
+        const firstUserMessage = presetTitle || messagesToSave.find(m => m.role === 'user')?.text || "Chat Session";
         const lastAiMessage = messagesToSave.filter(m => m.role === 'ai').pop()?.text || "";
 
         let activeSessionId = sessionIdArg !== undefined ? sessionIdArg : loadedSessionId;
@@ -1236,8 +1252,10 @@ const Queue: React.FC<any> = () => {
                 const updated = [newChat, ...prev];
                 localStorage.setItem('moubely_chats', JSON.stringify(updated));
 
-                // Auto-generate title for the new session
-                generateAndSaveTitle(activeSessionId, firstUserMessage);
+                // Auto-generate title ONLY if no preset title was provided
+                if (!presetTitle) {
+                    generateAndSaveTitle(activeSessionId, firstUserMessage);
+                }
 
                 return updated;
             }
@@ -1429,7 +1447,18 @@ const Queue: React.FC<any> = () => {
 
             const finalMessages = initialMessages.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m);
             setMessages(finalMessages);
-            saveChatToHistory(finalMessages);
+
+            // Determine Preset Title based on Action
+            let presetTitle = "";
+            switch (actionType) {
+                case "assist": presetTitle = "Fact-Checking Assistant"; break;
+                case "reply": presetTitle = "Communication Support"; break;
+                case "answer": presetTitle = "Digital Twin Explanation"; break;
+                case "ask": presetTitle = "Interview Question Analysis"; break;
+                case "recap": presetTitle = "Discussion Recap"; break;
+            }
+
+            saveChatToHistory(finalMessages, null, presetTitle);
         } catch (e: any) {
             console.error(e);
             setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: "Error: " + e.message, isStreaming: false } : m));
@@ -1513,7 +1542,7 @@ const Queue: React.FC<any> = () => {
 
             const finalMessages = initialMessages.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m);
             setMessages(finalMessages);
-            saveChatToHistory(finalMessages);
+            saveChatToHistory(finalMessages, null, "Coding Problem Solution");
 
         } catch (e: any) {
             setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: "Error: " + e.message, isStreaming: false } : m));
@@ -1965,7 +1994,7 @@ const Queue: React.FC<any> = () => {
                                     <button onClick={handleUseScreen} className="control-btn hover:bg-white/15 py-2 px-3"><Monitor size={14} className="text-blue-400" /><span>Queue Screen</span></button>
                                     <button onClick={() => setIsSmartMode(!isSmartMode)} className={`control-btn py-2 px-3 ${isSmartMode ? 'active' : ''}`}><Zap size={14} className={isSmartMode ? 'fill-current' : ''} /><span>Smart</span></button>
                                     <button onClick={() => window.location.hash = "#/settings"} className="control-btn py-2 px-3 text-white/60 hover:text-white/90 hover:bg-white/10 transition-all"><UserCog size={14} /><span>Persona</span></button>
-                                    <div className="relative"> <button onClick={() => setShowModeMenu(!showModeMenu)} className="control-btn hover:bg-white/15 py-2 px-3"><span>{mode}</span><ChevronDown size={12} /></button> {showModeMenu && (<div className="absolute bottom-full left-0 mb-2 w-32 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"> {['General', 'Developer', 'Student'].map((m) => (<button key={m} onClick={() => handleModeSelect(m)} className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 ${mode === m ? 'text-blue-400 bg-white/5' : 'text-gray-300'}`}> {m} </button>))} </div>)} </div>
+                                    <div className="relative"> <button onClick={() => setShowModeMenu(!showModeMenu)} className="control-btn hover:bg-white/15 py-2 px-3"><span>{mode}</span><ChevronDown size={12} /></button> {showModeMenu && (<div className="absolute bottom-full left-0 mb-2 w-32 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"> {['General', 'Student'].map((m) => (<button key={m} onClick={() => handleModeSelect(m)} className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 ${mode === m ? 'text-blue-400 bg-white/5' : 'text-gray-300'}`}> {m} </button>))} </div>)} </div>
                                     {mode === "Student" && (<button onClick={() => setShowStudentModal(true)} className="control-btn hover:bg-white/15 py-2 px-3 text-blue-300"> <UserCog size={14} /> <span>Update Profile</span> </button>)}
                                 </div>
                             )}
