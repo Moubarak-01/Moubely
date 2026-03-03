@@ -143,14 +143,14 @@ export class AppState {
     try { trayImage = nativeImage.createFromBuffer(Buffer.alloc(0)) } catch (e) { }
     this.tray = new Tray(trayImage)
     const contextMenu = Menu.buildFromTemplate([
-      { label: 'Show Interview Coder', click: () => { this.centerAndShowWindow() } },
+      { label: 'Show Moubely', click: () => { this.centerAndShowWindow() } },
       { label: 'Toggle Window', click: () => { this.toggleMainWindow() } },
       { type: 'separator' },
       { label: 'Quit', accelerator: 'Command+Q', click: () => { app.quit() } }
     ])
-    this.tray.setToolTip('Interview Coder')
+    this.tray.setToolTip('Moubely')
     this.tray.setContextMenu(contextMenu)
-    if (process.platform === 'darwin') this.tray.setTitle('IC')
+    if (process.platform === 'darwin') this.tray.setTitle('Moubely')
     this.tray.on('double-click', () => { this.centerAndShowWindow() })
   }
 
