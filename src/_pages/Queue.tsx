@@ -368,9 +368,11 @@ const Queue: React.FC<any> = () => {
     const [showStudentModal, setShowStudentModal] = useState(false);
     const [isFinalizing, setIsFinalizing] = useState(false);
 
-    // --- STEALTH MODE STATE ---
-    const [isStealth, setIsStealth] = useState(true);
-
+    // --- MODES STATE ---
+    const [isStealth, setIsStealth] = useState(false);
+    const [isPrivateMode, setIsPrivateMode] = useState(false);
+    const [isHoveringChat, setIsHoveringChat] = useState(false);
+    const [isCtrlPressed, setIsCtrlPressed] = useState(false);
     // --- AUDIO REFS ---
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const audioContextRef = useRef<AudioContext | null>(null)
@@ -470,12 +472,12 @@ const Queue: React.FC<any> = () => {
 
     useEffect(() => {
         if (window.electronAPI) {
-            window.electronAPI.setWindowSize({ width: 600, height: 200 })
-        }
-        setIsExpanded(false)
-
-        if (window.electronAPI && window.electronAPI.getStealthMode) {
-            window.electronAPI.getStealthMode().then(setIsStealth).catch(console.error);
+            if (window.electronAPI.getStealthMode) {
+                window.electronAPI.getStealthMode().then(setIsStealth).catch(console.error);
+            }
+            if (window.electronAPI.getPrivateMode) {
+                window.electronAPI.getPrivateMode().then(setIsPrivateMode).catch(console.error);
+            }
         }
 
         const savedMeetings = localStorage.getItem('moubely_meetings')
@@ -526,26 +528,76 @@ const Queue: React.FC<any> = () => {
                     }
                 })
             );
+
+            cleanupFunctions.push(
+                window.electronAPI.onStealthModeToggled((enabled) => {
+                    console.log(`[Queue] 🛡️ Stealth Toggle -> ${enabled}`);
+                    setIsStealth(enabled);
+                })
+            );
+
+            cleanupFunctions.push(
+                window.electronAPI.onPrivateModeToggled((enabled) => {
+                    console.log(`[Queue] 🕶️ Private Toggle -> ${enabled}`);
+                    setIsPrivateMode(enabled);
+                })
+            );
         }
 
-        // --- ADDED: CTRL+H LISTENER FOR LOCAL CAPTURE ---
+        // --- ADDED: CTRL+H LISTENER FOR LOCAL CAPTURE & CTRL FOR SCROLL PORTAL ---
         const handleKeyDown = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && (e.key === 'h' || e.key === 'H')) {
                 e.preventDefault();
                 console.log("[UI] ⌨️ Ctrl+H Detected -> Triggering Capture");
                 handleCapture();
             }
+            if (e.key === 'Control') {
+                setIsCtrlPressed(true);
+            }
         };
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'Control') {
+                setIsCtrlPressed(false);
+            }
+        };
+
+        // RELIABLE CTRL DETECTION: Use mouse events to sync Ctrl state 
+        // because mouse events are forwarded even when window is not focused!
+        const handleMouseUpdate = (e: MouseEvent | WheelEvent) => {
+            if (isPrivateMode) {
+                setIsCtrlPressed(e.ctrlKey);
+            }
+        };
+
         window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        window.addEventListener('mousemove', handleMouseUpdate);
+        window.addEventListener('wheel', handleMouseUpdate);
 
         return () => {
             cleanupFunctions.forEach(fn => fn());
             cleanupStream();
             if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
-            window.removeEventListener('keydown', handleKeyDown); // Cleanup listener
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('mousemove', handleMouseUpdate);
+            window.removeEventListener('wheel', handleMouseUpdate);
         };
-    }, [handleCapture])
+    }, [handleCapture, isPrivateMode])
 
+    // --- SCROLL PORTAL EFFECT ---
+    useEffect(() => {
+        if (!window.electronAPI || !isPrivateMode) return;
+
+        // If (Hovering Chat) AND (Ctrl Pressed) -> Temporary interactive mode
+        if (isHoveringChat && isCtrlPressed) {
+            console.log("[ScrollPortal] 🌀 Portal OPEN: Window Interactive (Hovering + Ctrl)");
+            window.electronAPI.toggleMouseIgnore(false);
+        } else {
+            // Otherwise, go back to ignoring events as per Private Mode rules
+            window.electronAPI.toggleMouseIgnore(true);
+        }
+    }, [isHoveringChat, isCtrlPressed, isPrivateMode]);
     const resetChat = () => {
         setMessages([{ id: "init", role: "ai", text: "Hi there. I'm Moubely. I'm ready to listen.", timestamp: Date.now() }]);
     }
@@ -1617,7 +1669,10 @@ const Queue: React.FC<any> = () => {
                         <button onClick={() => setActiveTab("History")} className={`tab-btn flex items-center gap-1.5 ${activeTab === 'History' ? 'active' : ''}`}><History size={14} /> History</button>
 
                         <div className="flex-1" />
-                        <button onClick={handleClearLoadedSession} className="text-xs flex items-center gap-1.5 text-blue-400 hover:text-blue-300 transition-colors pr-4 whitespace-nowrap font-medium outline-none">
+                        <button
+                            onClick={handleClearLoadedSession}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-gray-300 text-xs rounded transition-colors shrink-0 outline-none"
+                        >
                             <Plus size={14} /> New Chat
                         </button>
                     </div>
@@ -1690,6 +1745,14 @@ const Queue: React.FC<any> = () => {
                                     className="flex-1 overflow-y-auto chat-scroll-area space-y-5 pb-4 px-2"
                                     ref={chatContainerRef}
                                     onScroll={handleScroll}
+                                    onMouseEnter={() => {
+                                        console.log("[ScrollPortal] Mouse ENTER Chat Area");
+                                        setIsHoveringChat(true);
+                                    }}
+                                    onMouseLeave={() => {
+                                        console.log("[ScrollPortal] Mouse LEAVE Chat Area");
+                                        setIsHoveringChat(false);
+                                    }}
                                 >
                                     {messages.map((msg) => (
                                         <div key={msg.id} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>

@@ -1,9 +1,10 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage } from "electron"
+import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron';
 import { initializeIpcHandlers } from "./ipcHandlers"
 import { WindowHelper } from "./WindowHelper"
 import { ScreenshotHelper } from "./ScreenshotHelper"
 import { ShortcutsHelper } from "./shortcuts"
 import { ProcessingHelper } from "./ProcessingHelper"
+import { CursorHelper } from "./CursorHelper"
 
 console.log("Main process loading...");
 
@@ -14,10 +15,12 @@ export class AppState {
   private screenshotHelper: ScreenshotHelper
   public shortcutsHelper: ShortcutsHelper
   public processingHelper: ProcessingHelper
-  private tray: Tray | null = null
+  public cursorHelper: CursorHelper
+  private tray: any = null
 
   private view: "queue" | "solutions" = "queue"
   private isStealthMode: boolean = false
+  private isPrivateMode: boolean = false
   private liveModeInterval: NodeJS.Timeout | null = null;
   private problemInfo: any = null
   private hasDebugged: boolean = false
@@ -41,6 +44,7 @@ export class AppState {
     this.processingHelper = new ProcessingHelper(this)
     this.windowHelper = new WindowHelper(this)
     this.shortcutsHelper = new ShortcutsHelper(this)
+    this.cursorHelper = new CursorHelper()
 
     AppState.instance = this
   }
@@ -53,11 +57,34 @@ export class AppState {
   }
 
   public getIsStealthMode(): boolean { return this.isStealthMode }
+  public getIsPrivateMode(): boolean { return this.isPrivateMode }
 
   public toggleStealthMode(): boolean {
     this.isStealthMode = !this.isStealthMode
+    console.log(`[AppState] 🛡️ Stealth Mode (Recording Protection): ${this.isStealthMode ? "ON" : "OFF"}`);
     this.windowHelper.setStealthMode(this.isStealthMode)
+
+    // Notify renderer via IPC
+    const win = this.getMainWindow()
+    if (win && !win.isDestroyed()) {
+      win.webContents.send("stealth-mode-toggled", this.isStealthMode)
+    }
+
     return this.isStealthMode
+  }
+
+  public togglePrivateMode(): boolean {
+    this.isPrivateMode = !this.isPrivateMode
+    console.log(`[AppState] 🕶️ Private Mode (Click Pass-through): ${this.isPrivateMode ? "ON" : "OFF"}`);
+    this.windowHelper.setPrivateMode(this.isPrivateMode)
+
+    // Notify renderer via IPC
+    const win = this.getMainWindow()
+    if (win && !win.isDestroyed()) {
+      win.webContents.send("private-mode-toggled", this.isPrivateMode)
+    }
+
+    return this.isPrivateMode
   }
 
   // --- Live Mode Logic ---
@@ -159,18 +186,19 @@ export class AppState {
 }
 
 async function initializeApp() {
-  const appState = AppState.getInstance()
-  initializeIpcHandlers(appState)
-
   app.whenReady().then(() => {
+    const appState = AppState.getInstance()
+    initializeIpcHandlers(appState)
+
     console.log("App is ready")
+    console.log("Initializing App components...")
     appState.createWindow()
     appState.createTray()
     appState.shortcutsHelper.registerGlobalShortcuts()
-  })
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) appState.createWindow()
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) appState.createWindow()
+    })
   })
 
   app.on("window-all-closed", () => {

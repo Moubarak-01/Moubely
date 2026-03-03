@@ -16,6 +16,8 @@ export interface ElectronAPI {
   deleteScreenshot: (path: string) => Promise<{ success: boolean; error?: string }>
 
   // Events / Listeners
+  onStealthModeToggled: (callback: (enabled: boolean) => void) => () => void
+  onPrivateModeToggled: (callback: (enabled: boolean) => void) => () => void
   onScreenshotTaken: (callback: (data: { path: string; preview: string }) => void) => () => void
   onScreenshotAction: (callback: (data: any) => void) => () => void // <--- WAS MISSING
   onSolutionsReady: (callback: (solutions: string) => void) => () => void
@@ -44,6 +46,9 @@ export interface ElectronAPI {
   // Settings & Modes
   toggleStealthMode: () => Promise<boolean>
   getStealthMode: () => Promise<boolean>
+  togglePrivateMode: () => Promise<boolean>
+  getPrivateMode: () => Promise<boolean>
+  getBackgroundCursor: () => Promise<string | null>
   checkProfileExists: () => Promise<boolean>
   saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => Promise<boolean>
   saveUserProfile: (profileData: any) => Promise<{ success: boolean }>;

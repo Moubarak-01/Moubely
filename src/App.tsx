@@ -14,65 +14,76 @@ const queryClient = new QueryClient({
 })
 
 const App: React.FC = () => {
-  const [debugProcessing, setDebugProcessing] = useState(false);
-  const [view, setView] = useState<"queue" | "solutions" | "debug" | "settings">("queue")
   const [isStealth, setIsStealth] = useState(false)
-  const [isMouseIgnored, setIsMouseIgnored] = useState(false)
+  const [isPrivateMode, setIsPrivateMode] = useState(false)
+  const [view, setView] = useState<"queue" | "solutions" | "debug" | "settings">("queue")
   const appRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!window.electronAPI) return;
-    window.electronAPI.getStealthMode().then(setIsStealth);
-    window.electronAPI.setWindowSize({ width: 600, height: 200 });
 
-    const cleanup = [
+    // 1. Initial State Sync
+    window.electronAPI.getStealthMode().then((enabled: boolean) => {
+      setIsStealth(enabled);
+      console.log(`[App] 🛡️ Initial Stealth State: ${enabled}`);
+    });
+
+    window.electronAPI.getPrivateMode().then((enabled: boolean) => {
+      setIsPrivateMode(enabled);
+      console.log(`[App] 🕶️ Initial Private State: ${enabled}`);
+    });
+
+    // 2. Listen for Global Toggles
+    const removeStealthListener = window.electronAPI.onStealthModeToggled((enabled: boolean) => {
+      console.log(`[App] 🛡️ Global Toggle -> Stealth: ${enabled}`);
+      setIsStealth(enabled);
+    });
+
+    const removePrivateListener = window.electronAPI.onPrivateModeToggled((enabled: boolean) => {
+      console.log(`[App] 🕶️ Global Toggle -> Private: ${enabled}`);
+      setIsPrivateMode(enabled);
+    });
+
+    // 3. Core App Listeners
+    const cleanupIPC = [
       window.electronAPI.onSolutionStart(() => setView("solutions")),
       window.electronAPI.onResetView(() => {
         queryClient.invalidateQueries();
         setView("queue");
       }),
     ];
-    return () => cleanup.forEach(fn => fn());
+
+    return () => {
+      removeStealthListener();
+      removePrivateListener();
+      cleanupIPC.forEach(fn => fn());
+    };
   }, []);
 
-  const toggleMouseIgnore = (ignore: boolean) => {
-    if (!isStealth) return;
-    if (window.electronAPI && ignore !== isMouseIgnored) {
-      window.electronAPI.toggleMouseIgnore(ignore);
-      setIsMouseIgnored(ignore);
-      appRef.current?.classList.toggle('cursor-deep-stealth', ignore);
-    }
-  };
-
   return (
-    <div
-      ref={appRef}
-      className="min-h-0 h-screen w-screen flex flex-col transition-all duration-500"
-      onMouseMove={(e) => {
-        const target = e.target as HTMLElement;
-        const interactive = target.closest('.interactive') || target.tagName === 'BUTTON';
-        toggleMouseIgnore(!interactive);
-      }}
-      onMouseLeave={() => toggleMouseIgnore(false)}
-    >
-      <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          <Header />
-          <Router>
-            <Routes>
-              <Route path="/" element={<Navigate replace to="/queue" />} />
-              <Route path="/queue" element={<Queue setView={setView} />} />
-              <Route path="/solutions" element={<Solutions setView={setView} />} />
-              <Route path="/debug" element={<Debug isProcessing={false} setIsProcessing={() => { }} />} />
-              <Route path="/debug" element={<Debug isProcessing={debugProcessing} setIsProcessing={setDebugProcessing} />} />
-              <Route path="/settings" element={<ProfileSettings />} />
-            </Routes>
-          </Router>
-          <ToastViewport />
-        </ToastProvider>
-      </QueryClientProvider>
-    </div>
+    <>
+      <div
+        ref={appRef}
+        className="min-h-0 h-screen w-screen flex flex-col transition-all duration-500"
+      >
+        <QueryClientProvider client={queryClient}>
+          <ToastProvider>
+            <Header />
+            <Router>
+              <Routes>
+                <Route path="/" element={<Navigate replace to="/queue" />} />
+                <Route path="/queue" element={<Queue setView={setView} />} />
+                <Route path="/solutions" element={<Solutions setView={setView} />} />
+                <Route path="/debug" element={<Debug isProcessing={false} setIsProcessing={() => { }} />} />
+                <Route path="/settings" element={<ProfileSettings />} />
+              </Routes>
+            </Router>
+            <ToastViewport />
+          </ToastProvider>
+        </QueryClientProvider>
+      </div>
+    </>
   )
-}
+};
 
 export default App

@@ -15,6 +15,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("toggle-expansion", s);
   },
 
+  onStealthModeToggled: (cb: (enabled: boolean) => void) => {
+    const s = (_: any, e: boolean) => cb(e);
+    ipcRenderer.on("stealth-mode-toggled", s);
+    return () => ipcRenderer.removeListener("stealth-mode-toggled", s);
+  },
+
+  onPrivateModeToggled: (cb: (enabled: boolean) => void) => {
+    const s = (_: any, e: boolean) => cb(e);
+    ipcRenderer.on("private-mode-toggled", s);
+    return () => ipcRenderer.removeListener("private-mode-toggled", s);
+  },
+
   onScreenshotAction: (cb: any) => {
     const s = (_: any, d: any) => cb(d);
     ipcRenderer.on("screenshot-action-triggered", s);
@@ -74,4 +86,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   toggleStealthMode: () => ipcRenderer.invoke("toggle-stealth-mode"),
   getStealthMode: () => ipcRenderer.invoke("get-stealth-mode"),
+  togglePrivateMode: () => ipcRenderer.invoke("toggle-private-mode"),
+  getPrivateMode: () => ipcRenderer.invoke("get-private-mode"),
+  getBackgroundCursor: () => ipcRenderer.invoke("get-background-cursor"),
 })

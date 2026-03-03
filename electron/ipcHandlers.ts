@@ -90,13 +90,28 @@ export function initializeIpcHandlers(appState: AppState) {
   });
 
   // --- STEALTH MODE ---
+  ipcMain.handle("get-background-cursor", async () => {
+    return await appState.cursorHelper.getBackgroundCursor();
+  });
+
   ipcMain.handle("get-stealth-mode", () => {
     return appState.getIsStealthMode();
   });
 
   ipcMain.handle("toggle-stealth-mode", () => {
     const newState = appState.toggleStealthMode();
-    logIPC("toggle-stealth-mode", `New State: ${newState ? "HIDDEN" : "VISIBLE"}`);
+    logIPC("toggle-stealth-mode", `New State: ${newState ? "PROTECTED" : "VISIBLE"}`);
+    return newState;
+  });
+
+  // --- PRIVATE MODE ---
+  ipcMain.handle("get-private-mode", () => {
+    return appState.getIsPrivateMode();
+  });
+
+  ipcMain.handle("toggle-private-mode", () => {
+    const newState = appState.togglePrivateMode();
+    logIPC("toggle-private-mode", `New State: ${newState ? "PASS-THROUGH" : "INTERACTIVE"}`);
     return newState;
   });
 

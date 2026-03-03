@@ -63,7 +63,12 @@ export class WindowHelper {
       movable: true,
     })
 
-    this.setStealthMode(this.appState.getIsStealthMode())
+    // Immediately sync mouse events state based on private mode
+    const isPrivate = this.appState.getIsPrivateMode()
+    const isStealth = this.appState.getIsStealthMode()
+
+    this.setPrivateMode(isPrivate)
+    this.setStealthMode(isStealth)
 
     // --- NEW: Universal "Top Lock" for Zoom/Full-screen dominance ---
     // 'screen-saver' is the highest priority level on macOS and works as strict topmost on Windows.
@@ -86,18 +91,26 @@ export class WindowHelper {
     this.mainWindow.on("closed", () => { this.mainWindow = null })
   }
 
-  // --- STEALTH LOGIC (Fixes Recording Issue) ---
+  // --- STEALTH LOGIC (Content Protection) ---
   public setStealthMode(enabled: boolean): void {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return
 
     // enabled = true  -> Protected (Hidden from recording)
     // enabled = false -> Unprotected (Visible in recording)
-    // This updates the flag immediately so OBS/Zoom can see it when toggled off.
     this.mainWindow.setContentProtection(enabled)
 
     if (process.platform === "darwin") {
       this.mainWindow.setHiddenInMissionControl(enabled)
     }
+  }
+
+  // --- PRIVATE MODE LOGIC (Click Pass-through) ---
+  public setPrivateMode(enabled: boolean): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return
+
+    // Ensure mouse events state is synced
+    // { forward: true } allows the window to still "see" the mouse even if clicks pass through
+    this.mainWindow.setIgnoreMouseEvents(enabled, { forward: true })
   }
 
   public getMainWindow() { return this.mainWindow }
