@@ -61,6 +61,7 @@ export class WindowHelper {
       backgroundColor: "#00000000",
       resizable: true, // ✅ ENABLED: User can now drag-resize from edges/corners
       movable: true,
+      icon: path.join(__dirname, "../assets/Moubely_icon.png"),
     })
 
     // Immediately sync mouse events state based on private mode

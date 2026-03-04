@@ -51,7 +51,7 @@
           ]
         }
       ],
-      "icon": "assets/icons/mac/icon.icns",
+      "icon": "assets/Moubely_icon.png",
       "hardenedRuntime": true,
       "entitlements": "assets/entitlements.mac.plist"
     },
@@ -71,7 +71,7 @@
           ]
         }
       ],
-      "icon": "assets/icons/win/icon.ico",
+      "icon": "assets/Moubely_icon.png",
       "requestedExecutionLevel": "asInvoker"
     },
     "linux": {
@@ -89,7 +89,7 @@
           ]
         }
       ],
-      "icon": "assets/icons/png/",
+      "icon": "assets/Moubely_icon.png",
       "category": "Office"
     },
     "nsis": {
