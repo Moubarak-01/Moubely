@@ -7,6 +7,7 @@ interface ScreenshotActionData {
 contextBridge.exposeInMainWorld("electronAPI", {
   updateContentDimensions: (d: any) => ipcRenderer.invoke("update-content-dimensions", d),
   setWindowSize: (d: any) => ipcRenderer.invoke("set-window-size", d),
+  toggleExpand: (isExpanded: boolean) => ipcRenderer.invoke("toggle-expand", isExpanded),
 
   // Expansion Toggle Listener
   onToggleExpansion: (cb: any) => {
@@ -38,6 +39,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getUserProfile: () => ipcRenderer.invoke("get-user-profile"),
   getScreenshots: () => ipcRenderer.invoke("get-screenshots"),
   deleteScreenshot: (p: string) => ipcRenderer.invoke("delete-screenshot", p),
+
+  transcribeDictation: (base64Audio: string, mimeType: string) => ipcRenderer.invoke("transcribe-dictation", base64Audio, mimeType),
 
   onSolutionsReady: (cb: any) => { const s = (_: any, d: any) => cb(d); ipcRenderer.on("solutions-ready", s); return () => ipcRenderer.removeListener("solutions-ready", s) },
   onResetView: (cb: any) => { const s = () => cb(); ipcRenderer.on("reset-view", s); return () => ipcRenderer.removeListener("reset-view", s) },

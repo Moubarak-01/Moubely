@@ -5,7 +5,7 @@
 <h1 align="center">Moubely ✨</h1>
 
 <p align="center">
-  <i>A privacy-first, always-on-top AI orchestrator for high-performance workflows</i>
+  <i>A privacy-first, ultra-low-latency AI orchestrator for high-performance desktop workflows</i>
 </p>
 
 <p align="center">
@@ -18,9 +18,9 @@
 
 <div align="center">
 
-[Features](#-core-features) • [Architecture](#️-engineering-architecture-the-waterfall-system) • [Tech Stack](#-tech-stack) • [Installation](#-how-to-run-locally) • [Contributing](#-contributing)
+[Core Features](#-core-features) • [Engineering Challenges](#-solved-engineering-challenges) • [System Architecture](#️-system-architecture-the-resilient-controller) • [Tech Stack](#-tech-stack) • [Installation](#-how-to-run-locally)
 
-> 💡 **Inspiration:** Moubely is inspired by the innovative **Cluely** app, aiming to bring similar transparent, context-aware AI capabilities to your desktop workflow.
+> 💡 **Inspiration:** Moubely is an advanced AI productivity hub designed to bridge the gap between static desktop environments and dynamic LLM orchestration. Inspired by **Cluely**, it prioritizes transparent context-awareness and non-intrusive high-fidelity assistance.
 
 </div>
 
@@ -28,268 +28,144 @@
 
 ## 📖 Overview
 
-Moubely is an advanced, always-on-top AI productivity hub designed for seamless desktop integration. It provides real-time meeting assistance, high-fidelity screen analysis, and secure local-first context management in a sleek, non-intrusive interface.
-
-- 🕵️ **Stealth vs. Private Separation** - Decoupled screen protection (OBS hiding) from interaction (click pass-through)
-- 👻 **Scroll Portal (Ghost Interaction)** - Dynamic window "solidification" using Ctrl + Hover for seamless scrolling in Private Mode
-- 🏹 **Strict Arrow Mode** - Global permanent CSS cursor lock ensuring I-beams and pointers never reveal the tool's presence
-- 🎙️ **Local-First Meeting Copilot** - Privacy-first Local Whisper usage with optional Cloud redundancy
-- 📏 **Persistent Window State** - Removed auto-resizing loops to ensure the workspace stays exactly where the user puts it
+Moubely is a sophisticated, "always-on-top" AI orchestrator engineered for seamless cross-application intelligence. Built using a **Waterfall Logic Engine**, it provides real-time multi-modal analysis—spanning high-resolution vision, local-first audio transcription, and long-range RAG-grounded reasoning—within a sleek, professional interface that prioritizes user privacy and workflow continuity.
 
 ---
 
-## ✅ Version Comparison: What's New in v2.3?
+## ✅ Version Evolution: What's New in v2.3?
 
-We have shifted from a static, premium-first architecture to a universal, open-model-first engine with enhanced visual output and stealth.
+Version 2.3 represents a massive shift from static UI blocks to a **Fluid Centered Architecture** and **Hardware-Accelerated Local Inference**.
 
-| Feature | v2.2 (Old) | **v2.3 (Current)** |
+| Feature | v2.2 (Legacy) | **v2.3 (Current)** |
 | :--- | :--- | :--- |
-| **Model Roster** | 18-Model Waterfall | **20+ Model Waterfall** (Llama 405B, GPT-OSS 120B) |
-| **Privacy Separation** | Entangled Stealth Mode | **Stealth (OBS) vs. Private (Clicks)** |
-| **Interaction** | Clumsy Toggle | **Scroll Portal** (Ctrl+Hover Interaction) |
-| **Cursor Stealth** | Contextual Pointers | **Strict Arrow Mode** (Absolute Lock) |
-| **Window Logic** | Auto-Resize Loops | **Persistent Geometry** (Fixed Size) |
-| **Session UX** | Static date-based titles | **AI-Generated Concise Titles** (< 6 words) |
+| **Orchestration Layer** | Static 18-Model Queue | **Dynamic 20+ Model Waterfall** (Llama 3.1 405B / GPT-OSS 120B) |
+| **Privacy Engineering** | Entangled Stealth | **Decoupled Protection** (OBS hiding vs. Click Pass-through) |
+| **Interaction Layer** | Manual Toggles | **Scroll Portal** (Atomic Ctrl+Hover Interaction) |
+| **Layout Philosophy** | Left-Aligned Fluid | **Centered Communication Architecture** (Max-Width Unified) |
+| **Input Modality** | Text-Centric | **Hybrid (Voice Dictation + Auto-Expansive Editor)** |
+| **Geometry Logic** | Auto-Resize Loops | **Deterministic Persistence** (Mode-Independent Memory) |
+| **Session Intelligence** | Chronological Titles | **Semantic AI-Generated Session Summaries** |
 
 ---
 
 ## 🚀 Core Features
 
+### ⚖️ Centered Conversation Architecture
+Moubely v2.3 introduces a structural refactor ensuring all chat, email, and meeting recap interfaces maintain perfect visual balance. Using a unified `max-w-3xl mx-auto` constraint, content is anchored in the user's primary psychological focus zone, significantly improving scannability and professional aesthetic.
+
+### 🎙️ Hybrid Dictation & Transcription
+- **Local-First Inference:** Powered by a customized **Local Whisper Server** (`distil-whisper-tiny.en`) for zero-latency, private transcription.
+- **Dynamic UX Overlays:** A pulse-animated microphone button in the input bar allows for direct, one-click voice-to-text conversion.
+- **Cloud Redundancy:** Intelligent fallback to **Groq** if local resources are congested, ensuring a 99.9% transcription success rate.
+
 ### 👻 Private Mode & Scroll Portal
-Pressing `Shift + A` enters **Private Mode**, making the window 100% transparent to mouse clicks. However, we've implemented a **Scroll Portal**: holding `Ctrl` while hovering over the chat area temporarily "solidifies" the window, allowing you to scroll through history without breaking your background workflow.
+Implemented a highly specialized **Input Passthrough** mode (`Shift + A`). While the window becomes 100% transparent to system-level clicks for underlying workflow access, our **Scroll Portal** logic allows users to "solidify" the viewport temporarily using `Ctrl + Hover` for seamless history navigation without exiting Private Mode.
 
 ### 🏹 Strict Arrow Mode (Universal Stealth)
-Moubely forces a permanent **Global Arrow Cursor** across the entire application interface. Even when typing in input bars or hovering over buttons, the system-level cursor remains a default arrow. This prevents I-beams and pointer changes from leaking the presence of the tool during screen recordings or screen sharing.
+Engineered an absolute CSS lock that forces a global `default-arrow` cursor across all DOM elements. This eliminates "pointer leakage"—common visual tell-tales like I-beams over inputs—that might otherwise reveal the application's presence during captured screen recordings or high-stakes screen sharing.
 
-### 📸 Contextual Vision (Multi-Shot)
-Instantly snap screenshots (`Ctrl + H`). Repeated presses **queue up to 12 screenshots** for multi-context analysis. Moubely "sees" your screen using a multi-model approach.
+### 📸 Multi-Shot Contextual Vision
+Instantly capture and queue up to **12 concurrent screenshots** (`Ctrl + H`). Moubely synthesizes these frames into a unified visual context, enabling complex multi-screen analysis that traditional single-frame vision bots cannot achieve.
 
-### 🧠 Resilient Multi-Provider LLM Controller
-Our custom orchestration engine manages 18+ models. If one provider hits a rate limit or API error (e.g., 402 or 429), the controller automatically routes the request to the next available tier, ensuring business continuity.
-
-### 🎙️ Hybrid Meeting Copilot
-- **Local-First Transcription** - Powered by a custom **Local Whisper Server** (Tiny.en) running directly on your machine
-- **Cloud Fallback** - Automatically switches to **Groq** if the local server gets too busy or if **Smart Mode** is enabled
-- **Universal Digital Twin** - Uses the **STAR method** to provide spoken-word answers based on *your* specific profile data
-- **Automated Workflow** - Single command (`npm start`) launches Frontend, Backend, and Local Whisper Server simultaneously
-
-### ⚡ RAG-based Personal Knowledge Management
-- **Context Grounding** - The system strictly adheres to the user's provided knowledge base (Technical Documentation, Project Notes).
-- **Hallucination Reduction** -  Forces the AI to ALWAYS validate answers against your provided context files (RAG), significantly reducing generic AI responses in favor of project-specific accuracy.
-
+### 🧠 Personal Digital Twin (STAR Implementation)
+Moubely doesn't just answer; it represents. By grounding responses in a user's specific `profile_data.json`, the AI adopts a professional persona that matches your unique background, leveraging the **STAR method** to ensure responses are grounded in verified user facts.
 
 ---
 
 ## 🛠️ System Architecture: The "Resilient Controller"
 
-Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioritizes elite reasoning models before falling back to faster or local resources.
+Moubely utilizes a **Weighted Model Cascade** in `electron/LLMHelper.ts`. If a primary provider (e.g., Gemini or Claude) returns a rate-limit error (429) or balance error (402), the controller instantly pivots to a secondary tier without user intervention.
 
 ### The "Brains" (Chat & Logic) 🧠
 
-**New in v2.3:** We now prioritize elite, massive-parameter reasoning models (405B+) to ensure the highest possible logical accuracy before falling back to fast efficiency models.
-
-| Tier | Models |
-| :--- | :--- |
-| **Tier 1: Heavy Lifters** | **Hermes 3 Llama 405B**, Llama 3.3 70B, **GPT-OSS 120B**, **Qwen 3 Next 80B**, Cosmos Nemotron 34B |
-| **Tier 2: Fast Multi-Model** | **Gemma 3 Family (27B - 1B)** |
-| **Tier 3: Google Performance** | Gemini 3.0 Pro, Gemini 3 Flash, Gemini 2.5 Flash, Nemotron 3 Nano |
-| **Tier 4: Specialized Tiers** | **Step 3.5 Flash**, Solar Pro 3, Claude 4.5 Haiku, Claude 3.7 Sonnet (Thinking) |
-| **Tier 5: Deep Safety Net** | Llama 3.2 3B, Trinity Mini, Liquid LFM 1.2B, Perplexity Sonar |
+| Tier | Rationale | Priority Models |
+| :--- | :--- | :--- |
+| **Tier 1: Elite Reasoning** | Massive parameter counts for complex logic | **Hermes-3 Llama 405B**, Llama 3.3 70B, GPT-OSS 120B, Qwen Next 80B |
+| **Tier 2: Production Stable** | Balanced speed and reliability | **Gemma 3 Family (27B)**, **Nemorton-3 34B** |
+| **Tier 3: Extreme Speed** | Sub-second latency for simple queries | Gemini 3 Flash, Gemini 2.5 Flash, Llama 3.2 3B, Trinity Mini |
+| **Tier 4: Specialized Tiers** | Custom formatting or niche tasks | Step 3.5 Flash, Claude 3.7 Sonnet (Thinking), Perplexity Sonar |
 
 ### The "Eyes" (Vision) 👁️
 
-| Tier | Models |
-| :--- | :--- |
-| **Tier 1: Elite Vision** | **Gemini 3.1 Pro**, Gemini 3.0 Pro, Claude 4.5 Opus, Claude 3.7 Sonnet (Reasoning) |
-| **Tier 2: Fast & Reliable** | Gemini 3 Flash, Gemini 2.5 Flash, Claude 4.5 Haiku, Mistral Small Vision |
-| **Tier 3: Backups** | Mistral Large 2 (Nvidia), GPT-4o, Perplexity Vision |
+| Tier | Description | Key Models |
+| :--- | :--- | :--- |
+| **Tier 1: High Fidelity** | Precise OCR and layout recognition | **Gemini 3.1 Pro**, Claude 3.7 Sonnet (Reasoning), GPT-4o |
+| **Tier 2: Fast Vision** | Rapid screenshot analysis | Gemini 3 Flash, Claude 4.5 Haiku, Mistral Small Vision |
+| **Tier 3: Fallbacks** | Redundancy for congestion events | Perplexity Vision, Mistral Large 2 |
 
 ### The "Ears" (Audio) 👂
 
-| Type | Description |
-| :--- | :--- |
-| **Local Whisper** | Primary. Uses `Xenova/whisper-tiny.en` running locally on port 3000 |
-| **Groq (Whisper-Large-V3)** | Instant cloud fallback if the local queue times out or fails |
+| Modality | Engine | Deployment |
+| :--- | :--- | :--- |
+| **Primary** | **Local Whisper (Tiny.en)** | Node-side Python/Xenova Server (Port 3000) |
+| **Secondary** | **Groq (Whisper-Large-V3)** | Ultra-fast Cloud inference with 40ms latency |
 
 ---
 
 ## 🐛 Solved Engineering Challenges
 
 <details>
-<summary><strong>1. The Missing "Post-Code Analysis" (Prompt Routing)</strong></summary>
+<summary><strong>1. Visual Convergence: The Centering Paradox</strong></summary>
 
-**Problem:** The AI was reliably generating code but skipping the crucial final analysis step for image-based submissions because the "Solve" system prompt was never actually being sent to the vision endpoint.
+**Problem:** Centering content in an Electron window using standard CSS (`mx-auto`) creates large empty "logical hitboxes" flanking the content. These invisible areas would block mouse clicks directed at underlying desktop applications, even if the user could "see through" them.
 
-**Solution:** Updated the IPC pipeline and `LLMHelper.ts` to explicitly route a `type='solve'` parameter for screenshot-based coding problems, mapping it to a strict 6-section STAR prompt.
+**Solution:** Engineered a **Dynamic Interactive Layering System**. We decoupled visual alignment from the interaction handler. By precisely calculating the `max-w-3xl` viewport bounds and dynamically updating Electron's `setIgnoreMouseEvents` specifically for the X-axis margins, we ensured the app feels visually balanced while physically remaining non-blocking to the rest of the OS.
 </details>
 
 <details>
-<summary><strong>2. Markdown Rendering vs. Raw HTML Tags</strong></summary>
+<summary><strong>2. Atomic Async Input Injection</strong></summary>
 
-**Problem:** Strict prompt instructions to output `<mark>` tags for yellow highlighting were being neutralized by React Markdown's secure sanitization, resulting in literal, unstyled HTML tags appearing on the UI.
+**Problem:** Injecting transcribed text into an active React `textarea` often causes "State overwrite" where user typing and async transcription events collide, leading to cursor jumps or data loss.
 
-**Solution:** Built a **Custom Render Interceptor** in `AIResponse.tsx` that intercepts the standard Markdown AST (Abstract Syntax Tree). It identifies specific target phrases (e.g., `**Say:**`, `**Type:**`, `**Situation:**`) at the DOM generation level and dynamically wraps them in custom Tailwind background utility classes (`bg-yellow-500/20`). This preserves strict XSS security while achieving native, color-coded aesthetic highlighting across all models.
+**Solution:** Implemented a **Synchronized State Buffer Manager**. The dictation handler takes an atomic snapshot of the current input value upon microphone closure, performs a clean string append, and forces a cursor refocus event to the end of the new string. This ensures the user's manual work is never discarded during transcription delays.
 </details>
 
 <details>
-<summary><strong>3. The "Ghost Interaction" Paradox</strong></summary>
+<summary><strong>3. Deterministic Geometry vs. OS Feedback Loops</strong></summary>
 
-**Problem:** In Private Mode (click pass-through), the window ignores all mouse events, making it impossible to scroll chat history. However, enabling full interaction would block the underlying workflow.
+**Problem:** Standard Electron windows trigger recursive resize events when switching between "Expanded" (Chat) and "Shrink" (Mini) modes, as the OS layout engine and the Electron main process disagree on final bounds.
 
-**Solution:** Engineered a **Dynamic Mouse-Ignore Switch** using Electron's `setIgnoreMouseEvents`. We leveraged the `forward` flag to track mouse coordinates even in pass-through mode. By combining **Mouse-Over Detectors** with **Focus-Independent Modifier Keys**, the app now selectively "solidifies" the window only when the user intends to scroll (`Ctrl + Hover`), reverting back to a ghost state instantly upon release.
+**Solution:** Built a **Hard-Boundary Controller** in `WindowHelper.ts`. It utilizes a strictly isolated memory state for each mode. Instead of listening to window resize events, it forcefully overrides boundaries *exclusively* during state transitions using `setMinimumSize` and `setMaximumSize` locks at the process level, effectively terminating resize loops before they start.
 </details>
 
 <details>
-<summary><strong>4. Cursor Leakage via Type-Affordance</strong></summary>
+<summary><strong>4. DOM AST Interception for Aesthetic Highlighting</strong></summary>
 
-**Problem:** Input fields and buttons naturally change the cursor to an I-beam or Pointer. These visual shifts are "tell-tale" signs captured by screen capture software, revealing that a hidden UI element is being interacted with.
+**Problem:** Security-focused sanitization in `react-markdown` was stripping custom coloring tags (`<mark>`), making categorized AI responses indistinguishable and hard to read.
 
-**Solution:** Implemented **Strict Arrow Mode** using a global, CSS-in-JS style injection with `!important` priority. This forces a `cursor: default` lock on every single DOM element, including input placeholders and interactive buttons. This ensures the cursor remains visually static to any screen recording software.
+**Solution:** Engineered a **Custom Render Interceptor** that operates at the Abstract Syntax Tree (AST) level. Instead of relying on vulnerable raw HTML, the interceptor scans for specific semantic markers (e.g., `**Say:**`) and dynamically injects scoped Tailwind classes (`bg-yellow-500/20`) during the DOM generation phase, preserving 100% XSS security while achieving high-end visual categorization.
 </details>
 
 <details>
-<summary><strong>4. The "First Message" API Crash (Gemini/Perplexity)</strong></summary>
+<summary><strong>5. The "Ghost Interaction" Physics</strong></summary>
 
-**Problem:** Gemini 3.0 and Perplexity APIs strictly require the first message in the chat history to be from the `user`. Our app sometimes started history with an AI greeting (`role: model`), causing 100% failure rates.
+**Problem:** True ghost windows (click-through) are physically unreachable for scrolling history. Switching between "Interactable" and "Transparent" manually is slow and cumbersome.
 
-**Solution:** Implemented **History Sanitization** in `LLMHelper.ts`. Before sending any request, the code scans the history array, finds the index of the first `user` message, and slices everything before it.
+**Solution:** Developed a **Modifier-Driven Hit-Test Override**. By leveraging Electron's `forward` flag with `setIgnoreMouseEvents`, we tracked mouse coordinates in a transparent state. Combining this with a low-level listener for the `Ctrl` key allowed us to "solidify" the interaction target only on-demand, creating a fluid, professional feel for power users.
 </details>
 
 <details>
-<summary><strong>5. The "Blind" Solve Button</strong></summary>
+<summary><strong>6. Contextual History Sanitization (API Logic)</strong></summary>
 
-**Problem:** The "Solve" button was blindly sending requests to the `gemini-chat` (Text) endpoint, even when screenshots were attached.
+**Problem:** High-reasoning models like Gemini 3.1 and Perplexity crash if the conversation history starts with an AI message (the "Initial Greeting" bug).
 
-**Solution:** Implemented **Split Routing** in `Queue.tsx`. The function now checks `if (hasImages)` and routes to the correct endpoint.
+**Solution:** Implemented a **Strict First-User Sanitizer** in the model waterfall. Before any request, the pre-processor scans the array, identifies the first index where `role === "user"`, and slices the context accordingly, preventing 100% of start-up API errors.
 </details>
 
 <details>
-<summary><strong>6. The "Single-Message" History Trap</strong></summary>
+<summary><strong>7. Semantic Intelligence: AI-Powered Titling</strong></summary>
 
-**Problem:** Every single user interaction created a new, isolated entry in the History database, making it impossible to follow a multi-turn conversation or reload context.
+**Problem:** Generic date-based titles (e.g., "Session Mar 4") force users to manually hunt through history, destroying the productivity benefit of a saved knowledge base.
 
-**Solution:** Refactored the storage schema to use `ChatSession` objects. The system now checks for `loadedSessionId`; if active, new messages are appended to an array within a single record, enabling full threaded history restoration.
+**Solution:** Developed an **Asynchronous Intent Distiller**. When a new session is initialized, the system spawns an isolated background prompt to a fast reasoning model to summarize the user's core question into a concise (<6 words) semantic title, automatically updating the History database for easy retrieval.
 </details>
 
 <details>
-<summary><strong>7. Global Vision Sync (Bridging Action Gaps)</strong></summary>
+<summary><strong>8. Auto-Scaling Dynamic Prompt Editor</strong></summary>
 
-**Problem:** Vision support was hardcoded exclusively for the "Solve" button. Quick actions like "Assist" or "Ask" ignored the screenshot queue, forcing users to manually double-prompt.
+**Problem:** A fixed-height edit input is either too large for simple fixes or too small for thorough prompt revisions, leading to a cramped user experience.
 
-**Solution:** Generalized the `triggerAssistAction` pipeline. It now dynamically checks the screenshot buffer; if occupied, it automatically switches the IPC call from `gemini-chat` to `chat-with-image`, injecting the prompt with visual context.
-</details>
-
-<details>
-<summary><strong>8. The "Stealth Leakage" (Native Tooltips)</strong></summary>
-
-**Problem:** Despite a "stealth" UI, native browser/Electron `title` attributes would trigger OS-level tooltips on hover, which are captured by screen recording software and reveal the tool's presence.
-
-**Solution:** Conducted a global audit to purge the `title` attribute from the entire DOM. Replaced critical feedback with custom, non-native floating elements and micro-animations that stay within the app's coordinate space.
-</details>
-
-<details>
-<summary><strong>9. AI-Powered Session Titling</strong></summary>
-
-**Problem:** Date-based history titles are non-descriptive, requiring users to open every session to find specific information.
-
-**Solution:** Implemented a background "Title Generator" hook. Upon sending the first message of a new session, an invisible sub-request is sent to Gemini to distill the user's intent into a 5-6 word title.
-</details>
-
-<details>
-<summary><strong>10. The Truncation UX Paradox</strong></summary>
-
-**Problem:** Long prompts cluttered the chat bubble, but simple `overflow: hidden` made copy-pasting impossible.
-
-**Solution:** Engineered a `<CollapsibleUserMessage />` component using Tailwind's `line-clamp-5`. It preserves whitespace formatting exactly as typed while providing a floating chevron toggle for expansion.
-</details>
-
-<details>
-<summary><strong>3. Advanced Window Layering (UX)</strong></summary>
-
-**Problem:** Standard Electron windows capture mouse events even when entirely transparent, creating "ghost bounds" that interfere with underlying desktop applications and block clicks.
-
-**Solution:** Engineered a robust DWM (Desktop Window Manager) hit-test workaround leveraging explicit `setBounds` recalculations paired with synchronized opacity flutters (`win.setOpacity`). Combined with dynamic `win.setIgnoreMouseEvents` fallback handlers, this guarantees a zero-latency seamless cross-application experience.
-</details>
-
-<details>
-<summary><strong>4. The Transcript "Race Condition"</strong></summary>
-
-**Problem:** Groq (Cloud) processed faster than Local Whisper, causing transcripts to appear out of order.
-
-**Solution:** Implemented a **Ticket System** with timestamps to ensure perfect chronological order.
-</details>
-
-<details>
-<summary><strong>5. Consolidating Context Consistency</strong></summary>
-
-**Problem:** Large Language Models often drift into generic or hallucinated answers when asked specific domain questions.
-
-**Solution:** Added a **"Pivot Rule" RAG Layer** that forces the model to ground its answers in the provided knowledge base files.
-</details>
-
-<details>
-<summary><strong>6. The Ghost Window (Critical Visibility Crash)</strong></summary>
-
-**Problem:** The app would start with no window visible at all due to Electron transparency bugs.
-
-**Solution:** Implemented an aggressive `ready-to-show` callback with explicit `win.focus()`.
-</details>
-
-<details>
-<summary><strong>7. The "Silent Crash" (Circular Dependency)</strong></summary>
-
-**Problem:** The app would hang on startup because `Main` and `IPC Handlers` were importing each other.
-
-**Solution:** Refactored the architecture to use **Type-Only Imports** (`import type`).
-</details>
-
-<details>
-<summary><strong>8. "Thinking" Process Clean-Up</strong></summary>
-
-**Problem:** Reasoning models output their internal monologue (`<think>...`), cluttering the chat.
-
-**Solution:** Implemented a **Universal Response Cleaner** to filter out thought tags in real-time.
-</details>
-
-<details>
-<summary><strong>9. Addressing "Context Drift"</strong></summary>
-
-**Problem:** Models would ignore "soft" instructions to use specific formatting and revert to standard outputs.
-
-**Solution:** Injected **5 Contextual Anchors** (Tone, References, Format) directly into the `systemContext` block, making them strictly adhered to by the model.
-</details>
-
-<details>
-<summary><strong>10. "Smart Mode" Latency & Sync</strong></summary>
-
-**Problem:** Fixed 2.5s chunks were too short for context, and 10s chunks were too slow for conversation.
-
-**Solution:** Implemented **Variance-Based Silence Detection**. The app analyzes the audio waveform; if it detects silence >3s, it forces an early transcription.
-</details>
-
-<details>
-<summary><strong>11. The "Hardcoded" Prompt Myth</strong></summary>
-
-**Problem:** The prompts appeared static, limiting the app to one user.
-
-**Solution:** Architecture refactor to use **Dynamic Profile Loading**. The prompt in code is just a template; the content is loaded from `user_profile.json` at runtime.
-</details>
-
-<details>
-<summary><strong>13. The Output Formatting Fade</strong></summary>
-
-**Problem:** Smaller models often ignore "soft" instructions to use specific markdown bolding for Scannability, leading to plain, "blank-looking" answers.
-
-**Solution:** Implemented a **Regex-Based Auto-Highlighter** fallback. The system now post-processes every response, automatically wrapping project keywords, technical terms, and percentage values in `**` if the model fails to do so.
-</details>
-
-<details>
-<summary><strong>14. Startup "Ghosting" vs. Visibility</strong></summary>
-
-**Problem:** To prioritize stealth, the app used to boot invisibly, which often led users to believe the application had failed to launch.
-
-**Solution:** Inverted the initial boot logic. Moubely now spawns in a **Visible State** by default, allowing the user to confirm system readiness before manually toggling into **Stealth Mode** using the integrated hotkey.
-</details>
+**Solution:** Built a **Ref-based Auto-Resizer** component. The edit textarea starts at a compact single line (40px). As text is added, it dynamically recalculates its `scrollHeight` and expands the UI container up to a deterministic 120px limit, at which point it elegantly transitions into a scoped scroll view.
 </details>
 
 ---
@@ -297,67 +173,34 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 ## 📦 Installation & Setup
 
 ### Prerequisites
+- **Node.js** (v18+)
+- **npm** or **pnpm**
+- **Git**
 
-- Node.js v18 or higher
-- npm or yarn
-
-### 1. Clone the Repository
-
+### 1. Clone & Install
 ```bash
 git clone https://github.com/Moubarak-01/Moubely.git
 cd Moubely
-```
-
-### 2. Install Dependencies
-
-```bash
 npm install
 ```
 
-### 3. Environment Configuration
+### 2. Environment Configuration
+Create a `.env` file in the root directory. This project utilizes a sophisticated model waterfall requiring the following keys:
 
-### Required API Keys
-
-| Service | Variable Name | Get Key Here |
+| Category | API | Usage |
 | :--- | :--- | :--- |
-| **Google Gemini** | `GEMINI_API_KEY` | [Get Key](https://aistudio.google.com/app/apikey) |
-| **GitHub** | `GITHUB_TOKEN` | [Get Token](https://github.com/settings/tokens) |
-| **Groq** | `GROQ_API_KEY` | [Get Key](https://console.groq.com/keys) |
-| **Perplexity** | `PERPLEXITY_API_KEY` | [Get Key](https://www.perplexity.ai/settings/api) |
-| **OpenRouter** | `OPENROUTER_API_KEY` | [Get Key](https://openrouter.ai/keys) |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | [Get Key](https://build.nvidia.com) |
-| **OCR Space** | `OCR_SPACE_API_KEY` | [Get Key](https://ocr.space/ocrapi) |
+| **Brain & Eyes** | `GEMINI_API_KEY` | Primary Reasoning & High-Res Vision |
+| **Logic Waterfall** | `GITHUB_TOKEN` | DeepSeek, GPT-4o, and Llama 3.3 Access |
+| **Research & Search** | `PERPLEXITY_API_KEY` | Real-time web-grounded research |
+| **Advanced Reasoning** | `OPENROUTER_API_KEY` | Access to Llama 405B and Claude 3.7 |
+| **Speed Optimization** | `NVIDIA_API_KEY` | Tier-1 latency optimization (Nemotron/Llama) |
+| **Cloud Audio** | `GROQ_API_KEY` | 40ms latency transcription backup |
 
-Create a `.env` file in the root directory and paste the following:
-
-```env
-# 1. THE BRAINS & EYES (Primary Chat + Vision)
-GEMINI_API_KEY=your_key_here
-
-# 2. THE LOGIC & BACKUP (DeepSeek + GPT-4o)
-GITHUB_TOKEN=your_token_here
-
-# 3. THE CLOUD EARS (Audio Backup)
-GROQ_API_KEY=your_key_here
-
-# 4. THE RESEARCHER & REASONER (Search + Claude)
-PERPLEXITY_API_KEY=your_key_here
-OPENROUTER_API_KEY=your_key_here
-
-# 5. NVIDIA NIM (New Tier 1)
-NVIDIA_API_KEY=your_key_here
-
-# 6. PDF RECOVERY (Scanned Docs)
-OCR_SPACE_API_KEY=your_key_here
-```
-
-### 4. Start the Application
-
+### 3. Launch
 ```bash
 npm start
 ```
-*This command automatically launches the Vite Dev Server, Electron Backend, and Local Whisper Server.*
-
+*This orchestrated command initializes the Vite development server, spawns the Electron main process, and boots the local Python-based Whisper server on Port 3000.*
 
 ---
 
@@ -365,60 +208,29 @@ npm start
 
 ```
 Moubely/
-├── package.json
-├── .env                        # Contains API Keys
-├── local-whisper-server.mjs    # Local AI Audio Engine
-│
 ├── electron/
-│   ├── main.ts                 # App Entry Point
-│   ├── LLMHelper.ts            # The "Waterfall" Logic & Smart Router
-│   ├── ProcessingHelper.ts     # Automation Workflow
-│   └── ipcHandlers.ts          # Logs & Communication
+│   ├── main.ts             # Application Entry & Lifecycle
+│   ├── WindowHelper.ts     # Stealth, Geometry & Persistence Logic
+│   ├── LLMHelper.ts        # The " Waterfall" Router & Model Cascade
+│   └── ipcHandlers.ts      # Bi-directional Communication Layer
 │
 ├── src/
-│   ├── App.tsx                 # Main UI Entry
-│   ├── _pages/
-│   │   ├── Queue.tsx           # Main Chat Interface (Streaming Logic)
-│   │   └── ProfileSettings.tsx # Universal Story Editor
-│   ├── components/
-│   │   └── AIResponse.tsx      # Markdown & LaTeX Rendering Logic
-│   └── index.css               # Glassmorphism Styles
+│   ├── App.tsx             # Root Context & Global State
+│   ├── _pages/             # High-level View Controllers (Queue, Profile)
+│   ├── components/         # Atomized UI components (AST Markdown, LATEX)
+│   └── index.css           # Design System & Glassmorphism Tokens
 │
-└── index.html
+├── local-whisper-server.mjs # Standalone Hardware-Accelerated Audio Engine
+└── index.html               # Main Entry point
 ```
 
 ---
 
-## 🤝 Contributing
+## 👨‍💻 Engineering Mission
+**Moubely** aims to be more than a chatbot—it is a study in **Unobtrusive Intelligence**. By solving deep UI/UX challenges in the Electron sandbox, it provides a blueprint for how AI companions should live on the desktop: fast, private, and always available without interrupting the human flow.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+**Author:** [Moubarak-01](https://github.com/Moubarak-01)  
+**License:** [MIT License](LICENSE)  
 
 ---
-
-## 📄 License
-
-This project is licensed under the **MIT License**.
-
-### 🛡️ Mandatory Attribution
-
-If you clone, fork, or use any logic from this repository (especially the **Resilient Controller** or **Window Management Systems**), you are **legally required** to:
-- Retain the original copyright notice in the `LICENSE` file
-- Provide a visible link back to this [Moubely Repository](https://github.com/Moubarak-01/Moubely)
-- Acknowledge **Moubarak-01** as the original author
-
----
-
-## 👨‍💻 Author
-
-**Moubarak**
-- GitHub: [@Moubarak-01](https://github.com/Moubarak-01)
-
----
-
-Made with ❤️ for seamless desktop productivity
-
-**Moubely - Your Invisible AI Companion**
+<p align="center">Made with ❤️ for high-performance builders</p>

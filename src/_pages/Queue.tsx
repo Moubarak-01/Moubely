@@ -368,6 +368,11 @@ const Queue: React.FC<any> = () => {
     const [showStudentModal, setShowStudentModal] = useState(false);
     const [isFinalizing, setIsFinalizing] = useState(false);
 
+    // --- DICTATION STATE ---
+    const [isDictating, setIsDictating] = useState(false);
+    const dictationRecorderRef = useRef<MediaRecorder | null>(null);
+    const dictationChunksRef = useRef<Blob[]>([]);
+
     // --- MODES STATE ---
     const [isStealth, setIsStealth] = useState(false);
     const [isPrivateMode, setIsPrivateMode] = useState(false);
@@ -410,15 +415,62 @@ const Queue: React.FC<any> = () => {
 
     const MAX_QUEUE_SIZE = 12;
 
-    // --- ONE SINGLE DECLARATION HERE ---
     const handleExpandToggle = () => {
         if (window.electronAPI) {
-            if (!isExpanded) { window.electronAPI.setWindowSize({ width: 600, height: 700 }); setIsExpanded(true); }
-            else { window.electronAPI.setWindowSize({ width: 600, height: 200 }); setIsExpanded(false); }
+            const nextState = !isExpanded;
+            window.electronAPI.toggleExpand(nextState);
+            setIsExpanded(nextState);
         } else {
             setIsExpanded(!isExpanded);
         }
     }
+
+    // --- VOICE DICTATION LOGIC ---
+    const toggleDictation = async () => {
+        if (isDictating && dictationRecorderRef.current) {
+            // STOP RECORDING
+            dictationRecorderRef.current.stop();
+            setIsDictating(false);
+            return;
+        }
+
+        // START RECORDING
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            dictationRecorderRef.current = mediaRecorder;
+            dictationChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) dictationChunksRef.current.push(e.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(dictationChunksRef.current, { type: 'audio/webm' });
+                const arrayBuffer = await audioBlob.arrayBuffer();
+                const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+                if (window.electronAPI) {
+                    try {
+                        const transcribedText = await window.electronAPI.transcribeDictation(base64Audio, 'audio/webm');
+                        if (transcribedText && !transcribedText.startsWith("Error")) {
+                            setInput(prev => prev + (prev.length > 0 ? " " : "") + transcribedText);
+                        }
+                    } catch (err) {
+                        console.error("Dictation transcription failed:", err);
+                    }
+                }
+
+                // Cleanup tracks
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            setIsDictating(true);
+        } catch (err) {
+            console.error("Microphone access denied for dictation:", err);
+        }
+    };
 
     // --- SCREENSHOT CAPTURE LOGIC (Wrapped in useCallback) ---
     const handleCapture = useCallback(async () => {
@@ -445,7 +497,9 @@ const Queue: React.FC<any> = () => {
             // Ensure window is expanded to show the queue
             if (!isExpandedRef.current) {
                 if (window.electronAPI) {
-                    window.electronAPI.setWindowSize({ width: 600, height: 700 });
+                    window.electronAPI.toggleExpand(true);
+                    setIsExpanded(true);
+                } else {
                     setIsExpanded(true);
                 }
             }
@@ -1742,7 +1796,7 @@ const Queue: React.FC<any> = () => {
                         {activeTab === "Chat" && (
                             <div className="flex-1 flex flex-col min-h-0">
                                 <div
-                                    className="flex-1 overflow-y-auto chat-scroll-area space-y-5 pb-4 px-2"
+                                    className="flex-1 overflow-y-auto chat-scroll-area pb-4 px-2"
                                     ref={chatContainerRef}
                                     onScroll={handleScroll}
                                     onMouseEnter={() => {
@@ -1754,123 +1808,136 @@ const Queue: React.FC<any> = () => {
                                         setIsHoveringChat(false);
                                     }}
                                 >
-                                    {messages.map((msg) => (
-                                        <div key={msg.id} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                                            {msg.role === "user" && (
-                                                <div className="group relative max-w-[85%]">
-                                                    {msg.queuedScreenshots && msg.queuedScreenshots.length > 0 && (
-                                                        <div className={`mb-2 grid gap-2 ${msg.queuedScreenshots.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                                            {msg.queuedScreenshots.map((img, index) => (
-                                                                <img
-                                                                    key={index}
-                                                                    src={img.preview}
-                                                                    alt={`Screenshot ${index + 1}`}
-                                                                    className="rounded-lg border border-white/10 max-w-full h-auto max-h-[200px] object-cover bg-black/20"
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    )}
+                                    <div className="max-w-3xl w-full mx-auto flex flex-col space-y-5">
+                                        {messages.map((msg) => (
+                                            <div key={msg.id} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                                                {msg.role === "user" && (
+                                                    <div className={`group relative ${editingMsgId === msg.id ? 'w-full max-w-full flex justify-end' : 'max-w-[85%]'}`}>
+                                                        {msg.queuedScreenshots && msg.queuedScreenshots.length > 0 && (
+                                                            <div className={`mb-2 grid gap-2 ${msg.queuedScreenshots.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                                                {msg.queuedScreenshots.map((img, index) => (
+                                                                    <img
+                                                                        key={index}
+                                                                        src={img.preview}
+                                                                        alt={`Screenshot ${index + 1}`}
+                                                                        className="rounded-lg border border-white/10 max-w-full h-auto max-h-[200px] object-cover bg-black/20"
+                                                                    />
+                                                                ))}
+                                                            </div>
+                                                        )}
 
-                                                    {editingMsgId === msg.id ? (
-                                                        <div className="flex flex-col gap-2 bg-[#1a1a1a] p-2 rounded-xl border border-blue-500/50 min-w-[300px]">
-                                                            <textarea
-                                                                value={editText}
-                                                                onChange={(e) => setEditText(e.target.value)}
-                                                                className="w-full bg-transparent text-white text-sm p-2 outline-none resize-none h-20"
-                                                                autoFocus
-                                                            />
-                                                            <div className="flex justify-end gap-2">
-                                                                <button onClick={handleCancelEdit} className="px-3 py-1 text-xs text-gray-400 hover:text-white bg-white/5 rounded-md transition-colors">Cancel</button>
-                                                                <button onClick={() => handleSaveEdit(msg.id)} className="px-3 py-1 text-xs text-white bg-blue-600 hover:bg-blue-500 rounded-md transition-colors">Save & Retry</button>
+                                                        {editingMsgId === msg.id ? (
+                                                            <div className="flex flex-col gap-3 bg-[#1a1a1a] p-3 rounded-xl border border-blue-500/50 w-[95vw] sm:w-[500px] md:w-[600px] max-w-full shadow-2xl relative z-10">
+                                                                <textarea
+                                                                    ref={(el) => {
+                                                                        if (el) {
+                                                                            el.style.height = 'auto';
+                                                                            el.style.height = `${Math.min(Math.max(el.scrollHeight, 40), 120)}px`;
+                                                                        }
+                                                                    }}
+                                                                    value={editText}
+                                                                    onChange={(e) => setEditText(e.target.value)}
+                                                                    className="w-full bg-black/20 text-white text-sm p-3 outline-none resize-y min-h-[40px] max-h-[120px] rounded-lg border border-white/5 focus:border-white/10 custom-scrollbar overflow-y-auto leading-relaxed"
+                                                                    autoFocus
+                                                                />
+                                                                <div className="flex justify-end gap-2">
+                                                                    <button onClick={handleCancelEdit} className="px-4 py-1.5 text-xs font-medium text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors">Cancel</button>
+                                                                    <button onClick={() => handleSaveEdit(msg.id)} className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors shadow-lg shadow-blue-500/20">Update</button>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            <div className="user-bubble text-left relative">
-                                                                <CollapsibleUserMessage text={msg.text} />
-                                                            </div>
-                                                            <div className="absolute top-1/2 -left-16 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button
-                                                                    onClick={() => handleCopyUserMessage(msg.id, msg.text)}
-                                                                    className={`p-1.5 transition-colors rounded-full ${copiedId === msg.id ? 'text-green-400 bg-green-400/10' : 'text-gray-500 hover:text-white bg-black/40'}`}
-                                                                >
-                                                                    {copiedId === msg.id ? <CheckCheck size={12} /> : <Copy size={12} />}
-                                                                </button>
-                                                                <button onClick={() => handleStartEdit(msg)} className="p-1.5 text-gray-400 hover:text-white bg-black/40 rounded-full"><Edit2 size={12} /></button>
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            )}
-                                            {msg.role === "ai" && (
-                                                <div className="ai-message max-w-[95%] group relative">
-                                                    <MessageContent text={msg.text} />
-                                                    <div className="absolute top-0 -right-10 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button
-                                                            onClick={() => handleCopyAiMessage(msg.id, msg.text)}
-                                                            className={`p-1.5 transition-colors rounded-full ${copiedId === msg.id ? 'text-green-400 bg-green-400/10' : 'text-gray-500 hover:text-white bg-black/40'}`}
-                                                        >
-                                                            {copiedId === msg.id ? <CheckCheck size={12} /> : <Copy size={12} />}
-                                                        </button>
+                                                        ) : (
+                                                            <>
+                                                                <div className="user-bubble text-left relative">
+                                                                    <CollapsibleUserMessage text={msg.text} />
+                                                                </div>
+                                                                <div className="absolute top-1/2 -left-16 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <button
+                                                                        onClick={() => handleCopyUserMessage(msg.id, msg.text)}
+                                                                        className={`p-1.5 transition-colors rounded-full ${copiedId === msg.id ? 'text-green-400 bg-green-400/10' : 'text-gray-500 hover:text-white bg-black/40'}`}
+                                                                    >
+                                                                        {copiedId === msg.id ? <CheckCheck size={12} /> : <Copy size={12} />}
+                                                                    </button>
+                                                                    <button onClick={() => handleStartEdit(msg)} className="p-1.5 text-gray-400 hover:text-white bg-black/40 rounded-full"><Edit2 size={12} /></button>
+                                                                </div>
+                                                            </>
+                                                        )}
                                                     </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                    {showSlowLoader && (
-                                        <div className="flex items-center gap-3 text-sm text-gray-400 pl-1">
-                                            <Loader2 size={16} className="animate-spin text-blue-400" />
-                                            <span className="animate-pulse">{thinkingStep}</span>
-                                        </div>
-                                    )}
-                                    <div ref={chatEndRef} />
+                                                )}
+                                                {msg.role === "ai" && (
+                                                    <div className="ai-message max-w-[95%] group flex flex-col items-start space-y-1">
+                                                        <MessageContent text={msg.text} />
+                                                        <div className="flex items-center mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button
+                                                                onClick={() => handleCopyAiMessage(msg.id, msg.text)}
+                                                                className={`flex items-center gap-1.5 px-2 py-1 transition-colors rounded-md text-xs font-medium ${copiedId === msg.id ? 'text-green-400 bg-green-500/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                            >
+                                                                {copiedId === msg.id ? <CheckCheck size={13} /> : <Copy size={13} />}
+                                                                <span>{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                        {showSlowLoader && (
+                                            <div className="flex items-center gap-3 text-sm text-gray-400 pl-1">
+                                                <Loader2 size={16} className="animate-spin text-blue-400" />
+                                                <span className="animate-pulse">{thinkingStep}</span>
+                                            </div>
+                                        )}
+                                        <div ref={chatEndRef} />
+                                    </div>
                                 </div>
                             </div>
                         )}
                         {activeTab === "Transcript" && (
-                            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                                <div className="flex flex-col items-center justify-center sticky top-0 bg-[#0f0f14]/80 backdrop-blur-md p-4 mb-2 z-10 rounded-xl border border-white/5 shadow-lg">
-                                    {isRecording ? (<> <AudioVisualizer audioContext={audioContextRef.current} source={sourceNodeRef.current} /> <div className="text-xs text-blue-400 mt-2 font-medium animate-pulse">Listening...</div> </>) : transcriptError ? (<div className="flex flex-col items-center text-red-400 gap-2 p-2 bg-red-500/10 rounded-lg"> <AlertCircle size={20} /> <span className="text-xs font-semibold text-center">{transcriptError}</span> </div>) : (<div className="text-gray-500 text-xs">Microphone inactive</div>)}
+                            <div className="flex-1 overflow-y-auto p-4">
+                                <div className="max-w-3xl mx-auto w-full space-y-2">
+                                    <div className="flex flex-col items-center justify-center sticky top-0 bg-[#0f0f14]/80 backdrop-blur-md p-4 mb-2 z-10 rounded-xl border border-white/5 shadow-lg">
+                                        {isRecording ? (<> <AudioVisualizer audioContext={audioContextRef.current} source={sourceNodeRef.current} /> <div className="text-xs text-blue-400 mt-2 font-medium animate-pulse">Listening...</div> </>) : transcriptError ? (<div className="flex flex-col items-center text-red-400 gap-2 p-2 bg-red-500/10 rounded-lg"> <AlertCircle size={20} /> <span className="text-xs font-semibold text-center">{transcriptError}</span> </div>) : (<div className="text-gray-500 text-xs">Microphone inactive</div>)}
+                                    </div>
+                                    {transcriptLogs.length === 0 && !transcriptError && (<div className="text-gray-500 text-center mt-10 text-sm"> Speak clearly to see text appear here. </div>)}
+                                    {transcriptLogs.map((log) => (<div key={log.id} className="animate-in fade-in slide-in-from-bottom-1 duration-300"> <div className="text-[11px] text-gray-500 font-mono mb-0.5">{log.displayTime}</div> <div className="text-gray-200 leading-relaxed text-[15px] pl-2 border-l-2 border-blue-500/30"> {log.text} </div> </div>))}
+                                    <div ref={transcriptEndRef} />
                                 </div>
-                                {transcriptLogs.length === 0 && !transcriptError && (<div className="text-gray-500 text-center mt-10 text-sm"> Speak clearly to see text appear here. </div>)}
-                                {transcriptLogs.map((log) => (<div key={log.id} className="animate-in fade-in slide-in-from-bottom-1 duration-300"> <div className="text-[11px] text-gray-500 font-mono mb-0.5">{log.displayTime}</div> <div className="text-gray-200 leading-relaxed text-[15px] pl-2 border-l-2 border-blue-500/30"> {log.text} </div> </div>))}
-                                <div ref={transcriptEndRef} />
                             </div>
                         )}
                         {activeTab === "Email" && showPostMeeting && (
                             <div className="flex-1 overflow-y-auto p-2">
-                                {emailDraft ? (
-                                    <div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-2xl">
-                                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-white/10">
-                                            <h3 className="text-white font-medium flex items-center gap-2">
-                                                <Mail size={16} /> Generated Follow-up
-                                            </h3>
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={handleRegenerateEmail}
-                                                    disabled={isRegeneratingEmail}
-                                                    className={`text-xs flex items-center gap-1 transition-colors ${isRegeneratingEmail ? 'text-blue-400 cursor-not-allowed opacity-80' : 'hover:text-blue-400 text-gray-400'}`}
-                                                >
-                                                    <RefreshCw size={12} className={isRegeneratingEmail ? 'animate-spin' : ''} />
-                                                    {isRegeneratingEmail ? 'Regenerating...' : 'Regenerate'}
-                                                </button>
-                                                <button
-                                                    onClick={handleCopyEmail}
-                                                    className={`text-xs flex items-center gap-1 transition-colors ${isCopied ? 'text-green-400' : 'hover:text-white text-gray-400'}`}
-                                                >
-                                                    {isCopied ? <CheckCheck size={12} /> : <Copy size={12} />}
-                                                    {isCopied ? 'Copied!' : 'Copy Draft'}
-                                                </button>
+                                <div className="max-w-3xl mx-auto w-full h-full flex flex-col">
+                                    {emailDraft ? (
+                                        <div className="bg-white/5 border border-white/10 rounded-xl p-6 shadow-2xl">
+                                            <div className="flex justify-between items-center mb-4 pb-4 border-b border-white/10">
+                                                <h3 className="text-white font-medium flex items-center gap-2">
+                                                    <Mail size={16} /> Generated Follow-up
+                                                </h3>
+                                                <div className="flex items-center gap-3">
+                                                    <button
+                                                        onClick={handleRegenerateEmail}
+                                                        disabled={isRegeneratingEmail}
+                                                        className={`text-xs flex items-center gap-1 transition-colors ${isRegeneratingEmail ? 'text-blue-400 cursor-not-allowed opacity-80' : 'hover:text-blue-400 text-gray-400'}`}
+                                                    >
+                                                        <RefreshCw size={12} className={isRegeneratingEmail ? 'animate-spin' : ''} />
+                                                        {isRegeneratingEmail ? 'Regenerating...' : 'Regenerate'}
+                                                    </button>
+                                                    <button
+                                                        onClick={handleCopyEmail}
+                                                        className={`text-xs flex items-center gap-1 transition-colors ${isCopied ? 'text-green-400' : 'hover:text-white text-gray-400'}`}
+                                                    >
+                                                        {isCopied ? <CheckCheck size={12} /> : <Copy size={12} />}
+                                                        {isCopied ? 'Copied!' : 'Copy Draft'}
+                                                    </button>
+                                                </div>
                                             </div>
+                                            <MessageContent text={emailDraft} />
                                         </div>
-                                        <MessageContent text={emailDraft} />
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
-                                        <Loader2 size={24} className="animate-spin text-blue-400" />
-                                        <span>Drafting email...</span>
-                                    </div>
-                                )}
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center flex-1 text-gray-400 gap-3">
+                                            <Loader2 size={24} className="animate-spin text-blue-400" />
+                                            <span>Drafting email...</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
                         {activeTab === "History" && (
@@ -1881,186 +1948,205 @@ const Queue: React.FC<any> = () => {
                                         <button onClick={() => setHistoryTab("Meetings")} className={`px-4 py-1.5 rounded-md text-xs font-medium transition-colors ${historyTab === "Meetings" ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}>🎙️ Meeting Transcripts</button>
                                     </div>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
-                                    {historyTab === "Chats" ? (
-                                        pastChats.length === 0 ? (
-                                            <div className="text-center text-gray-500 mt-10 text-sm">No saved chats yet.</div>
-                                        ) : (
-                                            pastChats.map(chat => (
-                                                <div key={chat.id} className="bg-white/5 border border-white/10 rounded-xl p-3 hover:border-blue-500/50 transition-all group relative">
-                                                    <div className="flex justify-between items-center">
-                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                            <button
-                                                                onClick={(e) => toggleChat(chat.id, e)}
-                                                                className="flex items-center gap-1.5 text-xs text-gray-200 font-medium hover:text-blue-400 transition-colors p-1 rounded hover:bg-white/5 flex-1 min-w-0"
-                                                                onMouseEnter={(e) => {
-                                                                    const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
-                                                                    if (span && span.scrollWidth > span.clientWidth) {
-                                                                        span.style.setProperty('--scroll-dist', `-${span.scrollWidth - span.clientWidth + 20}px`);
-                                                                        span.classList.add('can-marquee');
-                                                                    }
-                                                                }}
-                                                                onMouseLeave={(e) => {
-                                                                    const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
-                                                                    if (span) span.classList.remove('can-marquee');
-                                                                }}
-                                                            >
-                                                                {expandedChats[chat.id] ? <ChevronDown size={14} className="shrink-0 text-blue-400" /> : <ChevronRight size={14} className="shrink-0 text-gray-500" />}
-                                                                <div className="marquee-container">
-                                                                    <span className="marquee-content">{chat.prompt}</span>
-                                                                </div>
-                                                            </button>
-                                                            <span className="text-gray-500 shrink-0 mx-1">•</span>
-                                                            <div className="text-[10px] text-blue-400/70 shrink-0">{new Date(chat.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                                                        </div>
-                                                        <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
-                                                            <button onClick={(e) => handleLoadPastChat(chat, e)} className="px-2 py-0.5 bg-blue-600/20 text-blue-400 hover:bg-blue-500/40 hover:text-white rounded text-[9px] uppercase tracking-wider font-bold border border-blue-500/20 transition-all flex items-center gap-1"><ArrowRight size={10} /> Open</button>
-                                                            <button onClick={(e) => deleteChat(chat.id, e)} className="p-1 px-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"><Trash2 size={12} /></button>
-                                                        </div>
-                                                    </div>
-                                                    {expandedChats[chat.id] && (
-                                                        <div className="mt-4 pt-4 border-t border-white/10 animate-in fade-in slide-in-from-top-2 duration-200">
-                                                            <div className="bg-black/40 rounded-lg p-4 border border-white/5 text-sm overflow-x-auto">
-                                                                <MessageContent text={chat.response} />
+                                <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
+                                    <div className="max-w-3xl mx-auto w-full space-y-3">
+                                        {historyTab === "Chats" ? (
+                                            pastChats.length === 0 ? (
+                                                <div className="text-center text-gray-500 mt-10 text-sm">No saved chats yet.</div>
+                                            ) : (
+                                                pastChats.map(chat => (
+                                                    <div key={chat.id} className="bg-white/5 border border-white/10 rounded-xl p-3 hover:border-blue-500/50 transition-all group relative">
+                                                        <div className="flex justify-between items-center">
+                                                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                                <button
+                                                                    onClick={(e) => toggleChat(chat.id, e)}
+                                                                    className="flex items-center gap-1.5 text-xs text-gray-200 font-medium hover:text-blue-400 transition-colors p-1 rounded hover:bg-white/5 flex-1 min-w-0"
+                                                                    onMouseEnter={(e) => {
+                                                                        const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
+                                                                        if (span && span.scrollWidth > span.clientWidth) {
+                                                                            span.style.setProperty('--scroll-dist', `-${span.scrollWidth - span.clientWidth + 20}px`);
+                                                                            span.classList.add('can-marquee');
+                                                                        }
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
+                                                                        if (span) span.classList.remove('can-marquee');
+                                                                    }}
+                                                                >
+                                                                    {expandedChats[chat.id] ? <ChevronDown size={14} className="shrink-0 text-blue-400" /> : <ChevronRight size={14} className="shrink-0 text-gray-500" />}
+                                                                    <div className="marquee-container">
+                                                                        <span className="marquee-content">{chat.prompt}</span>
+                                                                    </div>
+                                                                </button>
+                                                                <span className="text-gray-500 shrink-0 mx-1">•</span>
+                                                                <div className="text-[10px] text-blue-400/70 shrink-0">{new Date(chat.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
+                                                                <button onClick={(e) => handleLoadPastChat(chat, e)} className="px-2 py-0.5 bg-blue-600/20 text-blue-400 hover:bg-blue-500/40 hover:text-white rounded text-[9px] uppercase tracking-wider font-bold border border-blue-500/20 transition-all flex items-center gap-1"><ArrowRight size={10} /> Open</button>
+                                                                <button onClick={(e) => deleteChat(chat.id, e)} className="p-1 px-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"><Trash2 size={12} /></button>
                                                             </div>
                                                         </div>
-                                                    )}
-                                                </div>
-                                            ))
-                                        )
-                                    ) : (
-                                        pastMeetings.length === 0 ? (
-                                            <div className="text-center text-gray-500 mt-10 text-sm">No recorded meetings yet.</div>
-                                        ) : (
-                                            pastMeetings.map((meeting) => (
-                                                <div key={meeting.id} className="bg-white/5 border border-white/10 rounded-xl p-3 mb-2 hover:border-blue-500/50 transition-all group relative">
-                                                    <div className="flex justify-between items-center mb-3">
-                                                        <div className="flex items-center gap-1.5 text-blue-300 font-bold text-sm flex-1 min-w-0">
-                                                            <Calendar size={14} className="shrink-0 text-blue-400" />
-                                                            {editingTitleId === meeting.id ? (
-                                                                <div className="flex items-center gap-1.5 w-full relative" onClick={(e) => e.stopPropagation()}>
-                                                                    <input type="text" autoFocus value={editingTitleText} onChange={(e) => setEditingTitleText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTitle(meeting, e); if (e.key === 'Escape') handleCancelEditTitle(e); }} className="bg-black/40 text-blue-300 text-xs px-2 py-1 rounded w-full border border-blue-500/50 outline-none" />
-                                                                    <button onClick={(e) => handleSaveTitle(meeting, e)} className="p-1 hover:text-green-400 transition-colors"><Check size={14} /></button>
-                                                                    <button onClick={(e) => handleCancelEditTitle(e)} className="p-1 hover:text-red-400 transition-colors"><X size={14} /></button>
+                                                        {expandedChats[chat.id] && (
+                                                            <div className="mt-4 pt-4 border-t border-white/10 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                                <div className="bg-black/40 rounded-lg p-4 border border-white/5 text-sm overflow-x-auto">
+                                                                    <MessageContent text={chat.response} />
                                                                 </div>
-                                                            ) : (
-                                                                <div className="flex items-center min-w-0 flex-1">
-                                                                    <div
-                                                                        className="marquee-container"
-                                                                        onMouseEnter={(e) => {
-                                                                            const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
-                                                                            if (span && span.scrollWidth > span.clientWidth) {
-                                                                                span.style.setProperty('--scroll-dist', `-${span.scrollWidth - span.clientWidth + 20}px`);
-                                                                                span.classList.add('can-marquee');
-                                                                            }
-                                                                        }}
-                                                                        onMouseLeave={(e) => {
-                                                                            const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
-                                                                            if (span) span.classList.remove('can-marquee');
-                                                                        }}
-                                                                    >
-                                                                        <span className="marquee-content">{meeting.title || new Date(meeting.date).toLocaleDateString()}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))
+                                            )
+                                        ) : (
+                                            pastMeetings.length === 0 ? (
+                                                <div className="text-center text-gray-500 mt-10 text-sm">No recorded meetings yet.</div>
+                                            ) : (
+                                                pastMeetings.map((meeting) => (
+                                                    <div key={meeting.id} className="bg-white/5 border border-white/10 rounded-xl p-3 mb-2 hover:border-blue-500/50 transition-all group relative">
+                                                        <div className="flex justify-between items-center mb-3">
+                                                            <div className="flex items-center gap-1.5 text-blue-300 font-bold text-sm flex-1 min-w-0">
+                                                                <Calendar size={14} className="shrink-0 text-blue-400" />
+                                                                {editingTitleId === meeting.id ? (
+                                                                    <div className="flex items-center gap-1.5 w-full relative" onClick={(e) => e.stopPropagation()}>
+                                                                        <input type="text" autoFocus value={editingTitleText} onChange={(e) => setEditingTitleText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTitle(meeting, e); if (e.key === 'Escape') handleCancelEditTitle(e); }} className="bg-black/40 text-blue-300 text-xs px-2 py-1 rounded w-full border border-blue-500/50 outline-none" />
+                                                                        <button onClick={(e) => handleSaveTitle(meeting, e)} className="p-1 hover:text-green-400 transition-colors"><Check size={14} /></button>
+                                                                        <button onClick={(e) => handleCancelEditTitle(e)} className="p-1 hover:text-red-400 transition-colors"><X size={14} /></button>
                                                                     </div>
-                                                                    <span className="text-gray-500 shrink-0 mx-1">•</span>
-                                                                    <Clock size={12} className="shrink-0 text-gray-400" />
-                                                                    <span className="shrink-0 text-gray-400 font-medium text-[10px] ml-0.5">{new Date(meeting.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                ) : (
+                                                                    <div className="flex items-center min-w-0 flex-1">
+                                                                        <div
+                                                                            className="marquee-container"
+                                                                            onMouseEnter={(e) => {
+                                                                                const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
+                                                                                if (span && span.scrollWidth > span.clientWidth) {
+                                                                                    span.style.setProperty('--scroll-dist', `-${span.scrollWidth - span.clientWidth + 20}px`);
+                                                                                    span.classList.add('can-marquee');
+                                                                                }
+                                                                            }}
+                                                                            onMouseLeave={(e) => {
+                                                                                const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
+                                                                                if (span) span.classList.remove('can-marquee');
+                                                                            }}
+                                                                        >
+                                                                            <span className="marquee-content">{meeting.title || new Date(meeting.date).toLocaleDateString()}</span>
+                                                                        </div>
+                                                                        <span className="text-gray-500 shrink-0 mx-1">•</span>
+                                                                        <Clock size={12} className="shrink-0 text-gray-400" />
+                                                                        <span className="shrink-0 text-gray-400 font-medium text-[10px] ml-0.5">{new Date(meeting.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {editingTitleId !== meeting.id && (
+                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
+                                                                    <button onClick={(e) => handleLoadPastMeeting(meeting, e)} className="px-2 py-0.5 bg-blue-600/20 text-blue-400 hover:bg-blue-500/40 hover:text-white rounded text-[9px] uppercase tracking-wider font-bold border border-blue-500/20 transition-all flex items-center gap-1"><ArrowRight size={10} /> Open</button>
+                                                                    <button onClick={(e) => handleStartEditTitle(meeting, e)} className="p-1 px-1.5 text-gray-400 hover:text-blue-400 hover:bg-blue-400/10 rounded transition-colors"><Edit2 size={12} /></button>
+                                                                    <button onClick={(e) => deleteMeeting(meeting.id, e)} className="p-1 px-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"><Trash2 size={12} /></button>
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        {editingTitleId !== meeting.id && (
-                                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
-                                                                <button onClick={(e) => handleLoadPastMeeting(meeting, e)} className="px-2 py-0.5 bg-blue-600/20 text-blue-400 hover:bg-blue-500/40 hover:text-white rounded text-[9px] uppercase tracking-wider font-bold border border-blue-500/20 transition-all flex items-center gap-1"><ArrowRight size={10} /> Open</button>
-                                                                <button onClick={(e) => handleStartEditTitle(meeting, e)} className="p-1 px-1.5 text-gray-400 hover:text-blue-400 hover:bg-blue-400/10 rounded transition-colors"><Edit2 size={12} /></button>
-                                                                <button onClick={(e) => deleteMeeting(meeting.id, e)} className="p-1 px-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"><Trash2 size={12} /></button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="relative group/transcript text-sm mb-4">
-                                                        <div className="flex justify-between items-center mb-2">
-                                                            <button onClick={(e) => toggleMeeting(meeting.id, e)} className="text-[11px] font-semibold text-blue-400/80 hover:text-blue-300 transition-colors uppercase tracking-wider flex items-center gap-1 focus:outline-none"> {expandedMeetings[meeting.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />} Transcript </button>
-                                                            <button
-                                                                onClick={(e) => handleCopyHistoryTranscript(meeting.id, meeting.transcript, e)}
-                                                                className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all border opacity-0 group-hover/transcript:opacity-100 ${copiedTranscriptId === meeting.id ? 'bg-green-500/20 text-green-400 border-green-500/40' : 'bg-black/40 text-gray-500 border-white/5 hover:border-white/20 hover:text-white'}`}
-                                                            >
-                                                                {copiedTranscriptId === meeting.id ? <><Check size={10} /> Copied</> : <><Copy size={10} /> Copy</>}
-                                                            </button>
-                                                        </div>
-                                                        {expandedMeetings[meeting.id] ? (
-                                                            <div className="bg-black/50 rounded-lg p-3 border border-white/5 animate-in fade-in slide-in-from-top-1">
-                                                                <div className="max-h-[200px] overflow-y-auto custom-scrollbar pr-1 text-xs text-gray-200"> {meeting.transcript.map(t => (<div key={t.id} className="mb-2 border-l border-blue-500/40 pl-2"> <span className="text-[9px] text-gray-400 block font-medium">{t.displayTime}</span> {t.text} </div>))} </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="bg-black/40 hover:bg-black/80 hover:border-blue-500/50 transition-all rounded-lg p-3 border border-white/5 text-xs text-gray-300 hover:text-gray-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.1)] line-clamp-2 cursor-pointer shadow-inner" onClick={(e) => toggleMeeting(meeting.id, e)}> {meeting.transcript.map(t => t.text).join(' ').slice(0, 120)}... </div>
-                                                        )}
-                                                    </div>
-                                                    {meeting.emailDraft && (
-                                                        <div className="relative group/email text-sm">
+                                                        <div className="relative group/transcript text-sm mb-4">
                                                             <div className="flex justify-between items-center mb-2">
-                                                                <button onClick={(e) => toggleEmail(meeting.id, e)} className="text-[11px] font-semibold text-purple-400/80 hover:text-purple-300 transition-colors uppercase gap-1 flex items-center focus:outline-none"> {expandedEmails[meeting.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />} Email </button>
+                                                                <button onClick={(e) => toggleMeeting(meeting.id, e)} className="text-[11px] font-semibold text-blue-400/80 hover:text-blue-300 transition-colors uppercase tracking-wider flex items-center gap-1 focus:outline-none"> {expandedMeetings[meeting.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />} Transcript </button>
                                                                 <button
-                                                                    onClick={(e) => handleCopyHistoryEmail(meeting.id, meeting.emailDraft, e)}
-                                                                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all border opacity-0 group-hover/email:opacity-100 ${copiedEmailId === meeting.id ? 'bg-green-500/20 text-green-400 border-green-500/40' : 'bg-black/40 text-gray-500 border-white/5 hover:border-white/20 hover:text-white'}`}
+                                                                    onClick={(e) => handleCopyHistoryTranscript(meeting.id, meeting.transcript, e)}
+                                                                    className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all border opacity-0 group-hover/transcript:opacity-100 ${copiedTranscriptId === meeting.id ? 'bg-green-500/20 text-green-400 border-green-500/40' : 'bg-black/40 text-gray-500 border-white/5 hover:border-white/20 hover:text-white'}`}
                                                                 >
-                                                                    {copiedEmailId === meeting.id ? <><Check size={10} /> Copied</> : <><Copy size={10} /> Copy</>}
+                                                                    {copiedTranscriptId === meeting.id ? <><Check size={10} /> Copied</> : <><Copy size={10} /> Copy</>}
                                                                 </button>
                                                             </div>
-                                                            {expandedEmails[meeting.id] ? (
-                                                                <div className="bg-black/50 p-3 rounded-lg border border-purple-500/20 animate-in fade-in slide-in-from-top-1 text-xs text-gray-200"> <MessageContent text={meeting.emailDraft} /> </div>
+                                                            {expandedMeetings[meeting.id] ? (
+                                                                <div className="bg-black/50 rounded-lg p-3 border border-white/5 animate-in fade-in slide-in-from-top-1">
+                                                                    <div className="max-h-[200px] overflow-y-auto custom-scrollbar pr-1 text-xs text-gray-200"> {meeting.transcript.map(t => (<div key={t.id} className="mb-2 border-l border-blue-500/40 pl-2"> <span className="text-[9px] text-gray-400 block font-medium">{t.displayTime}</span> {t.text} </div>))} </div>
+                                                                </div>
                                                             ) : (
-                                                                <div className="bg-black/40 hover:bg-black/80 hover:border-purple-500/40 transition-all p-3 rounded-lg border border-transparent text-xs text-gray-300 hover:text-gray-100 hover:shadow-[0_0_15px_rgba(168,85,247,0.1)] line-clamp-2 cursor-pointer shadow-inner" onClick={(e) => toggleEmail(meeting.id, e)}> {meeting.emailDraft.slice(0, 120)}... </div>
+                                                                <div className="bg-black/40 hover:bg-black/80 hover:border-blue-500/50 transition-all rounded-lg p-3 border border-white/5 text-xs text-gray-300 hover:text-gray-100 hover:shadow-[0_0_15px_rgba(59,130,246,0.1)] line-clamp-2 cursor-pointer shadow-inner" onClick={(e) => toggleMeeting(meeting.id, e)}> {meeting.transcript.map(t => t.text).join(' ').slice(0, 120)}... </div>
                                                             )}
                                                         </div>
-                                                    )}
-                                                </div>
-                                            ))
-                                        )
-                                    )}
+                                                        {meeting.emailDraft && (
+                                                            <div className="relative group/email text-sm">
+                                                                <div className="flex justify-between items-center mb-2">
+                                                                    <button onClick={(e) => toggleEmail(meeting.id, e)} className="text-[11px] font-semibold text-purple-400/80 hover:text-purple-300 transition-colors uppercase gap-1 flex items-center focus:outline-none"> {expandedEmails[meeting.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />} Email </button>
+                                                                    <button
+                                                                        onClick={(e) => handleCopyHistoryEmail(meeting.id, meeting.emailDraft, e)}
+                                                                        className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all border opacity-0 group-hover/email:opacity-100 ${copiedEmailId === meeting.id ? 'bg-green-500/20 text-green-400 border-green-500/40' : 'bg-black/40 text-gray-500 border-white/5 hover:border-white/20 hover:text-white'}`}
+                                                                    >
+                                                                        {copiedEmailId === meeting.id ? <><Check size={10} /> Copied</> : <><Copy size={10} /> Copy</>}
+                                                                    </button>
+                                                                </div>
+                                                                {expandedEmails[meeting.id] ? (
+                                                                    <div className="bg-black/50 p-3 rounded-lg border border-purple-500/20 animate-in fade-in slide-in-from-top-1 text-xs text-gray-200"> <MessageContent text={meeting.emailDraft} /> </div>
+                                                                ) : (
+                                                                    <div className="bg-black/40 hover:bg-black/80 hover:border-purple-500/40 transition-all p-3 rounded-lg border border-transparent text-xs text-gray-300 hover:text-gray-100 hover:shadow-[0_0_15px_rgba(168,85,247,0.1)] line-clamp-2 cursor-pointer shadow-inner" onClick={(e) => toggleEmail(meeting.id, e)}> {meeting.emailDraft.slice(0, 120)}... </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))
+                                            )
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}
                     </div>
                     {activeTab === "Chat" && (
-                        <div className="p-5 bg-gradient-to-t from-black via-black/90 to-transparent shrink-0">
-                            {queuedScreenshots.length > 0 && (
-                                <div className="mb-3 flex items-center gap-3 p-2 bg-white/5 border border-white/10 rounded-xl overflow-x-auto">
-                                    <span className="text-xs text-gray-400 font-medium whitespace-nowrap">{queuedScreenshots.length}/{MAX_QUEUE_SIZE} screens ready:</span>
-                                    {queuedScreenshots.map((img, index) => (
-                                        <div key={img.path} className="relative group shrink-0">
-                                            <img
-                                                src={img.preview}
-                                                className="w-10 h-8 rounded object-cover border border-white/10"
-                                                alt={`Queued Image ${index + 1}`}
-                                            />
-                                            <button
-                                                onClick={() => handleRemoveQueuedScreenshot(img.path)}
-                                                className="absolute -top-2 -right-2 p-0.5 bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <X size={10} className="text-white" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                    <button
-                                        onClick={handleClearQueue}
-                                        className="flex items-center gap-1 text-red-400 text-xs hover:text-red-300 transition-colors whitespace-nowrap"
-                                    >
-                                        <Trash2 size={12} /> Clear All
-                                    </button>
-                                </div>
-                            )}
+                        <div className="p-5 bg-gradient-to-t from-black via-black/90 to-transparent shrink-0 flex flex-col items-center">
+                            <div className="max-w-3xl w-full mx-auto relative">
+                                {queuedScreenshots.length > 0 && (
+                                    <div className="mb-3 flex items-center gap-3 p-2 bg-white/5 border border-white/10 rounded-xl overflow-x-auto w-full">
+                                        <span className="text-xs text-gray-400 font-medium whitespace-nowrap">{queuedScreenshots.length}/{MAX_QUEUE_SIZE} screens ready:</span>
+                                        {queuedScreenshots.map((img, index) => (
+                                            <div key={img.path} className="relative group shrink-0">
+                                                <img
+                                                    src={img.preview}
+                                                    className="w-10 h-8 rounded object-cover border border-white/10"
+                                                    alt={`Queued Image ${index + 1}`}
+                                                />
+                                                <button
+                                                    onClick={() => handleRemoveQueuedScreenshot(img.path)}
+                                                    className="absolute -top-2 -right-2 p-0.5 bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <X size={10} className="text-white" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <button
+                                            onClick={handleClearQueue}
+                                            className="flex items-center gap-1 text-red-400 text-xs hover:text-red-300 transition-colors whitespace-nowrap"
+                                        >
+                                            <Trash2 size={12} /> Clear All
+                                        </button>
+                                    </div>
+                                )}
 
-                            <div className="relative mb-3">
-                                <textarea ref={textareaRef} value={input} onFocus={handleInputFocus} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); handleSend(); } }} placeholder={showPostMeeting ? "Ask about the meeting..." : "Ask about your screen..."} rows={1} className="w-full bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 focus:border-white/20 rounded-2xl px-5 py-4 text-sm text-gray-100 placeholder-gray-500 outline-none transition-all shadow-lg resize-none overflow-y-auto" style={{ minHeight: '52px', maxHeight: '150px' }} />
-                                {(input.length > 0 || queuedScreenshots.length > 0) && <button onClick={() => handleSend()} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors"><Send size={16} className="text-white" /></button>}
-                            </div>
-                            {isInputFocused && (
-                                <div className="flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                    <button onClick={handleUseScreen} className="control-btn hover:bg-white/15 py-2 px-3"><Monitor size={14} className="text-blue-400" /><span>Queue Screen</span></button>
-                                    <button onClick={() => setIsSmartMode(!isSmartMode)} className={`control-btn py-2 px-3 ${isSmartMode ? 'active' : ''}`}><Zap size={14} className={isSmartMode ? 'fill-current' : ''} /><span>Smart</span></button>
-                                    <button onClick={() => window.location.hash = "#/settings"} className="control-btn py-2 px-3 text-white/60 hover:text-white/90 hover:bg-white/10 transition-all"><UserCog size={14} /><span>Persona</span></button>
-                                    <div className="relative"> <button onClick={() => setShowModeMenu(!showModeMenu)} className="control-btn hover:bg-white/15 py-2 px-3"><span>{mode}</span><ChevronDown size={12} /></button> {showModeMenu && (<div className="absolute bottom-full left-0 mb-2 w-32 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"> {['General', 'Student'].map((m) => (<button key={m} onClick={() => handleModeSelect(m)} className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 ${mode === m ? 'text-blue-400 bg-white/5' : 'text-gray-300'}`}> {m} </button>))} </div>)} </div>
-                                    {mode === "Student" && (<button onClick={() => setShowStudentModal(true)} className="control-btn hover:bg-white/15 py-2 px-3 text-blue-300"> <UserCog size={14} /> <span>Update Profile</span> </button>)}
+                                <div className="relative mb-3 w-full">
+                                    <textarea ref={textareaRef} value={input} onFocus={handleInputFocus} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); handleSend(); } }} placeholder={showPostMeeting ? "Ask about the meeting..." : "Ask about your screen..."} rows={1} className="w-full bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 focus:border-white/20 rounded-2xl px-5 py-4 pr-24 text-sm text-gray-100 placeholder-gray-500 outline-none transition-all shadow-lg resize-none overflow-y-auto" style={{ minHeight: '52px', maxHeight: '150px' }} />
+
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                        <button
+                                            onClick={toggleDictation}
+                                            className={`p-2 rounded-xl transition-colors ${isDictating ? 'bg-red-500/20 text-red-400 animate-pulse' : 'hover:bg-white/10 text-gray-400 hover:text-white'}`}
+                                            title={isDictating ? "Stop Dictation" : "Start Dictation"}
+                                        >
+                                            <Mic size={16} />
+                                        </button>
+
+                                        {(input.length > 0 || queuedScreenshots.length > 0) && (
+                                            <button onClick={() => handleSend()} className="p-2 bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors">
+                                                <Send size={16} className="text-white" />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                            )}
+                                {isInputFocused && (
+                                    <div className="flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full">
+                                        <button onClick={handleUseScreen} className="control-btn hover:bg-white/15 py-2 px-3"><Monitor size={14} className="text-blue-400" /><span>Queue Screen</span></button>
+                                        <button onClick={() => setIsSmartMode(!isSmartMode)} className={`control-btn py-2 px-3 ${isSmartMode ? 'active' : ''}`}><Zap size={14} className={isSmartMode ? 'fill-current' : ''} /><span>Smart</span></button>
+                                        <button onClick={() => window.location.hash = "#/settings"} className="control-btn py-2 px-3 text-white/60 hover:text-white/90 hover:bg-white/10 transition-all"><UserCog size={14} /><span>Persona</span></button>
+                                        <div className="relative"> <button onClick={() => setShowModeMenu(!showModeMenu)} className="control-btn hover:bg-white/15 py-2 px-3"><span>{mode}</span><ChevronDown size={12} /></button> {showModeMenu && (<div className="absolute bottom-full left-0 mb-2 w-32 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"> {['General', 'Student'].map((m) => (<button key={m} onClick={() => handleModeSelect(m)} className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 ${mode === m ? 'text-blue-400 bg-white/5' : 'text-gray-300'}`}> {m} </button>))} </div>)} </div>
+                                        {mode === "Student" && (<button onClick={() => setShowStudentModal(true)} className="control-btn hover:bg-white/15 py-2 px-3 text-blue-300"> <UserCog size={14} /> <span>Update Profile</span> </button>)}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>

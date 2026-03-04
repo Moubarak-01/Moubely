@@ -147,6 +147,7 @@ export class AppState {
   public toggleMainWindow() { this.windowHelper.toggleMainWindow() }
   public centerAndShowWindow() { this.windowHelper.centerAndShowWindow() }
   public setWindowDimensions(width: number, height: number) { this.windowHelper.setWindowDimensions(width, height) }
+  public toggleExpand(isExpanded: boolean) { this.windowHelper.toggleExpand(isExpanded) }
   public deleteScreenshot(path: string) { return this.screenshotHelper.deleteScreenshot(path) }
   public takeScreenshot() { return this.screenshotHelper.takeScreenshot(this.windowHelper.hideMainWindow.bind(this.windowHelper), this.windowHelper.showMainWindow.bind(this.windowHelper)) }
   public getImagePreview(path: string) { return this.screenshotHelper.getImagePreview(path) }

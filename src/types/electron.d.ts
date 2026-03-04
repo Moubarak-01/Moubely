@@ -2,6 +2,7 @@ export interface ElectronAPI {
   // Window & Layout
   updateContentDimensions: (dimensions: { width: number; height: number }) => Promise<void>
   setWindowSize: (dimensions: { width: number, height: number }) => Promise<void>
+  toggleExpand: (isExpanded: boolean) => Promise<void>
   moveWindowLeft: () => Promise<void>
   moveWindowRight: () => Promise<void>
   moveWindowUp: () => Promise<void>
@@ -14,6 +15,7 @@ export interface ElectronAPI {
   takeScreenshot: () => Promise<any> // Changed to any or specific Interface to match return
   getScreenshots: () => Promise<Array<{ path: string; preview: string }>>
   deleteScreenshot: (path: string) => Promise<{ success: boolean; error?: string }>
+  transcribeDictation: (base64Audio: string, mimeType: string) => Promise<string>
 
   // Events / Listeners
   onStealthModeToggled: (callback: (enabled: boolean) => void) => () => void

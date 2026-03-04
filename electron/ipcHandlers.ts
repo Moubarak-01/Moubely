@@ -48,6 +48,12 @@ export function initializeIpcHandlers(appState: AppState) {
     return true;
   });
 
+  ipcMain.handle("toggle-expand", (event, isExpanded: boolean) => {
+    logIPC("toggle-expand", `Expanded: ${isExpanded}`);
+    appState.toggleExpand(isExpanded);
+    return true;
+  });
+
   ipcMain.handle("quit-app", () => {
     logIPC("quit-app", "User requested quit.");
     app.quit();
@@ -179,8 +185,22 @@ export function initializeIpcHandlers(appState: AppState) {
       return { text: "Audio Error: LLM Not Ready" };
     }
 
-    // FIX: Pass timestamp to helper so it comes back attached to the text
+    // --- FIX: Pass timestamp to helper so it comes back attached to the text
     return await llmHelper.analyzeAudioFromBase64(base64Data, mimeType, safeUrgency, timestamp);
+  });
+
+  // --- NEW: DICTATION HANDLER ---
+  ipcMain.handle("transcribe-dictation", async (event, base64Data, mimeType) => {
+    logIPC("transcribe-dictation", `Format: ${mimeType} | Size: ${base64Data ? base64Data.length : 0}`);
+    if (!llmHelper) {
+      console.error("[IPC ⚡] ❌ LLM Helper is missing!");
+      return "Error: LLM Worker offline";
+    }
+
+    // Call the exact same function but ONLY return the text property immediately.
+    // urgency = false to prioritize local whisper queue.
+    const result = await llmHelper.analyzeAudioFromBase64(base64Data, mimeType, false);
+    return result.text;
   });
 
   // --- 5. SCREENSHOT HANDLERS ---

@@ -13,11 +13,22 @@ export class WindowHelper {
     this.appState = appState
   }
 
+  // State variables for window geometry memory
+  private customExpandedHeight: number = 700
+  private isExpandedState: boolean = false
+
   // --- UNLOCKED RESIZING ---
   public setWindowDimensions(width: number, height: number): void {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return
-    const w = Math.round(width)
-    const h = Math.round(height)
+    let w = Math.round(width)
+    let h = Math.round(height)
+
+    w = Math.max(600, w);
+    if (this.isExpandedState) {
+      h = Math.max(700, h);
+    } else {
+      h = 200;
+    }
 
     // Explicit bounds calculation for DWM hit-test bug on transparent Windows apps
     const bounds = this.mainWindow.getBounds()
@@ -35,6 +46,35 @@ export class WindowHelper {
     }
   }
 
+  // --- NEW: STATEFUL EXPAND TOGGLE ---
+  public toggleExpand(isExpanded: boolean): void {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return;
+
+    this.isExpandedState = isExpanded;
+    const [currentWidth, currentHeight] = this.mainWindow.getSize();
+
+    if (isExpanded) {
+      // User clicked "Up" arrow (Expanding)
+      // 1. Remove max height limit, set min height to 700
+      this.mainWindow.setMinimumSize(600, 700);
+      this.mainWindow.setMaximumSize(9999, 9999);
+
+      // 2. Set the bounds: width comes from BEFORE expand (shared width), height comes from memory
+      this.setWindowDimensions(currentWidth, this.customExpandedHeight);
+    } else {
+      // User clicked "Down" arrow (Collapsing)
+      // 1. Save their custom expanded window height
+      this.customExpandedHeight = Math.max(700, currentHeight);
+
+      // 2. Lock height to strict 200 bounds
+      this.mainWindow.setMinimumSize(600, 200);
+      this.mainWindow.setMaximumSize(9999, 200);
+
+      // 3. Set bounds: width stays the SAME, height goes to 200
+      this.setWindowDimensions(currentWidth, 200);
+    }
+  }
+
   public createWindow(): void {
     if (this.mainWindow !== null) return
 
@@ -48,6 +88,7 @@ export class WindowHelper {
       height: 200, // Initial height (compact with Start button)
       minWidth: 600,  // Safety floor - prevents content from disappearing
       minHeight: 200, // Minimum for compact view
+      maxHeight: 200, // Lock height for compact view to prevent vertical stretch
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: true,
