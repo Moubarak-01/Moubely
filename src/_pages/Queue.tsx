@@ -429,7 +429,9 @@ const Queue: React.FC<any> = () => {
     const toggleDictation = async () => {
         if (isDictating && dictationRecorderRef.current) {
             // STOP RECORDING
-            dictationRecorderRef.current.stop();
+            if (dictationRecorderRef.current.state !== 'inactive') {
+                dictationRecorderRef.current.stop();
+            }
             setIsDictating(false);
             return;
         }
@@ -447,22 +449,51 @@ const Queue: React.FC<any> = () => {
 
             mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(dictationChunksRef.current, { type: 'audio/webm' });
-                const arrayBuffer = await audioBlob.arrayBuffer();
-                const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
-                if (window.electronAPI) {
-                    try {
-                        const transcribedText = await window.electronAPI.transcribeDictation(base64Audio, 'audio/webm');
-                        if (transcribedText && !transcribedText.startsWith("Error")) {
-                            setInput(prev => prev + (prev.length > 0 ? " " : "") + transcribedText);
-                        }
-                    } catch (err) {
-                        console.error("Dictation transcription failed:", err);
-                    }
-                }
-
-                // Cleanup tracks
+                // Cleanup tracks so the mic icon disappears immediately
                 stream.getTracks().forEach(track => track.stop());
+
+                const reader = new FileReader();
+                reader.readAsDataURL(audioBlob);
+                reader.onloadend = async () => {
+                    const base64Audio = (reader.result as string).split(',')[1];
+
+                    if (window.electronAPI) {
+                        try {
+                            const transcribedText = await window.electronAPI.transcribeDictation(base64Audio, 'audio/webm');
+                            if (transcribedText && !transcribedText.startsWith("Error")) {
+                                setInput(prev => {
+                                    const el = textareaRef.current;
+                                    if (!el) return prev + (prev.length > 0 ? " " : "") + transcribedText;
+
+                                    const startPos = el.selectionStart;
+                                    const endPos = el.selectionEnd;
+
+                                    const insertText = (prev.length > 0 && startPos > 0 && prev[startPos - 1] !== ' ') ? " " + transcribedText : transcribedText;
+
+                                    const newText = prev.substring(0, startPos) + insertText + prev.substring(endPos);
+
+                                    // Schedule setting cursor pos after react render
+                                    setTimeout(() => {
+                                        if (textareaRef.current) {
+                                            const newPos = startPos + insertText.length;
+                                            textareaRef.current.setSelectionRange(newPos, newPos);
+                                            textareaRef.current.focus();
+                                        }
+                                    }, 0);
+
+                                    return newText;
+                                });
+                            }
+                        } catch (err) {
+                            console.error("Dictation transcription failed:", err);
+                        } finally {
+                            setIsDictating(false);
+                        }
+                    }
+
+                    // Duplicate cleanup removed
+                };
             };
 
             mediaRecorder.start();
@@ -2124,8 +2155,11 @@ const Queue: React.FC<any> = () => {
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
                                         <button
                                             onClick={toggleDictation}
-                                            className={`p-2 rounded-xl transition-colors ${isDictating ? 'bg-red-500/20 text-red-400 animate-pulse' : 'hover:bg-white/10 text-gray-400 hover:text-white'}`}
-                                            title={isDictating ? "Stop Dictation" : "Start Dictation"}
+                                            className={`p-2 rounded-full transition-colors relative flex items-center justify-center ${isDictating
+                                                ? 'text-[#60a5fa] bg-[#60a5fa]/10 gemini-mic-active'
+                                                : 'hover:bg-white/10 text-gray-400 hover:text-white'
+                                                }`}
+                                            title={isStealth ? undefined : (isDictating ? "Stop Dictation" : "Start Dictation")}
                                         >
                                             <Mic size={16} />
                                         </button>

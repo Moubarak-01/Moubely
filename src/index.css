@@ -312,3 +312,24 @@ a,
     transform: translateX(var(--scroll-dist, -20px));
   }
 }
+
+/* --- GEMINI-STYLE MIC ANIMATION --- */
+.gemini-mic-active {
+  animation: gemini-mic-pulse 1.5s ease-out infinite;
+}
+
+@keyframes gemini-mic-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 0 10px rgba(96, 165, 250, 0.1), 0 0 0 20px rgba(96, 165, 250, 0.05);
+    /* Two outer rings */
+  }
+
+  100% {
+    box-shadow: 0 0 0 15px rgba(96, 165, 250, 0), 0 0 0 30px rgba(96, 165, 250, 0);
+    /* Fade out */
+  }
+}
