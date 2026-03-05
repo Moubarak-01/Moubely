@@ -21,7 +21,7 @@ export class AppState {
   private view: "queue" | "solutions" = "queue"
   private isStealthMode: boolean = false
   private isPrivateMode: boolean = false
-  private liveModeInterval: NodeJS.Timeout | null = null;
+
   private problemInfo: any = null
   private hasDebugged: boolean = false
 
@@ -87,60 +87,6 @@ export class AppState {
     return this.isPrivateMode
   }
 
-  // --- Live Mode Logic ---
-
-  public startLiveMode() {
-    if (this.liveModeInterval) return { success: true };
-
-    console.log("[AppState] 🚀 Starting Live Assist Loop (8s Interval)");
-
-    this.runLiveAssistCycle();
-
-    // Loop set to 8 seconds
-    this.liveModeInterval = setInterval(() => {
-      this.runLiveAssistCycle();
-    }, 8000);
-
-    return { success: true };
-  }
-
-  public stopLiveMode() {
-    if (this.liveModeInterval) {
-      clearInterval(this.liveModeInterval);
-      this.liveModeInterval = null;
-      console.log("[AppState] 🛑 Live Assist Loop Stopped");
-    }
-    return { success: true };
-  }
-
-  private async runLiveAssistCycle() {
-    try {
-      console.log("[LiveLoop] 🔄 Cycle Start...");
-
-      // 1. Capture & Diff Check
-      const screenshotPath = await this.screenshotHelper.captureAndCheckDiff(
-        this.windowHelper.hideMainWindow.bind(this.windowHelper),
-        this.windowHelper.showMainWindow.bind(this.windowHelper)
-      );
-
-      if (!screenshotPath) return;
-
-      // 2. Routing
-      if (this.view === "solutions") {
-        console.log("[LiveLoop] ℹ️ View is 'Solutions' -> Adding to Debug Queue");
-        this.screenshotHelper.addPathToExtraQueue(screenshotPath);
-      } else {
-        console.log("[LiveLoop] ℹ️ View is 'Queue' -> Adding to Main Queue");
-        this.screenshotHelper.addPathToMainQueue(screenshotPath);
-      }
-
-      // 3. Process
-      await this.processingHelper.processScreenshots();
-
-    } catch (error) {
-      console.error("[LiveLoop] ⚠️ Cycle Error:", error);
-    }
-  }
 
   public getMainWindow() { return this.windowHelper.getMainWindow() }
   public createWindow() { this.windowHelper.createWindow() }

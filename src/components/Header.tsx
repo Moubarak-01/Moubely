@@ -1,20 +1,7 @@
 import React, { useState } from 'react';
-import { GripVertical, Eye, X, Zap, ZapOff } from 'lucide-react'; // Added Zap icons for Live Mode
+import { GripVertical, X } from 'lucide-react'; // Removed Zap icons for Live Mode
 
 const Header: React.FC = () => {
-  const [isLiveMode, setIsLiveMode] = useState(false);
-
-  const toggleLiveMode = async () => {
-    const newState = !isLiveMode;
-    setIsLiveMode(newState);
-
-    if (newState) {
-      await window.electronAPI.invoke('start-live-mode');
-    } else {
-      await window.electronAPI.invoke('stop-live-mode');
-    }
-  };
-
   return (
     // The Container
     <div className="flex items-center justify-between px-4 py-3 select-none">
@@ -38,20 +25,6 @@ const Header: React.FC = () => {
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2 no-drag">
-        {/* LIVE MODE TOGGLE */}
-        <button
-          onClick={toggleLiveMode}
-          className={`group flex items-center gap-1.5 px-2 py-1 rounded-md border transition-all ${isLiveMode
-              ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-              : 'bg-white/5 border-white/5 text-white/40 hover:text-white/60'
-            }`}
-        >
-          {isLiveMode ? <Zap size={12} className="fill-current" /> : <ZapOff size={12} />}
-          <span className="text-[10px] font-medium uppercase tracking-wider">
-            {isLiveMode ? 'Live' : 'Off'}
-          </span>
-        </button>
-
         <button
           onClick={() => window.electronAPI.quitApp()}
           className="p-1.5 hover:bg-red-500/10 hover:text-red-400 rounded-md text-white/20 transition-all"

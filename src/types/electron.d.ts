@@ -63,9 +63,7 @@ export interface ElectronAPI {
   switchToGemini: (key?: string) => Promise<any>
   testLlmConnection: () => Promise<any>
 
-  // Live Mode
-  startLiveMode: () => Promise<void>
-  stopLiveMode: () => Promise<void>
+  // Live Mode removed
 }
 
 declare global {
