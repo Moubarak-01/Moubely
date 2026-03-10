@@ -21,12 +21,13 @@ export const ProfileSettings: React.FC = () => {
     targetPersona: "High School Graduate",
     communicationStyle: "Analogy-Heavy",
     technicalDepth: "Beginner",
-    keyExperiences: "Biology Research Intern, Tennis Athlete",
+    keyExperiences: "",
     storyMappings: []
   });
 
   const [activeTab, setActiveTab] = useState<'persona' | 'stories'>('persona');
   const [editingStory, setEditingStory] = useState<StoryMapping | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
 
   // Load profile on mount
   useEffect(() => {
@@ -54,14 +55,20 @@ export const ProfileSettings: React.FC = () => {
   };
 
   const handleSave = async () => {
+    setSaveStatus('saving');
     try {
       const response = await window.electronAPI.saveUserProfile(formData);
       if (response.success) {
-        alert("✅ Persona & Stories Saved! The AI will now act like this.");
+        setSaveStatus('success');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } else {
+        setSaveStatus('error');
+        setTimeout(() => setSaveStatus('idle'), 3000);
       }
     } catch (error) {
       console.error(error);
-      alert("❌ Failed to save profile.");
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
     }
   };
 
@@ -167,8 +174,18 @@ export const ProfileSettings: React.FC = () => {
             <textarea name="keyExperiences" value={formData.keyExperiences} onChange={handleChange} className="w-full p-2 rounded bg-black/10 border border-black/10 outline-none h-24 outline-none resize-none" placeholder="e.g. Biology Research Intern, Tennis Captain" />
           </div>
 
-          <button onClick={handleSave} className="px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded font-bold transition-colors shadow-lg shadow-blue-900/20">
-            Save Persona
+          <button
+            onClick={handleSave}
+            disabled={saveStatus === 'saving'}
+            className={`px-6 py-2 rounded font-bold transition-colors shadow-lg ${saveStatus === 'success' ? 'bg-green-500 hover:bg-green-400 shadow-green-900/20' :
+              saveStatus === 'error' ? 'bg-red-500 hover:bg-red-400 shadow-red-900/20' :
+                'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20'
+              }`}
+          >
+            {saveStatus === 'saving' ? 'Saving...' :
+              saveStatus === 'success' ? '✅ Saved!' :
+                saveStatus === 'error' ? '❌ Error' :
+                  'Save Persona'}
           </button>
         </div>
       ) : (
@@ -253,8 +270,18 @@ export const ProfileSettings: React.FC = () => {
 
           {/* GLOBAL SAVE (Only visible when not editing) */}
           {!editingStory && (
-            <button onClick={handleSave} className="w-full py-4 bg-green-600 hover:bg-green-500 rounded font-bold transition-colors shadow-lg shadow-green-900/20 text-lg">
-              💾 Save All Changes
+            <button
+              onClick={handleSave}
+              disabled={saveStatus === 'saving'}
+              className={`w-full py-4 rounded font-bold transition-colors shadow-lg text-lg ${saveStatus === 'success' ? 'bg-blue-500 hover:bg-blue-400 shadow-blue-900/20' :
+                saveStatus === 'error' ? 'bg-red-500 hover:bg-red-400 shadow-red-900/20' :
+                  'bg-green-600 hover:bg-green-500 shadow-green-900/20'
+                }`}
+            >
+              {saveStatus === 'saving' ? 'Saving...' :
+                saveStatus === 'success' ? '✅ All Changes Saved!' :
+                  saveStatus === 'error' ? '❌ Failed to Save' :
+                    '💾 Save All Changes'}
             </button>
           )}
         </div>

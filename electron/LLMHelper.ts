@@ -118,11 +118,16 @@ export class LLMHelper {
 
     private sessionTranscript: string = "";
     private storiesTold: Set<string> = new Set(); // Track which stories have been used
+    private isAborted: boolean = false;
 
     // --- SMART CACHING ---
     private cachedStudentText: string = "";
     private cachedStudentSummary: string = "";
     private cachedStudentPdfPart: any = null;
+
+    public abortChat() {
+        this.isAborted = true;
+    }
 
     private readonly systemPrompt = `
   You are 'Moubely', an intelligent AI assistant.
@@ -760,6 +765,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
         onToken?: (token: string) => void
     ): Promise<string> {
 
+        this.isAborted = false; // Reset flag at start
         const studentDir = path.join(app.getPath("userData"), "student_profile");
 
         if (mode === "Student" || isCandidateMode) {
@@ -817,6 +823,10 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
 
                     const result = await chat.sendMessageStream(parts);
                     for await (const chunk of result.stream) {
+                        if (this.isAborted) {
+                            console.log(`[LLM] 🛑 Generation aborted by user.`);
+                            break;
+                        }
                         const text = chunk.text();
                         fullResponse += text;
                         if (onToken) onToken(text);
@@ -844,6 +854,10 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                         });
 
                         for await (const chunk of stream) {
+                            if (this.isAborted) {
+                                console.log(`[LLM] 🛑 Generation aborted by user.`);
+                                break;
+                            }
                             const content = chunk.choices[0]?.delta?.content || "";
                             if (content && !content.includes('<think>')) {
                                 fullResponse += content;
@@ -863,6 +877,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
     }
 
     public async chatWithImage(message: string, imagePaths: string[], onToken?: (token: string) => void, type: string = "answer"): Promise<string> {
+        this.isAborted = false; // Reset flag at start
         console.log(`[LLM] 🖼️ Vision Waterfall: Analyzing ${imagePaths.length} images...`);
         const imageParts: { inlineData: { data: string; mimeType: string } }[] = [];
 
@@ -895,6 +910,10 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     const model = this.genAI.getGenerativeModel({ model: config.model });
                     const result = await model.generateContentStream([{ text: visionPrompt }, ...imageParts]);
                     for await (const chunk of result.stream) {
+                        if (this.isAborted) {
+                            console.log(`[LLM] 🛑 Generation aborted by user.`);
+                            break;
+                        }
                         const text = chunk.text();
                         fullResponse += text;
                         if (onToken) onToken(text);
@@ -921,6 +940,10 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                             stream: true
                         });
                         for await (const chunk of stream) {
+                            if (this.isAborted) {
+                                console.log(`[LLM] 🛑 Generation aborted by user.`);
+                                break;
+                            }
                             const content = chunk.choices[0]?.delta?.content || "";
                             if (content) { fullResponse += content; if (onToken) onToken(content); }
                         }

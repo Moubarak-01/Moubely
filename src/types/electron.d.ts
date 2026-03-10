@@ -16,6 +16,7 @@ export interface ElectronAPI {
   getScreenshots: () => Promise<Array<{ path: string; preview: string }>>
   deleteScreenshot: (path: string) => Promise<{ success: boolean; error?: string }>
   transcribeDictation: (base64Audio: string, mimeType: string) => Promise<string>
+  cancelChat: () => Promise<void>
 
   // Events / Listeners
   onStealthModeToggled: (callback: (enabled: boolean) => void) => () => void

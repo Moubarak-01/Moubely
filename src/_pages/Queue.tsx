@@ -1293,7 +1293,7 @@ const Queue: React.FC<any> = () => {
         setEditingTitleText(m.title || new Date(m.date).toLocaleDateString());
     };
 
-    const handleSaveTitle = (m: MeetingSession, e: React.MouseEvent | React.KeyboardEvent) => {
+    const handleSaveTitle = (m: MeetingSession, e: React.MouseEvent | React.KeyboardEvent | React.FocusEvent) => {
         e.stopPropagation();
         if (!editingTitleText.trim()) return;
 
@@ -1305,9 +1305,35 @@ const Queue: React.FC<any> = () => {
         setEditingTitleId(null);
     };
 
-    const handleCancelEditTitle = (e: React.MouseEvent | React.KeyboardEvent) => {
+    const handleCancelEditTitle = (e: React.MouseEvent | React.KeyboardEvent | React.FocusEvent) => {
         e.stopPropagation();
         setEditingTitleId(null);
+    };
+
+    // --- EDITING CHAT TITLES ---
+    const [editingChatTitleId, setEditingChatTitleId] = useState<string | null>(null);
+    const [editingChatTitleText, setEditingChatTitleText] = useState("");
+
+    const handleStartEditChatTitle = (chat: ChatSession, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setEditingChatTitleId(chat.id);
+        setEditingChatTitleText(chat.prompt || new Date(chat.date).toLocaleDateString());
+    };
+
+    const handleSaveChatTitle = (chat: ChatSession, e: React.MouseEvent | React.KeyboardEvent | React.FocusEvent) => {
+        e.stopPropagation();
+        const newTitle = editingChatTitleText.trim();
+        setPastChats(prev => {
+            const updated = prev.map(c => c.id === chat.id ? { ...c, prompt: newTitle || c.prompt } : c);
+            localStorage.setItem('moubely_chats', JSON.stringify(updated));
+            return updated;
+        });
+        setEditingChatTitleId(null);
+    };
+
+    const handleCancelEditChatTitle = (e: React.MouseEvent | React.KeyboardEvent) => {
+        e.stopPropagation();
+        setEditingChatTitleId(null);
     };
 
     const [expandedChats, setExpandedChats] = useState<Record<string, boolean>>({});
@@ -1341,6 +1367,11 @@ const Queue: React.FC<any> = () => {
             });
             const cleanTitle = title.replace(/['"]/g, '').trim();
             setPastChats(prev => {
+                const targetChat = prev.find(c => c.id === sessionId);
+                if (!targetChat) return prev;
+                // If the user already manually renamed the chat or it no longer matches the initial userText, skip AI rename
+                if (targetChat.prompt !== userText) return prev;
+
                 const updated = prev.map(c => c.id === sessionId ? { ...c, prompt: cleanTitle } : c);
                 localStorage.setItem('moubely_chats', JSON.stringify(updated));
                 return updated;
@@ -1397,6 +1428,14 @@ const Queue: React.FC<any> = () => {
                 return updated;
             }
         });
+    };
+
+    const handleCancelGeneration = () => {
+        if (!window.electronAPI) return;
+        window.electronAPI.cancelChat();
+        setIsThinking(false);
+        setShowSlowLoader(false);
+        if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
     };
 
     const handleSend = async (overrideText?: string) => {
@@ -1595,7 +1634,7 @@ const Queue: React.FC<any> = () => {
                 case "recap": presetTitle = "Discussion Recap"; break;
             }
 
-            saveChatToHistory(finalMessages, null, presetTitle);
+            saveChatToHistory(finalMessages, undefined, presetTitle);
         } catch (e: any) {
             console.error(e);
             setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: "Error: " + e.message, isStreaming: false } : m));
@@ -1679,7 +1718,7 @@ const Queue: React.FC<any> = () => {
 
             const finalMessages = initialMessages.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m);
             setMessages(finalMessages);
-            saveChatToHistory(finalMessages, null, "Coding Problem Solution");
+            saveChatToHistory(finalMessages, undefined, "Coding Problem Solution");
 
         } catch (e: any) {
             setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: "Error: " + e.message, isStreaming: false } : m));
@@ -1987,35 +2026,39 @@ const Queue: React.FC<any> = () => {
                                             ) : (
                                                 pastChats.map(chat => (
                                                     <div key={chat.id} className="bg-white/5 border border-white/10 rounded-xl p-3 hover:border-blue-500/50 transition-all group relative">
-                                                        <div className="flex justify-between items-center">
-                                                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                        <div className={`flex justify-between items-center ${expandedChats[chat.id] ? 'mb-3' : ''}`}>
+                                                            <div className="flex items-center gap-1.5 text-blue-300 font-bold text-sm flex-1 min-w-0">
                                                                 <button
                                                                     onClick={(e) => toggleChat(chat.id, e)}
-                                                                    className="flex items-center gap-1.5 text-xs text-gray-200 font-medium hover:text-blue-400 transition-colors p-1 rounded hover:bg-white/5 flex-1 min-w-0"
-                                                                    onMouseEnter={(e) => {
-                                                                        const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
-                                                                        if (span && span.scrollWidth > span.clientWidth) {
-                                                                            span.style.setProperty('--scroll-dist', `-${span.scrollWidth - span.clientWidth + 20}px`);
-                                                                            span.classList.add('can-marquee');
-                                                                        }
-                                                                    }}
-                                                                    onMouseLeave={(e) => {
-                                                                        const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement;
-                                                                        if (span) span.classList.remove('can-marquee');
-                                                                    }}
+                                                                    className="flex items-center text-blue-400 hover:text-blue-300 transition-colors p-1 rounded hover:bg-white/5 shrink-0 outline-none"
                                                                 >
-                                                                    {expandedChats[chat.id] ? <ChevronDown size={14} className="shrink-0 text-blue-400" /> : <ChevronRight size={14} className="shrink-0 text-gray-500" />}
-                                                                    <div className="marquee-container">
-                                                                        <span className="marquee-content">{chat.prompt}</span>
-                                                                    </div>
+                                                                    {expandedChats[chat.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                                                 </button>
-                                                                <span className="text-gray-500 shrink-0 mx-1">•</span>
-                                                                <div className="text-[10px] text-blue-400/70 shrink-0">{new Date(chat.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                                <MessageSquare size={14} className="shrink-0 text-blue-400" />
+                                                                {editingChatTitleId === chat.id ? (
+                                                                    <div className="flex items-center gap-1.5 w-full relative" onClick={(e) => e.stopPropagation()}>
+                                                                        <input type="text" autoFocus value={editingChatTitleText} onChange={(e) => setEditingChatTitleText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSaveChatTitle(chat, e); if (e.key === 'Escape') handleCancelEditChatTitle(e); }} onBlur={(e) => handleSaveChatTitle(chat, e)} className="bg-black/40 text-blue-300 text-xs px-2 py-1 rounded w-full border border-blue-500/50 outline-none" />
+                                                                        <button onMouseDown={(e) => { e.preventDefault(); handleSaveChatTitle(chat, e); }} className="p-1 hover:text-green-400 transition-colors"><Check size={14} /></button>
+                                                                        <button onMouseDown={(e) => { e.preventDefault(); handleCancelEditChatTitle(e); }} className="p-1 hover:text-red-400 transition-colors"><X size={14} /></button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center min-w-0 flex-1">
+                                                                        <div className="marquee-container flex-1" onMouseEnter={(e) => { const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement; if (span && span.scrollWidth > span.clientWidth) { span.style.setProperty('--scroll-dist', `-${span.scrollWidth - span.clientWidth + 20}px`); span.classList.add('can-marquee'); } }} onMouseLeave={(e) => { const span = e.currentTarget.querySelector('.marquee-content') as HTMLElement; if (span) span.classList.remove('can-marquee'); }}>
+                                                                            <span className="marquee-content">{chat.prompt}</span>
+                                                                        </div>
+                                                                        <span className="text-gray-500 shrink-0 mx-1">•</span>
+                                                                        <Clock size={12} className="shrink-0 text-gray-400" />
+                                                                        <span className="shrink-0 text-gray-400 font-medium text-[10px] ml-0.5">{new Date(chat.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                            <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
-                                                                <button onClick={(e) => handleLoadPastChat(chat, e)} className="px-2 py-0.5 bg-blue-600/20 text-blue-400 hover:bg-blue-500/40 hover:text-white rounded text-[9px] uppercase tracking-wider font-bold border border-blue-500/20 transition-all flex items-center gap-1"><ArrowRight size={10} /> Open</button>
-                                                                <button onClick={(e) => deleteChat(chat.id, e)} className="p-1 px-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"><Trash2 size={12} /></button>
-                                                            </div>
+                                                            {editingChatTitleId !== chat.id && (
+                                                                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
+                                                                    <button onClick={(e) => handleLoadPastChat(chat, e)} className="px-2 py-0.5 bg-blue-600/20 text-blue-400 hover:bg-blue-500/40 hover:text-white rounded text-[9px] uppercase tracking-wider font-bold border border-blue-500/20 transition-all flex items-center gap-1"><ArrowRight size={10} /> Open</button>
+                                                                    <button onClick={(e) => handleStartEditChatTitle(chat, e)} className="p-1 px-1.5 text-gray-400 hover:text-blue-400 hover:bg-blue-400/10 rounded transition-colors"><Edit2 size={12} /></button>
+                                                                    <button onClick={(e) => deleteChat(chat.id, e)} className="p-1 px-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"><Trash2 size={12} /></button>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         {expandedChats[chat.id] && (
                                                             <div className="mt-4 pt-4 border-t border-white/10 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -2038,9 +2081,9 @@ const Queue: React.FC<any> = () => {
                                                                 <Calendar size={14} className="shrink-0 text-blue-400" />
                                                                 {editingTitleId === meeting.id ? (
                                                                     <div className="flex items-center gap-1.5 w-full relative" onClick={(e) => e.stopPropagation()}>
-                                                                        <input type="text" autoFocus value={editingTitleText} onChange={(e) => setEditingTitleText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTitle(meeting, e); if (e.key === 'Escape') handleCancelEditTitle(e); }} className="bg-black/40 text-blue-300 text-xs px-2 py-1 rounded w-full border border-blue-500/50 outline-none" />
-                                                                        <button onClick={(e) => handleSaveTitle(meeting, e)} className="p-1 hover:text-green-400 transition-colors"><Check size={14} /></button>
-                                                                        <button onClick={(e) => handleCancelEditTitle(e)} className="p-1 hover:text-red-400 transition-colors"><X size={14} /></button>
+                                                                        <input type="text" autoFocus value={editingTitleText} onChange={(e) => setEditingTitleText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTitle(meeting, e); if (e.key === 'Escape') handleCancelEditTitle(e); }} onBlur={(e) => handleSaveTitle(meeting, e)} className="bg-black/40 text-blue-300 text-xs px-2 py-1 rounded w-full border border-blue-500/50 outline-none" />
+                                                                        <button onMouseDown={(e) => { e.preventDefault(); handleSaveTitle(meeting, e); }} className="p-1 hover:text-green-400 transition-colors"><Check size={14} /></button>
+                                                                        <button onMouseDown={(e) => { e.preventDefault(); handleCancelEditTitle(e); }} className="p-1 hover:text-red-400 transition-colors"><X size={14} /></button>
                                                                     </div>
                                                                 ) : (
                                                                     <div className="flex items-center min-w-0 flex-1">
@@ -2164,10 +2207,20 @@ const Queue: React.FC<any> = () => {
                                             <Mic size={16} />
                                         </button>
 
-                                        {(input.length > 0 || queuedScreenshots.length > 0) && (
-                                            <button onClick={() => handleSend()} className="p-2 bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors">
-                                                <Send size={16} className="text-white" />
+                                        {isThinking ? (
+                                            <button
+                                                onClick={handleCancelGeneration}
+                                                className="p-2 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-[0_0_15px_rgba(220,38,38,0.2)]"
+                                                title={isStealth ? undefined : "Stop Generation"}
+                                            >
+                                                <div className="w-3.5 h-3.5 bg-current rounded-[2px]" />
                                             </button>
+                                        ) : (
+                                            (input.length > 0 || queuedScreenshots.length > 0) && (
+                                                <button onClick={() => handleSend()} className="p-2 bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors">
+                                                    <Send size={16} className="text-white" />
+                                                </button>
+                                            )
                                         )}
                                     </div>
                                 </div>
@@ -2184,7 +2237,8 @@ const Queue: React.FC<any> = () => {
                         </div>
                     )}
                 </div>
-            )}
+            )
+            }
             {/* ✨ ALWAYS-VISIBLE RESIZE HANDLE */}
             <div
                 onMouseDown={startResize}
@@ -2192,7 +2246,7 @@ const Queue: React.FC<any> = () => {
             >
                 <Scaling size={16} className="text-gray-500 group-hover:text-blue-400 transition-colors" />
             </div>
-        </div>
+        </div >
     )
 }
 

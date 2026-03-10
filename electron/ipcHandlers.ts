@@ -154,6 +154,13 @@ export function initializeIpcHandlers(appState: AppState) {
     }
   });
 
+  ipcMain.handle("cancel-gemini-chat", async () => {
+    if (llmHelper) {
+      llmHelper.abortChat();
+      logIPC("cancel-gemini-chat", "Cancellation signal sent to LLM Helper");
+    }
+  });
+
   // --- 3. VISION HANDLER ---
   ipcMain.handle("chat-with-image", async (event, { message, imagePaths, type }) => {
     try {

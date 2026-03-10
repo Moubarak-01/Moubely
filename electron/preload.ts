@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   deleteScreenshot: (p: string) => ipcRenderer.invoke("delete-screenshot", p),
 
   transcribeDictation: (base64Audio: string, mimeType: string) => ipcRenderer.invoke("transcribe-dictation", base64Audio, mimeType),
+  cancelChat: () => ipcRenderer.invoke("cancel-gemini-chat"),
 
   onSolutionsReady: (cb: any) => { const s = (_: any, d: any) => cb(d); ipcRenderer.on("solutions-ready", s); return () => ipcRenderer.removeListener("solutions-ready", s) },
   onResetView: (cb: any) => { const s = () => cb(); ipcRenderer.on("reset-view", s); return () => ipcRenderer.removeListener("reset-view", s) },
