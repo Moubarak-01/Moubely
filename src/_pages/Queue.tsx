@@ -1032,12 +1032,22 @@ const Queue: React.FC<any> = () => {
                     const updatedHistory = [newMeeting, ...pastMeetings];
                     setPastMeetings(updatedHistory);
                     localStorage.setItem('moubely_meetings', JSON.stringify(updatedHistory));
-                } catch (e) { setEmailDraft("Failed to generate content."); }
-                finally { setIsThinking(false); }
+                } catch (e) {
+                    console.error("[Queue] Failed to generate email/title:", e);
+                    setEmailDraft("Failed to generate content.");
+                }
+                finally {
+                    setIsThinking(false);
+                }
+            } else if (!isFinalizing && showPostMeeting && isThinking && !loadedSessionId) {
+                // FALLBACK: If we're stuck thinking but condition is NO LONGER valid (e.g. empty transcript)
+                // Stop the "rolling" state so the user isn't stuck forever.
+                console.warn("[Queue] Meeting ended but skipping email generation (likely empty transcript).");
+                setIsThinking(false);
             }
         };
         generateEmailAfterFinalize();
-    }, [isFinalizing, showPostMeeting, loadedSessionId]);
+    }, [isFinalizing, showPostMeeting, loadedSessionId, transcriptLogs]); // Added transcriptLogs as dependency
 
     // --- INTERACTION FEEDBACK STATES ---
     const [isCopied, setIsCopied] = useState(false);
@@ -1760,14 +1770,45 @@ const Queue: React.FC<any> = () => {
                     </div>
                 )}
                 <div className="compact-bar interactive no-drag">
+
                     <div className="flex items-center gap-2">
-                        {!isRecording ? (<button onClick={handleStartSession} className="icon-btn hover:text-green-400 hover:bg-green-400/10"><Play size={18} fill="currentColor" /></button>) : (
-                            <> <button onClick={handlePauseToggle} className={`icon-btn ${isPaused ? 'text-yellow-400' : 'text-blue-400'}`}>{isPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}</button>
-                                <button onClick={handleStopSession} className="icon-btn hover:text-red-400 hover:bg-red-400/10"><Square size={16} fill="currentColor" className="text-red-400" /></button> </>
+                        {!isRecording ? (
+                            <button
+                                onClick={handleStartSession}
+                                className="icon-btn hover:text-green-400 hover:bg-green-400/10"
+                                title={isStealth ? undefined : "Start Meeting"}
+                            >
+                                <Play size={18} fill="currentColor" />
+                            </button>
+                        ) : (
+                            <>
+                                <button
+                                    onClick={handlePauseToggle}
+                                    className={`icon-btn ${isPaused ? 'text-yellow-400' : 'text-blue-400'}`}
+                                    title={isStealth ? undefined : (isPaused ? "Resume" : "Pause")}
+                                >
+                                    {isPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
+                                </button>
+                                <button
+                                    onClick={handleStopSession}
+                                    className="icon-btn hover:text-red-400 hover:bg-red-400/10"
+                                    title={isStealth ? undefined : "Stop Meeting"}
+                                >
+                                    <Square size={16} fill="currentColor" className="text-red-400" />
+                                </button>
+                            </>
                         )}
-                        <button onClick={() => { resetChat(); setTranscriptLogs([]); setShowPostMeeting(false); }} className="icon-btn hover:text-red-400"><Trash2 size={16} /></button>
+                        <button
+                            onClick={() => { resetChat(); setTranscriptLogs([]); setShowPostMeeting(false); }}
+                            className="icon-btn hover:text-red-400"
+                            title={isStealth ? undefined : "Reset Chat & Transcripts"}
+                        >
+                            <Trash2 size={16} />
+                        </button>
                     </div>
+
                     <div className="flex-1 flex justify-center"><div className="draggable cursor-grab active:cursor-grabbing p-2 rounded hover:bg-white/5 group"><GripHorizontal size={20} className="text-gray-600 group-hover:text-gray-400" /></div></div>
+
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handleToggleStealth}
@@ -1777,8 +1818,15 @@ const Queue: React.FC<any> = () => {
                             {isStealth ? <EyeOff size={20} /> : <Eye size={20} />}
                         </button>
 
-                        <button onClick={handleExpandToggle} className="icon-btn">{isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</button>
-                        <button onClick={() => window.electronAPI && window.electronAPI.quitApp()} className="icon-btn hover:text-red-400"><X size={20} /></button>
+                        <button
+                            onClick={handleExpandToggle}
+                            className="icon-btn"
+                            title={isStealth ? undefined : (isExpanded ? "Collapse View" : "Expand View")}
+                        >
+                            {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                        </button>
+
+
                     </div>
                 </div>
             </div>
@@ -2239,13 +2287,16 @@ const Queue: React.FC<any> = () => {
                 </div>
             )
             }
-            {/* ✨ ALWAYS-VISIBLE RESIZE HANDLE */}
+            {/* ✨ DYNAMIC RESIZE HANDLE */}
             <div
                 onMouseDown={startResize}
-                className="absolute bottom-0 right-0 w-10 h-10 cursor-se-resize flex items-end justify-end p-2 interactive hover:bg-blue-500/20 rounded-tl-xl transition-all z-[70] group"
+                className={`absolute w-8 h-8 cursor-se-resize flex items-center justify-center interactive hover:bg-white/10 rounded-lg transition-all z-[100] group shadow-lg ${isExpanded ? "bottom-1 right-1" : "top-[85px] right-2"
+                    }`}
+                title={isStealth ? undefined : "Resize Window"}
             >
-                <Scaling size={16} className="text-gray-500 group-hover:text-blue-400 transition-colors" />
+                <Scaling size={14} className="text-white/20 group-hover:text-blue-400 rotate-90 transition-colors" />
             </div>
+
         </div >
     )
 }

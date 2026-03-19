@@ -67,8 +67,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   moveWindowUp: () => ipcRenderer.invoke("move-window-up"),
   moveWindowDown: () => ipcRenderer.invoke("move-window-down"),
 
-  // UPDATED: Now accepts 'u' (isUrgent) as the 3rd argument
-  analyzeAudioFromBase64: (d: string, m: string, u: boolean) => ipcRenderer.invoke("analyze-audio-base64", d, m, u),
+  // UPDATED: Now accepts 'u' (isUrgent) as the 3rd argument, and 't' (timestamp) as 4th
+  analyzeAudioFromBase64: (d: string, m: string, u: boolean, t?: number) => ipcRenderer.invoke("analyze-audio-base64", d, m, u, t),
 
   analyzeAudioFile: (p: string) => ipcRenderer.invoke("analyze-audio-file", p),
   analyzeImageFile: (p: string) => ipcRenderer.invoke("analyze-image-file", p),
