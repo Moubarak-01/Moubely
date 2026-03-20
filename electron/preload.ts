@@ -39,6 +39,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getUserProfile: () => ipcRenderer.invoke("get-user-profile"),
   getScreenshots: () => ipcRenderer.invoke("get-screenshots"),
   deleteScreenshot: (p: string) => ipcRenderer.invoke("delete-screenshot", p),
+  saveChatImage: (ab: ArrayBuffer, ext: string) => ipcRenderer.invoke("save-chat-image", ab, ext),
+  deleteChatImages: (urls: string[]) => ipcRenderer.invoke("delete-chat-images", urls),
 
   transcribeDictation: (base64Audio: string, mimeType: string) => ipcRenderer.invoke("transcribe-dictation", base64Audio, mimeType),
   cancelChat: () => ipcRenderer.invoke("cancel-gemini-chat"),

@@ -6,7 +6,7 @@ import {
     GripHorizontal, HelpCircle, MessageCircleQuestion, FileText,
     Scaling, Copy, Check, CheckCheck, Trash2, Mail,
     Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
-    Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw, Plus
+    Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw, Plus, Maximize
 } from "lucide-react"
 
 // --- IMPORTS FOR FORMULAS & HIGHLIGHTING ---
@@ -326,11 +326,62 @@ const StudentModeSetupModal = ({ open, onClose, onSave }: { open: boolean, onClo
     );
 };
 
+// --- IMAGE LIGHTBOX COMPONENT ---
+const ImageLightbox = ({ src, onClose }: { src: string, onClose: () => void }) => {
+    const [scale, setScale] = useState(1);
+    const [pos, setPos] = useState({ x: 0, y: 0 });
+    const isDragging = useRef(false);
+    const dragStart = useRef({ x: 0, y: 0 });
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
+    return (
+        <div className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center interactive"
+            onWheel={(e) => setScale(s => Math.min(Math.max(0.5, s - e.deltaY * 0.005), 5))}
+            onPointerDown={(e) => {
+                isDragging.current = true;
+                dragStart.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+            }}
+            onPointerUp={() => isDragging.current = false}
+            onPointerMove={(e) => {
+                if (isDragging.current) {
+                    setPos({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y });
+                }
+            }}
+            onPointerLeave={() => isDragging.current = false}
+        >
+            <div className="absolute top-4 right-4 z-50 flex gap-4">
+                <button onClick={() => { setScale(1); setPos({ x: 0, y: 0 }); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur">
+                    <Maximize size={20} />
+                </button>
+                <button onClick={onClose} className="p-2 bg-white/10 hover:bg-red-500/80 rounded-full text-white backdrop-blur">
+                    <X size={20} />
+                </button>
+            </div>
+            <img
+                src={src}
+                className="max-w-full max-h-full object-contain pointer-events-none transition-transform duration-75 ease-out"
+                style={{ transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})` }}
+                alt="Fullscreen View"
+            />
+        </div>
+    );
+};
+
 // --- MAIN COMPONENT ---
 const Queue: React.FC<any> = () => {
     const [isExpanded, setIsExpanded] = useState(false)
     const [activeTab, setActiveTab] = useState<"Chat" | "Transcript" | "Email" | "History">("Chat")
     const [isInputFocused, setIsInputFocused] = useState(false)
+    const [fullscreenImage, setFullscreenImage] = useState<string | null>(null)
+    const [hoverImage, setHoverImage] = useState<string | null>(null)
+    const [needsEmailGeneration, setNeedsEmailGeneration] = useState(false)
 
     const [input, setInput] = useState("")
     const [messages, setMessages] = useState<Message[]>([])
@@ -893,10 +944,11 @@ const Queue: React.FC<any> = () => {
 
             destinationRef.current = destination;
 
-            resetChat();
+            // Preserve existing chat & loaded session state so user's current view isn't interrupted
             setTranscriptLogs([]);
             setShowPostMeeting(false);
             setEmailDraft("");
+            setNeedsEmailGeneration(false);
 
             const startT = Date.now();
             setMeetingStartTime(startT);
@@ -993,12 +1045,13 @@ const Queue: React.FC<any> = () => {
 
         setThinkingStep("Drafting summary...");
         setIsFinalizing(false);
+        setNeedsEmailGeneration(true);
     }
 
     useEffect(() => {
         const generateEmailAfterFinalize = async () => {
-            // FIX: Ensure this ONLY runs for NEW meetings, not loaded historical ones
-            if (!isFinalizing && showPostMeeting && !emailDraft && transcriptLogs.length > 0 && window.electronAPI && !loadedSessionId) {
+            if (needsEmailGeneration && showPostMeeting && !emailDraft && transcriptLogs.length > 0 && window.electronAPI) {
+                setNeedsEmailGeneration(false);
                 setIsThinking(true);
                 setThinkingStep("Drafting summary...");
                 const fullTranscript = transcriptLogs.map(t => t.text).join(" ");
@@ -1039,15 +1092,15 @@ const Queue: React.FC<any> = () => {
                 finally {
                     setIsThinking(false);
                 }
-            } else if (!isFinalizing && showPostMeeting && isThinking && !loadedSessionId) {
-                // FALLBACK: If we're stuck thinking but condition is NO LONGER valid (e.g. empty transcript)
-                // Stop the "rolling" state so the user isn't stuck forever.
+            } else if (needsEmailGeneration && showPostMeeting && isThinking) {
+                // FALLBACK: empty transcript
                 console.warn("[Queue] Meeting ended but skipping email generation (likely empty transcript).");
+                setNeedsEmailGeneration(false);
                 setIsThinking(false);
             }
         };
         generateEmailAfterFinalize();
-    }, [isFinalizing, showPostMeeting, loadedSessionId, transcriptLogs]); // Added transcriptLogs as dependency
+    }, [needsEmailGeneration, showPostMeeting, isThinking, emailDraft, transcriptLogs, pastMeetings]);
 
     // --- INTERACTION FEEDBACK STATES ---
     const [isCopied, setIsCopied] = useState(false);
@@ -1229,6 +1282,19 @@ const Queue: React.FC<any> = () => {
 
     const deleteChat = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
+        const chatToDelete = pastChats.find(c => c.id === id);
+        if (chatToDelete && window.electronAPI && window.electronAPI.deleteChatImages) {
+            const allImagePaths: string[] = [];
+            chatToDelete.messages?.forEach(m => {
+                if (m.queuedScreenshots) {
+                    m.queuedScreenshots.forEach(img => allImagePaths.push(img.preview));
+                }
+            });
+            if (allImagePaths.length > 0) {
+                window.electronAPI.deleteChatImages(allImagePaths);
+            }
+        }
+
         const u = pastChats.filter(c => c.id !== id);
         setPastChats(u);
         localStorage.setItem('moubely_chats', JSON.stringify(u));
@@ -1537,7 +1603,7 @@ const Queue: React.FC<any> = () => {
             setIsThinking(false);
 
             if (hasImages) {
-                handleClearQueue();
+                setQueuedScreenshots([]);
             }
         }
     }
@@ -1620,7 +1686,7 @@ const Queue: React.FC<any> = () => {
                     imagePaths,
                     actionType as any
                 );
-                handleClearQueue();
+                setQueuedScreenshots([]);
             } else {
                 response = await window.electronAPI.invoke("gemini-chat", {
                     message: transcriptText || "Context from files",
@@ -1713,7 +1779,7 @@ const Queue: React.FC<any> = () => {
                     imagePaths,
                     "solve"
                 );
-                handleClearQueue();
+                setQueuedScreenshots([]);
 
             } else {
                 // --- PATH B: TEXT BRAIN (Transcript Only) ---
@@ -1746,6 +1812,16 @@ const Queue: React.FC<any> = () => {
 
     return (
         <div className={`moubely-window ${isExpanded ? 'expanded' : ''} flex flex-col h-full relative overflow-hidden`}>
+            {fullscreenImage && <ImageLightbox src={fullscreenImage} onClose={() => setFullscreenImage(null)} />}
+            {hoverImage && !fullscreenImage && (
+                <div className="absolute inset-0 z-[500] pointer-events-none flex items-center justify-center bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-200">
+                    <img
+                        src={hoverImage}
+                        className="max-w-[85%] max-h-[85%] object-contain rounded-xl border border-white/20 shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+                        alt="Hover Preview"
+                    />
+                </div>
+            )}
             <StudentModeSetupModal
                 open={showStudentModal}
                 onClose={() => {
@@ -1938,7 +2014,8 @@ const Queue: React.FC<any> = () => {
                                                                         key={index}
                                                                         src={img.preview}
                                                                         alt={`Screenshot ${index + 1}`}
-                                                                        className="rounded-lg border border-white/10 max-w-full h-auto max-h-[200px] object-cover bg-black/20"
+                                                                        className="rounded-lg border border-white/10 max-w-full h-auto max-h-[200px] object-cover bg-black/20 cursor-pointer hover:opacity-90 transition-opacity"
+                                                                        onClick={(e) => { e.stopPropagation(); setFullscreenImage(img.preview); }}
                                                                     />
                                                                 ))}
                                                             </div>
@@ -2220,8 +2297,11 @@ const Queue: React.FC<any> = () => {
                                             <div key={img.path} className="relative group shrink-0">
                                                 <img
                                                     src={img.preview}
-                                                    className="w-10 h-8 rounded object-cover border border-white/10"
+                                                    className="w-10 h-8 rounded object-cover border border-white/10 cursor-pointer hover:opacity-80 transition-opacity"
                                                     alt={`Queued Image ${index + 1}`}
+                                                    onClick={(e) => { e.stopPropagation(); setFullscreenImage(img.preview); setHoverImage(null); }}
+                                                    onMouseEnter={() => setHoverImage(img.preview)}
+                                                    onMouseLeave={() => setHoverImage(null)}
                                                 />
                                                 <button
                                                     onClick={() => handleRemoveQueuedScreenshot(img.path)}
@@ -2241,7 +2321,28 @@ const Queue: React.FC<any> = () => {
                                 )}
 
                                 <div className="relative mb-3 w-full">
-                                    <textarea ref={textareaRef} value={input} onFocus={handleInputFocus} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); handleSend(); } }} placeholder={showPostMeeting ? "Ask about the meeting..." : "Ask about your screen..."} rows={1} className="w-full bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 focus:border-white/20 rounded-2xl px-5 py-4 pr-24 text-sm text-gray-100 placeholder-gray-500 outline-none transition-all shadow-lg resize-none overflow-y-auto" style={{ minHeight: '52px', maxHeight: '150px' }} />
+                                    <textarea ref={textareaRef} value={input} onFocus={handleInputFocus} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); handleSend(); } }} onPaste={async (e) => {
+                                        const items = e.clipboardData?.items;
+                                        if (!items) return;
+                                        for (let i = 0; i < items.length; i++) {
+                                            if (items[i].type.indexOf('image') !== -1) {
+                                                e.preventDefault();
+                                                const file = items[i].getAsFile();
+                                                if (file && window.electronAPI && window.electronAPI.saveChatImage) {
+                                                    const arrayBuffer = await file.arrayBuffer();
+                                                    const ext = file.name.split('.').pop() || 'png';
+                                                    try {
+                                                        const protocolUrl = await window.electronAPI.saveChatImage(arrayBuffer, ext);
+                                                        setQueuedScreenshots(prev => {
+                                                            const newQueue = [...prev, { path: protocolUrl, preview: protocolUrl }];
+                                                            if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
+                                                            return newQueue;
+                                                        });
+                                                    } catch (err) { console.error("Failed to save pasted image", err); }
+                                                }
+                                            }
+                                        }
+                                    }} placeholder={showPostMeeting ? "Ask about the meeting..." : "Ask about your screen..."} rows={1} className="w-full bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 focus:border-white/20 rounded-2xl px-5 py-4 pr-24 text-sm text-gray-100 placeholder-gray-500 outline-none transition-all shadow-lg resize-none overflow-y-auto" style={{ minHeight: '52px', maxHeight: '150px' }} />
 
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
                                         <button

@@ -642,7 +642,7 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
             case 'assist': taskInstruction = "Provide technical facts, documentation, or definitions."; break;
             case 'reply': taskInstruction = "Draft a short, 2-3 sentence response."; break;
             case 'answer': taskInstruction = "Provide a deep, comprehensive answer using the STAR method."; break;
-            case 'ask': taskInstruction = "Suggest 3-4 insightful follow-up questions."; break;
+            case 'ask': taskInstruction = "Suggest 3-4 insightful follow-up questions. Keep each question extremely brief (maximum 3 lines per question). Do not write long or elaborate paragraphs."; break;
             case 'recap': taskInstruction = "Summarize the conversation in 3 brief bullet points."; break;
             default: taskInstruction = "Answer the user's request."; break;
         }
@@ -883,8 +883,13 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
 
         for (const imagePath of imagePaths) {
             try {
-                const buffer = await fs.promises.readFile(imagePath);
-                imageParts.push({ inlineData: { data: buffer.toString("base64"), mimeType: imagePath.endsWith(".png") ? "image/png" : "image/jpeg" } });
+                let actualPath = imagePath;
+                if (imagePath.startsWith('moubely://')) {
+                    const urlPath = imagePath.slice('moubely://'.length);
+                    actualPath = path.join(app.getPath('userData'), urlPath);
+                }
+                const buffer = await fs.promises.readFile(actualPath);
+                imageParts.push({ inlineData: { data: buffer.toString("base64"), mimeType: actualPath.endsWith(".png") ? "image/png" : "image/jpeg" } });
             } catch (e) { console.error(`[LLM] ❌ Image Read Error: ${imagePath}`); }
         }
         if (imageParts.length === 0) return "❌ No valid images found.";

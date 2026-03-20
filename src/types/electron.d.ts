@@ -15,6 +15,8 @@ export interface ElectronAPI {
   takeScreenshot: () => Promise<any> // Changed to any or specific Interface to match return
   getScreenshots: () => Promise<Array<{ path: string; preview: string }>>
   deleteScreenshot: (path: string) => Promise<{ success: boolean; error?: string }>
+  saveChatImage: (arrayBuffer: ArrayBuffer, extension: string) => Promise<string>
+  deleteChatImages: (urls: string[]) => Promise<{ success: boolean; error?: string }>
   transcribeDictation: (base64Audio: string, mimeType: string) => Promise<string>
   cancelChat: () => Promise<void>
 

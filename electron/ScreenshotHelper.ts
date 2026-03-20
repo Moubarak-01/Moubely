@@ -156,10 +156,11 @@ export class ScreenshotHelper {
 
   public async getImagePreview(filepath: string): Promise<string> {
     try {
-      const data = await fs.promises.readFile(filepath)
-      return `data:image/png;base64,${data.toString("base64")}`
+      const dirName = path.basename(path.dirname(filepath));
+      const fileName = path.basename(filepath);
+      return `moubely://${dirName}/${fileName}`;
     } catch (error) {
-      console.error("[ScreenshotHelper] Error reading image:", error)
+      console.error("[ScreenshotHelper] Error generating preview URL:", error)
       throw error
     }
   }

@@ -1,6 +1,7 @@
 import { ipcMain, app, desktopCapturer, shell } from "electron";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import { AppState } from "./main";
 
 // Helper for consistent logging
@@ -258,5 +259,45 @@ export function initializeIpcHandlers(appState: AppState) {
 
     logIPC("save-student-files", "✅ Save Complete & Cache Cleared");
     return true;
+  });
+
+  ipcMain.handle('save-chat-image', async (event, arrayBuffer: ArrayBuffer, extension: string) => {
+    try {
+      const userDataPath = app.getPath('userData');
+      const imagesDir = path.join(userDataPath, 'moubely_chat_images');
+      if (!fs.existsSync(imagesDir)) {
+        fs.mkdirSync(imagesDir, { recursive: true });
+      }
+      const filename = `${crypto.randomUUID()}.${extension.replace('.', '')}`;
+      const filePath = path.join(imagesDir, filename);
+      fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
+      console.log(`[IPC ⚡] ✅ Chat Image Saved to: ${filePath}`);
+      return `moubely://${filename}`;
+    } catch (error) {
+      console.error(`[IPC ⚡] ❌ Chat Image Save Failed:`, error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('delete-chat-images', async (event, urls: string[]) => {
+    try {
+      const userDataPath = app.getPath('userData');
+      const imagesDir = path.join(userDataPath, 'moubely_chat_images');
+      for (const url of urls) {
+        if (url.startsWith('moubely://')) {
+          const filename = url.replace('moubely://', '');
+          const filePath = path.join(imagesDir, filename);
+          // prevent directory traversal
+          if (filePath.startsWith(imagesDir) && fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log(`[IPC ⚡] 🗑️ Deleted chat image: ${filename}`);
+          }
+        }
+      }
+      return { success: true };
+    } catch (error: any) {
+      console.error(`[IPC ⚡] ❌ Chat Image Delete Failed:`, error);
+      return { success: false, error: error.message };
+    }
   });
 }

@@ -1,4 +1,5 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, protocol, net } from 'electron';
+import path from 'path';
 import { initializeIpcHandlers } from "./ipcHandlers"
 import { WindowHelper } from "./WindowHelper"
 import { ScreenshotHelper } from "./ScreenshotHelper"
@@ -142,6 +143,17 @@ async function initializeApp() {
     appState.createWindow()
     appState.createTray()
     appState.shortcutsHelper.registerGlobalShortcuts()
+
+    protocol.handle('moubely', (request) => {
+      const urlPath = request.url.slice('moubely://'.length);
+      const userDataPath = app.getPath('userData');
+      const absolutePath = path.join(userDataPath, urlPath);
+
+      if (!absolutePath.startsWith(userDataPath)) {
+        return new Response('Not Found', { status: 404 });
+      }
+      return net.fetch(require('url').pathToFileURL(absolutePath).toString());
+    });
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) appState.createWindow()
