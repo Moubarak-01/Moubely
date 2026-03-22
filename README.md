@@ -45,6 +45,9 @@ Moubely is an advanced, always-on-top AI productivity hub designed for seamless 
 - ⚖️ **Centered Conversation Architecture**: Structural UI refactor ensuring all chat, email, and history content maintains perfect visual balance with a unified max-width constraint
 - 🎤 **Direct Voice Dictation**: Integrated microphone button in the chat bar for instant, low-latency speech-to-text input
 - 📏 **Persistent Window Geometry**: Intelligent window state management that remembers dimensions across expand/shrink transitions without layout loops
+- 🎨 **Art Studio (Multi-Modal)**: Built-in creation engine for generating high-fidelity images and videos using Imagen 4, Nano Banana, and Veo 3.1
+- 🔁 **Asynchronous Media Polling**: Integrated LRO (Long Running Operation) controller that polls and downloads physical video artifacts in the background
+- 🫧 **Zero-Overhead Studio**: Streamlined creation lane that delivers raw media artifacts without redundant AI text interjections
 
 ---
 
@@ -64,6 +67,7 @@ We have shifted from a static, premium-first architecture to a universal, open-m
 | **Geometry Logic** | Auto-Resize Loops | **Deterministic Persistence** (Mode-Independent Memory) |
 | **Session UX** | Static date-based titles | **AI-Generated Concise Titles** (< 6 words) |
 | **Truncation** | Standard overflow | **Smart line-clamp-5** with floating toggle |
+| **Media Creation**| None | **Art Studio** (Imagen 4, Veo 3.1, Nano Banana) |
 
 ---
 
@@ -125,6 +129,14 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 | **Tier 1: Elite Vision** | **Gemini 3.1 Pro**, Gemini 3.0 Pro, Claude 4.5 Opus, Claude 3.7 Sonnet (Reasoning) |
 | **Tier 2: Fast & Reliable** | Gemini 3 Flash, Gemini 2.5 Flash, Claude 4.5 Haiku, Mistral Small Vision |
 | **Tier 3: Backups** | Mistral Large 2 (Nvidia), GPT-4o, Perplexity Vision |
+
+### The "Hands" (Creation - Art Studio) 🎨
+
+| Model | Type | Protocol |
+| :--- | :--- | :--- |
+| **Veo 3.1** | Physical Video | `predictLongRunning` (Asynchronous Polling + Direct URI) |
+| **Imagen 4** | High-Fidelity Art| `predict` (bytesBase64Encoded) |
+| **Nano Banana**| Fast Generation | `generateContent` (Natural Data Discovery) |
 
 ### The "Ears" (Audio) 👂
 
@@ -345,6 +357,38 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Solution:** Built a **Ref-based Auto-Resizer**. The edit textarea starts at a single line (40px). As text is added, it dynamically recalculates `scrollHeight` and expands the UI container up to a 120px limit before transitioning into a scroll view.
 </details>
 
+<details>
+<summary><strong>27. The Unified "Creation Lane" Protocol</strong></summary>
+
+**Problem:** Google AI Studio uses three distinct API protocols for media generation. Imagen 4, Veo 3.1, and Nano Banana (Gemini) each reject the others' payload structures and endpoint types.
+
+**Solution:** Engineered a **Triple-Lane Dispatcher** in `GenerationHelper.ts`. It intelligently routes requests between `predict` (Imagen), `predictLongRunning` (Veo), and `generateContent` (Banana) lanes based on the model string, ensuring zero-latency protocol switching.
+</details>
+
+<details>
+<summary><strong>28. Atomic Video Artifact Polling</strong></summary>
+
+**Problem:** Video generation is a heavy process that can take up to 2-3 minutes, meaning a standard HTTP request would time out long before the physical file is ready.
+
+**Solution:** Implemented an **Automated Polling Loop** for the Veo engine. Moubely now spawns a background observer that checks Google’s "Operation Status" every 5 seconds, maintaining state until the server reports "Done," allowing the user to continue chatting while their cinematic render finishes.
+</details>
+
+<details>
+<summary><strong>29. The Physical Download Secret</strong></summary>
+
+**Problem:** Unlike images which return base64 bytes, Veo 3.1 returns a high-speed temporary download URI that expires quickly and requires authenticated access.
+
+**Solution:** Built a **High-Speed Artifact Downloader**. Upon receiving the "Done" signal, the engine immediately initiates a binary stream from the provided URI using the user's API key, saving the physical `.mp4` file directly to the local Moubely studio for native rendering.
+</details>
+
+<details>
+<summary><strong>30. The "Yellow Line" Boundary Constraint</strong></summary>
+
+**Problem:** In the Fluid Centered Architecture, user messages with long text or large attachments would sometimes "bleed" over the AI's visual margin, creating layout overlaps and breaking the professional aesthetic.
+
+**Solution:** Restored a hard **85% Max-Width Constraint** paired with `ml-auto` specifically for the User message container. This enforces a permanent "Yellow Line" safety margin, ensuring user content stays strictly on the right side of the communication bridge.
+</details>
+
 ---
 
 ## 📦 Installation & Setup
@@ -426,6 +470,7 @@ Moubely/
 │   ├── main.ts                 # App Entry Point
 │   ├── WindowHelper.ts         # Stealth, Geometry & Persistence Logic
 │   ├── LLMHelper.ts            # The "Waterfall" Logic & Smart Router
+│   ├── GenerationHelper.ts     # Art Studio & Video Diffusion Engine
 │   ├── ProcessingHelper.ts     # Automation Workflow
 │   └── ipcHandlers.ts          # Logs & Communication
 │
