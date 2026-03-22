@@ -15,10 +15,12 @@ export interface ElectronAPI {
   takeScreenshot: () => Promise<any> // Changed to any or specific Interface to match return
   getScreenshots: () => Promise<Array<{ path: string; preview: string }>>
   deleteScreenshot: (path: string) => Promise<{ success: boolean; error?: string }>
-  saveChatImage: (arrayBuffer: ArrayBuffer, extension: string) => Promise<string>
-  deleteChatImages: (urls: string[]) => Promise<{ success: boolean; error?: string }>
+  saveChatFile: (arrayBuffer: ArrayBuffer, extension: string, name?: string) => Promise<string>
+  deleteChatFiles: (urls: string[]) => Promise<{ success: boolean; error?: string }>
+  openFilePicker: () => Promise<{ name: string, path: string, type: string }[]>
   transcribeDictation: (base64Audio: string, mimeType: string) => Promise<string>
   cancelChat: () => Promise<void>
+  generateMedia: (request: any) => Promise<any>
 
   // Events / Listeners
   onStealthModeToggled: (callback: (enabled: boolean) => void) => () => void
@@ -44,9 +46,7 @@ export interface ElectronAPI {
   analyzeAudioFile: (path: string) => Promise<{ text: string; timestamp: number }>
   invoke: (channel: string, ...args: any[]) => Promise<any>
 
-  // Chat / Vision
-  // Note: Updated imagePath to string[] to match usage in Queue.tsx
-  chatWithImage: (message: string, imagePaths: string[], type?: string) => Promise<string>
+  chatWithAttachments: (message: string, attachments: { path: string, type: string }[], type?: string) => Promise<string>
 
   // Settings & Modes
   toggleStealthMode: () => Promise<boolean>

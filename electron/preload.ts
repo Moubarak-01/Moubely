@@ -39,11 +39,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getUserProfile: () => ipcRenderer.invoke("get-user-profile"),
   getScreenshots: () => ipcRenderer.invoke("get-screenshots"),
   deleteScreenshot: (p: string) => ipcRenderer.invoke("delete-screenshot", p),
-  saveChatImage: (ab: ArrayBuffer, ext: string) => ipcRenderer.invoke("save-chat-image", ab, ext),
-  deleteChatImages: (urls: string[]) => ipcRenderer.invoke("delete-chat-images", urls),
+  saveChatFile: (ab: ArrayBuffer, ext: string, name?: string) => ipcRenderer.invoke("save-chat-file", ab, ext, name),
+  deleteChatFiles: (urls: string[]) => ipcRenderer.invoke("delete-chat-files", urls),
+  openFilePicker: () => ipcRenderer.invoke("open-file-picker"),
 
   transcribeDictation: (base64Audio: string, mimeType: string) => ipcRenderer.invoke("transcribe-dictation", base64Audio, mimeType),
   cancelChat: () => ipcRenderer.invoke("cancel-gemini-chat"),
+  generateMedia: (request: any) => ipcRenderer.invoke("generate-media", request),
 
   onSolutionsReady: (cb: any) => { const s = (_: any, d: any) => cb(d); ipcRenderer.on("solutions-ready", s); return () => ipcRenderer.removeListener("solutions-ready", s) },
   onResetView: (cb: any) => { const s = () => cb(); ipcRenderer.on("reset-view", s); return () => ipcRenderer.removeListener("reset-view", s) },
@@ -86,7 +88,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setIgnoreMouseEvents: (i: boolean, o: any) => ipcRenderer.invoke("set-ignore-mouse-events", i, o),
   toggleMouseIgnore: (i: boolean) => ipcRenderer.send("toggle-mouse-ignore", i),
 
-  chatWithImage: (m: string, i: string[], t?: string) => ipcRenderer.invoke("chat-with-image", { message: m, imagePaths: i, type: t }),
+  chatWithAttachments: (m: string, a: { path: string, type: string }[], t?: string) => ipcRenderer.invoke("chat-with-attachments", { message: m, attachments: a, type: t }),
   checkProfileExists: () => ipcRenderer.invoke("check-profile-exists"),
   saveStudentFiles: (f: any[]) => ipcRenderer.invoke("save-student-files", f),
 

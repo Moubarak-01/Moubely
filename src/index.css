@@ -183,7 +183,7 @@ body,
   font-size: clamp(12px, 2.5vmin, 14px);
   line-height: 1.5;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  max-width: 85%;
+  max-width: 100%;
 }
 
 /* AI Message */
@@ -192,7 +192,7 @@ body,
   font-size: clamp(13px, 2.5vmin, 15px);
   line-height: 1.6;
   padding: 4px 0;
-  max-width: 65ch;
+  max-width: 100%;
 }
 
 /* Utils */
@@ -332,4 +332,26 @@ a,
     box-shadow: 0 0 0 15px rgba(96, 165, 250, 0), 0 0 0 30px rgba(96, 165, 250, 0);
     /* Fade out */
   }
+}
+
+/* --- ART STUDIO ANIMATIONS --- */
+@keyframes art-pulse {
+  0% {
+    transform: scale(1);
+    filter: brightness(1) drop-shadow(0 0 0px rgba(250, 204, 21, 0));
+  }
+
+  50% {
+    transform: scale(1.05);
+    filter: brightness(1.2) drop-shadow(0 0 8px rgba(250, 204, 21, 0.4));
+  }
+
+  100% {
+    transform: scale(1);
+    filter: brightness(1) drop-shadow(0 0 0px rgba(250, 204, 21, 0));
+  }
+}
+
+.active-art-pulse svg {
+  animation: art-pulse 2s infinite ease-in-out;
 }

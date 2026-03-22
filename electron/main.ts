@@ -6,8 +6,14 @@ import { ScreenshotHelper } from "./ScreenshotHelper"
 import { ShortcutsHelper } from "./shortcuts"
 import { ProcessingHelper } from "./ProcessingHelper"
 import { CursorHelper } from "./CursorHelper"
+import { LocalServerHelper } from "./LocalServerHelper"
 
 console.log("Main process loading...");
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'moubely', privileges: { standard: true, secure: true, supportFetchAPI: true, bypassCSP: true, stream: true } },
+  { scheme: 'moubely-local', privileges: { secure: true, supportFetchAPI: true, bypassCSP: true, stream: true } }
+]);
 
 export class AppState {
   private static instance: AppState | null = null
@@ -144,6 +150,10 @@ async function initializeApp() {
     appState.createTray()
     appState.shortcutsHelper.registerGlobalShortcuts()
 
+    // ✨ Boot up the dedicated Media Server for Videos & PDFs
+    const mediaServer = new LocalServerHelper()
+    mediaServer.startServer()
+
     protocol.handle('moubely', (request) => {
       const urlPath = request.url.slice('moubely://'.length);
       const userDataPath = app.getPath('userData');
@@ -153,6 +163,17 @@ async function initializeApp() {
         return new Response('Not Found', { status: 404 });
       }
       return net.fetch(require('url').pathToFileURL(absolutePath).toString());
+    });
+
+    protocol.handle('moubely-local', (request) => {
+      try {
+        const urlStr = request.url.slice('moubely-local://'.length);
+        const absolutePath = decodeURIComponent(urlStr);
+        return net.fetch(require('url').pathToFileURL(absolutePath).toString());
+      } catch (err) {
+        console.error("Failed handling moubely-local:", err);
+        return new Response('Not Found', { status: 404 });
+      }
     });
 
     app.on("activate", () => {

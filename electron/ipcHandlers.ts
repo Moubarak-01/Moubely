@@ -1,8 +1,10 @@
-import { ipcMain, app, desktopCapturer, shell } from "electron";
+import { ipcMain, app, desktopCapturer, shell, dialog } from "electron";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { AppState } from "./main";
+import { LocalServerHelper } from "./LocalServerHelper";
+import { GenerationHelper } from "./GenerationHelper";
 
 // Helper for consistent logging
 const logIPC = (channel: string, details: string = "") => {
@@ -12,6 +14,7 @@ const logIPC = (channel: string, details: string = "") => {
 export function initializeIpcHandlers(appState: AppState) {
   // Access the LLMHelper through the processingHelper existing in AppState
   const llmHelper = (appState.processingHelper as any).llmHelper;
+  const generationHelper = new GenerationHelper();
 
   ipcMain.handle('save-user-profile', async (event, profileData) => {
     try {
@@ -123,6 +126,16 @@ export function initializeIpcHandlers(appState: AppState) {
   });
 
   // --- 2. AI CHAT HANDLER ---
+  ipcMain.handle("generate-media", async (event, args) => {
+    try {
+      logIPC("generate-media", `Model: ${args.model} | Prompt: ${args.prompt.substring(0, 30)}...`);
+      return await generationHelper.generateMedia(args);
+    } catch (error: any) {
+      console.error(`[IPC ⚡] ❌ Generation Error:`, error);
+      throw error;
+    }
+  });
+
   ipcMain.handle("gemini-chat", async (event, args) => {
     try {
       if (!llmHelper) throw new Error("LLM Helper not initialized");
@@ -162,20 +175,20 @@ export function initializeIpcHandlers(appState: AppState) {
     }
   });
 
-  // --- 3. VISION HANDLER ---
-  ipcMain.handle("chat-with-image", async (event, { message, imagePaths, type }) => {
+  // --- 3. ATTACHMENT HANDLER ---
+  ipcMain.handle("chat-with-attachments", async (event, { message, attachments, type }) => {
     try {
-      logIPC("chat-with-image", `Images: ${imagePaths?.length || 0} | Type: ${type || "answer"}`);
+      logIPC("chat-with-attachments", `Attachments: ${attachments?.length || 0} | Type: ${type || "answer"}`);
       if (!llmHelper) throw new Error("LLM Helper not initialized");
 
-      return await llmHelper.chatWithImage(message, imagePaths, (token: string) => {
+      return await llmHelper.chatWithAttachments(message, attachments, (token: string) => {
         if (!event.sender.isDestroyed()) {
           event.sender.send("llm-token", token);
         }
       }, type);
     } catch (error: any) {
-      console.error(`[IPC ⚡] ❌ Vision Error:`, error);
-      return `Vision Error: ${error.message}`;
+      console.error(`[IPC ⚡] ❌ Attachment Error:`, error);
+      return `Attachment Error: ${error.message}`;
     }
   });
 
@@ -261,42 +274,89 @@ export function initializeIpcHandlers(appState: AppState) {
     return true;
   });
 
-  ipcMain.handle('save-chat-image', async (event, arrayBuffer: ArrayBuffer, extension: string) => {
+  ipcMain.handle('open-file-picker', async () => {
     try {
+      const result: any = await dialog.showOpenDialog({
+        properties: ['openFile', 'multiSelections'],
+        filters: [
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+
+      if (result.canceled) return [];
+
       const userDataPath = app.getPath('userData');
-      const imagesDir = path.join(userDataPath, 'moubely_chat_images');
-      if (!fs.existsSync(imagesDir)) {
-        fs.mkdirSync(imagesDir, { recursive: true });
+      const attachmentsDir = path.join(userDataPath, 'moubely_attachments');
+      if (!fs.existsSync(attachmentsDir)) {
+        fs.mkdirSync(attachmentsDir, { recursive: true });
       }
-      const filename = `${crypto.randomUUID()}.${extension.replace('.', '')}`;
-      const filePath = path.join(imagesDir, filename);
-      fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
-      console.log(`[IPC ⚡] ✅ Chat Image Saved to: ${filePath}`);
-      return `moubely://${filename}`;
+
+      const files = [];
+      for (const sourcePath of result.filePaths) {
+        const ext = path.extname(sourcePath).toLowerCase().replace('.', '');
+        const filename = `${crypto.randomUUID()}.${ext}`;
+        const destPath = path.join(attachmentsDir, filename);
+
+        fs.copyFileSync(sourcePath, destPath);
+
+        const textExtensions = ['txt', 'md', 'csv', 'json', 'js', 'ts', 'jsx', 'tsx', 'py', 'html', 'css', 'go', 'cs', 'java', 'cpp', 'c', 'h', 'hpp', 'sh', 'bash', 'yml', 'yaml', 'xml', 'log', 'ini', 'cfg', 'conf', 'php', 'rb', 'swift', 'kt', 'dart', 'rs', 'sql', 'env'];
+        let type = 'generic_file';
+        if (['png', 'jpg', 'jpeg', 'webp', 'heic'].includes(ext)) type = 'image';
+        else if (['mp4', 'webm', 'mov', 'avi'].includes(ext)) type = 'video';
+        else if (ext === 'pdf') type = 'pdf';
+        else if (textExtensions.includes(ext)) type = 'text';
+
+        files.push({
+          name: path.basename(sourcePath),
+          path: `moubely://moubely_attachments/${filename}`,
+          localPath: LocalServerHelper.getMediaUrl(filename),
+          type: type
+        });
+      }
+
+      console.log(`[IPC ⚡] ✅ Picked ${files.length} files.`);
+      return files;
     } catch (error) {
-      console.error(`[IPC ⚡] ❌ Chat Image Save Failed:`, error);
+      console.error(`[IPC ⚡] ❌ File Picker Failed:`, error);
       throw error;
     }
   });
 
-  ipcMain.handle('delete-chat-images', async (event, urls: string[]) => {
+  ipcMain.handle('save-chat-file', async (event, arrayBuffer: ArrayBuffer, extension: string, originalName: string = 'pasted_file') => {
     try {
       const userDataPath = app.getPath('userData');
-      const imagesDir = path.join(userDataPath, 'moubely_chat_images');
+      const attachmentsDir = path.join(userDataPath, 'moubely_attachments');
+      if (!fs.existsSync(attachmentsDir)) fs.mkdirSync(attachmentsDir, { recursive: true });
+
+      const filename = `${crypto.randomUUID()}.${extension.replace('.', '')}`;
+      const filePath = path.join(attachmentsDir, filename);
+      fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
+
+      console.log(`[IPC ⚡] ✅ Chat File Saved to: ${filePath}`);
+      return `moubely://moubely_attachments/${filename}`;
+    } catch (error) {
+      console.error(`[IPC ⚡] ❌ Chat File Save Failed:`, error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('delete-chat-files', async (event, urls: string[]) => {
+    try {
+      const userDataPath = app.getPath('userData');
       for (const url of urls) {
         if (url.startsWith('moubely://')) {
-          const filename = url.replace('moubely://', '');
-          const filePath = path.join(imagesDir, filename);
-          // prevent directory traversal
-          if (filePath.startsWith(imagesDir) && fs.existsSync(filePath)) {
+          const relativePath = url.replace('moubely://', '');
+          const filePath = path.join(userDataPath, relativePath);
+          // prevent directory traversal outside userData
+          if (filePath.startsWith(userDataPath) && fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
-            console.log(`[IPC ⚡] 🗑️ Deleted chat image: ${filename}`);
+            console.log(`[IPC ⚡] 🗑️ Deleted chat file: ${relativePath}`);
           }
         }
       }
       return { success: true };
     } catch (error: any) {
-      console.error(`[IPC ⚡] ❌ Chat Image Delete Failed:`, error);
+      console.error(`[IPC ⚡] ❌ Chat File Delete Failed:`, error);
       return { success: false, error: error.message };
     }
   });

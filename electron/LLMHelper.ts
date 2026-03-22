@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { GoogleAIFileManager } from "@google/generative-ai/server"
 import OpenAI from "openai"
 import { Client as NotionClient } from "@notionhq/client"
 import fs from "fs"
@@ -108,6 +109,7 @@ const VISION_MODELS = [
 
 export class LLMHelper {
     private genAI: GoogleGenerativeAI | null = null
+    private fileManager: GoogleAIFileManager | null = null
     private githubClient: OpenAI | null = null
     private groqClient: OpenAI | null = null
     private perplexityClient: OpenAI | null = null
@@ -154,7 +156,10 @@ export class LLMHelper {
 
     private initializeProviders(geminiKey?: string) {
         if (process.env.NOTION_TOKEN) this.notionClient = new NotionClient({ auth: process.env.NOTION_TOKEN });
-        if (geminiKey) this.genAI = new GoogleGenerativeAI(geminiKey);
+        if (geminiKey) {
+            this.genAI = new GoogleGenerativeAI(geminiKey);
+            this.fileManager = new GoogleAIFileManager(geminiKey);
+        }
 
         if (process.env.GITHUB_TOKEN) this.githubClient = new OpenAI({ baseURL: "https://models.inference.ai.azure.com", apiKey: process.env.GITHUB_TOKEN, dangerouslyAllowBrowser: true });
         if (process.env.PERPLEXITY_API_KEY) this.perplexityClient = new OpenAI({ baseURL: "https://api.perplexity.ai", apiKey: process.env.PERPLEXITY_API_KEY, dangerouslyAllowBrowser: true });
@@ -876,29 +881,64 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
         return "⚠️ All AI providers failed. Check API Keys.";
     }
 
-    public async chatWithImage(message: string, imagePaths: string[], onToken?: (token: string) => void, type: string = "answer"): Promise<string> {
+    public async chatWithAttachments(message: string, attachments: { path: string, type: string }[], onToken?: (token: string) => void, type: string = "answer"): Promise<string> {
         this.isAborted = false; // Reset flag at start
-        console.log(`[LLM] 🖼️ Vision Waterfall: Analyzing ${imagePaths.length} images...`);
-        const imageParts: { inlineData: { data: string; mimeType: string } }[] = [];
+        console.log(`[LLM] 🖼️ Attachment Waterfall: Analyzing ${attachments.length} attachments...`);
+        const geminiParts: any[] = [];
+        const openAIParts: any[] = [];
+        let attachedTextCode = "";
 
-        for (const imagePath of imagePaths) {
+        for (const attachment of attachments) {
             try {
-                let actualPath = imagePath;
-                if (imagePath.startsWith('moubely://')) {
-                    const urlPath = imagePath.slice('moubely://'.length);
+                let actualPath = attachment.path;
+                if (attachment.path.startsWith('moubely://')) {
+                    const urlPath = attachment.path.slice('moubely://'.length);
                     actualPath = path.join(app.getPath('userData'), urlPath);
                 }
-                const buffer = await fs.promises.readFile(actualPath);
-                imageParts.push({ inlineData: { data: buffer.toString("base64"), mimeType: actualPath.endsWith(".png") ? "image/png" : "image/jpeg" } });
-            } catch (e) { console.error(`[LLM] ❌ Image Read Error: ${imagePath}`); }
+
+                if (attachment.type === 'text') {
+                    const textContent = await fs.promises.readFile(actualPath, 'utf8');
+                    const fileName = path.basename(actualPath);
+                    attachedTextCode += `\n\n<AttachedFile name="${fileName}">\n${textContent}\n</AttachedFile>\n`;
+                } else if (attachment.type === 'image') {
+                    const buffer = await fs.promises.readFile(actualPath);
+                    const mimeType = actualPath.endsWith(".png") ? "image/png" : "image/jpeg";
+                    const b64 = buffer.toString("base64");
+                    geminiParts.push({ inlineData: { data: b64, mimeType } });
+                    openAIParts.push({ type: "image_url", image_url: { url: `data:${mimeType};base64,${b64}` } });
+                } else if (attachment.type === 'pdf' || attachment.type === 'video' || attachment.type === 'generic_file') {
+                    if (this.fileManager) {
+                        console.log(`[LLM] 📤 Uploading heavy file to Google: ${actualPath}`);
+
+                        let mimeType = 'application/octet-stream';
+                        if (attachment.type === 'pdf') mimeType = 'application/pdf';
+                        else if (attachment.type === 'video') mimeType = actualPath.endsWith('.webm') ? 'video/webm' : (actualPath.endsWith('.mov') ? 'video/quicktime' : 'video/mp4');
+                        // Else we let Gemini infer from extension (or pass generic application/octet-stream)
+                        const uploadResponse = await this.fileManager.uploadFile(actualPath, { mimeType, displayName: path.basename(actualPath) });
+
+                        if (attachment.type === 'video') {
+                            console.log(`[LLM] ⏳ Waiting for video processing...`);
+                            let fileState = await this.fileManager.getFile(uploadResponse.file.name);
+                            while (fileState.state === 'PROCESSING') {
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                fileState = await this.fileManager.getFile(uploadResponse.file.name);
+                            }
+                            if (fileState.state === 'FAILED') throw new Error("Video processing failed on Google servers");
+                        }
+                        geminiParts.push({ fileData: { mimeType: uploadResponse.file.mimeType, fileUri: uploadResponse.file.uri } });
+                    }
+                }
+            } catch (e: any) { console.error(`[LLM] ❌ Attachment Read Error: ${attachment.path}`, e.message); }
         }
-        if (imageParts.length === 0) return "❌ No valid images found.";
+
+        if (attachments.length > 0 && geminiParts.length === 0 && openAIParts.length === 0 && !attachedTextCode) return "❌ No valid attachments found.";
 
         const isCandidateMode = type === 'answer' || type === 'reply' || type === 'solve';
         const systemRules = this.getSystemInstruction(type, isCandidateMode);
-        let visionPrompt = `${systemRules}\n\nUSER REQUEST: ${message || "Analyze these images."}`;
+        let visionPrompt = `${systemRules}\n\nUSER REQUEST: ${message || "Analyze these attachments."}`;
 
-        // [NEW] AUGMENT VISION MODELS WITH STUDENT CONTEXT
+        if (attachedTextCode) visionPrompt += attachedTextCode;
+
         if (isCandidateMode) {
             const studentAugmentation = await this.getStudentAugmentation(message, "gemini", type);
             visionPrompt += studentAugmentation;
@@ -913,7 +953,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                 if (config.type === 'gemini') {
                     if (!this.genAI) continue;
                     const model = this.genAI.getGenerativeModel({ model: config.model });
-                    const result = await model.generateContentStream([{ text: visionPrompt }, ...imageParts]);
+                    const result = await model.generateContentStream([{ text: visionPrompt }, ...geminiParts]);
                     for await (const chunk of result.stream) {
                         if (this.isAborted) {
                             console.log(`[LLM] 🛑 Generation aborted by user.`);
@@ -934,13 +974,14 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     else if (config.type === 'perplexity') client = this.perplexityClient;
 
                     if (client) {
-                        const openAIParts: any[] = [textPart, ...imageParts.map(p => ({
-                            type: "image_url",
-                            image_url: { url: `data:${p.inlineData.mimeType};base64,${p.inlineData.data}` }
-                        }))];
+                        const heavyAttachmentsCount = attachments.filter(a => a.type !== 'image' && a.type !== 'text').length;
+                        const fallbackTextPart = heavyAttachmentsCount > 0
+                            ? { type: "text", text: `${visionPrompt}\n\n[SYSTEM WARNING: The user attached ${heavyAttachmentsCount} heavy file(s) that your current API backend lacks the native ingestion support for. Please gracefully inform the user you can only see images and pure text scripts.]` }
+                            : textPart;
+
                         const stream = await client.chat.completions.create({
                             model: config.model,
-                            messages: [{ role: "user", content: openAIParts }],
+                            messages: [{ role: "user", content: [fallbackTextPart, ...openAIParts] }],
                             max_tokens: 4096,
                             stream: true
                         });
@@ -1025,7 +1066,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
     }
 
     public async debugSolutionWithImages(problemInfo: any, currentCode: string, debugImagePaths: string[]) {
-        const response = await this.chatWithImage(`Debug:\n${JSON.stringify(problemInfo)}\nCode: ${currentCode}`, debugImagePaths);
+        const response = await this.chatWithAttachments(`Debug:\n${JSON.stringify(problemInfo)}\nCode: ${currentCode}`, debugImagePaths.map(p => ({ path: p, type: 'image' })));
         return { solution: { code: currentCode, explanation: response } };
     }
 

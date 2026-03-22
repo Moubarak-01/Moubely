@@ -6,8 +6,10 @@ import {
     GripHorizontal, HelpCircle, MessageCircleQuestion, FileText,
     Scaling, Copy, Check, CheckCheck, Trash2, Mail,
     Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
-    Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw, Plus, Maximize
+    Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw, Plus, Maximize,
+    Video, Image, Code, Maximize2
 } from "lucide-react"
+import moubelyIcon from "../../assets/Moubely_icon.png"
 
 // --- IMPORTS FOR FORMULAS & HIGHLIGHTING ---
 import ReactMarkdown from 'react-markdown';
@@ -28,6 +30,7 @@ interface Message {
     role: "user" | "ai"
     text: string
     queuedScreenshots?: ScreenshotData[];
+    queuedAttachments?: { name: string; path: string; type: string, localPath?: string }[];
     timestamp: number
     isStreaming?: boolean
 }
@@ -326,12 +329,42 @@ const StudentModeSetupModal = ({ open, onClose, onSave }: { open: boolean, onClo
     );
 };
 
-// --- IMAGE LIGHTBOX COMPONENT ---
-const ImageLightbox = ({ src, onClose }: { src: string, onClose: () => void }) => {
+// --- GLOBAL MEDIA RESOLUTION HELPER ---
+const getResolvedMediaUrl = (file: { path: string, localPath?: string }): string => {
+    let resolvedSrc = file.localPath || file.path;
+    if (resolvedSrc.includes('moubely_screenshots')) {
+        const decoded = decodeURIComponent(resolvedSrc.replace('moubely-local://', '').replace('moubely://', ''));
+        const filename = decoded.split(/[/\\]/).pop();
+        return `http://127.0.0.1:5181/screenshots/${filename}`;
+    }
+    if (resolvedSrc.includes('moubely_attachments')) {
+        const decoded = decodeURIComponent(resolvedSrc.replace('moubely-local://', '').replace('moubely://', ''));
+        const filename = decoded.split(/[/\\]/).pop();
+        return `http://127.0.0.1:5181/attachments/${filename}`;
+    }
+    return resolvedSrc;
+};
+
+// --- TEXT FILE PREVIEW COMPONENT ---
+const TextFilePreview = ({ url }: { url: string }) => {
+    const [text, setText] = useState<string>('Loading source...');
+    useEffect(() => {
+        fetch(url)
+            .then(res => res.text())
+            .then(data => setText(data.slice(0, 10000) + (data.length > 10000 ? '\n\n...[Truncated for Performance]' : '')))
+            .catch(() => setText('Failed to stream text content.'));
+    }, [url]);
+    return <pre className="text-[11px] font-mono text-gray-300 w-full h-full p-4 overflow-auto custom-scrollbar whitespace-pre-wrap select-text text-left">{text}</pre>;
+};
+
+// --- UNIVERSAL MEDIA LIGHTBOX COMPONENT ---
+const UniversalMediaLightbox = ({ file, onClose }: { file: { path: string, type: string, name?: string, localPath?: string }, onClose: () => void }) => {
     const [scale, setScale] = useState(1);
     const [pos, setPos] = useState({ x: 0, y: 0 });
     const isDragging = useRef(false);
     const dragStart = useRef({ x: 0, y: 0 });
+
+    const src = getResolvedMediaUrl(file);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -342,34 +375,61 @@ const ImageLightbox = ({ src, onClose }: { src: string, onClose: () => void }) =
     }, [onClose]);
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center interactive"
-            onWheel={(e) => setScale(s => Math.min(Math.max(0.5, s - e.deltaY * 0.005), 5))}
+        <div className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center interactive p-4 md:p-10"
+            onWheel={(e) => { if (file.type === 'image') setScale(s => Math.min(Math.max(0.5, s - e.deltaY * 0.005), 5)); }}
             onPointerDown={(e) => {
+                if (file.type !== 'image') return;
                 isDragging.current = true;
                 dragStart.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
             }}
             onPointerUp={() => isDragging.current = false}
             onPointerMove={(e) => {
-                if (isDragging.current) {
+                if (isDragging.current && file.type === 'image') {
                     setPos({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y });
                 }
             }}
             onPointerLeave={() => isDragging.current = false}
         >
             <div className="absolute top-4 right-4 z-50 flex gap-4">
-                <button onClick={() => { setScale(1); setPos({ x: 0, y: 0 }); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur">
-                    <Maximize size={20} />
-                </button>
-                <button onClick={onClose} className="p-2 bg-white/10 hover:bg-red-500/80 rounded-full text-white backdrop-blur">
+                {file.type === 'image' && (
+                    <button onClick={() => { setScale(1); setPos({ x: 0, y: 0 }); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur">
+                        <Maximize size={20} />
+                    </button>
+                )}
+                <button onClick={onClose} className="p-2 bg-white/10 hover:bg-red-500/80 rounded-full text-white backdrop-blur transition-colors">
                     <X size={20} />
                 </button>
             </div>
-            <img
-                src={src}
-                className="max-w-full max-h-full object-contain pointer-events-none transition-transform duration-75 ease-out"
-                style={{ transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})` }}
-                alt="Fullscreen View"
-            />
+
+            <div className="w-full h-full flex items-center justify-center overflow-hidden">
+                {file.type === 'video' ? (
+                    <video controls autoPlay src={src} className="max-w-full max-h-full rounded-lg shadow-2xl shadow-purple-500/10" />
+                ) : file.type === 'pdf' ? (
+                    <iframe src={`${src}#toolbar=1`} className="w-full h-full bg-white rounded-lg shadow-2xl" title="PDF Preview" />
+                ) : file.type === 'image' ? (
+                    <img
+                        src={src}
+                        className="max-w-full max-h-full object-contain pointer-events-none transition-transform duration-75 ease-out rounded-lg shadow-2xl"
+                        style={{ transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})` }}
+                        alt="Fullscreen View"
+                    />
+                ) : file.type === 'text' ? (
+                    <div className="w-[80vw] h-[80vh] flex items-start justify-start bg-[#1a1a1a] rounded-2xl border border-white/10 shadow-2xl relative overflow-hidden">
+                        <TextFilePreview url={src} />
+                        <div className="absolute top-4 right-6 text-xs text-white/30 font-mono select-none pointer-events-none">{file.name}</div>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center gap-6 p-20 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-2xl">
+                        <div className="p-6 bg-blue-500/10 rounded-2xl border border-blue-500/20">
+                            <Code size={64} className="text-blue-400" />
+                        </div>
+                        <div className="flex flex-col items-center gap-2">
+                            <span className="text-xl text-white font-semibold">{file.name || 'File Preview'}</span>
+                            <span className="text-xs text-gray-400 uppercase tracking-widest font-mono">Source format • {file.type}</span>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
@@ -379,8 +439,10 @@ const Queue: React.FC<any> = () => {
     const [isExpanded, setIsExpanded] = useState(false)
     const [activeTab, setActiveTab] = useState<"Chat" | "Transcript" | "Email" | "History">("Chat")
     const [isInputFocused, setIsInputFocused] = useState(false)
-    const [fullscreenImage, setFullscreenImage] = useState<string | null>(null)
+    const [fullscreenFile, setFullscreenFile] = useState<{ path: string, type: string, name?: string, localPath?: string } | null>(null)
     const [hoverImage, setHoverImage] = useState<string | null>(null)
+    const [hoverAttachment, setHoverAttachment] = useState<{ name: string, path: string, type: string, localPath?: string } | null>(null)
+    const [hoverRect, setHoverRect] = useState<DOMRect | null>(null)
     const [needsEmailGeneration, setNeedsEmailGeneration] = useState(false)
 
     const [input, setInput] = useState("")
@@ -390,6 +452,27 @@ const Queue: React.FC<any> = () => {
 
     // --- Multi-Screenshot State ---
     const [queuedScreenshots, setQueuedScreenshots] = useState<ScreenshotData[]>([]);
+    const [queuedAttachments, setQueuedAttachments] = useState<{ name: string, path: string, type: string, localPath?: string }[]>([]);
+
+    const handleAttachFile = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!window.electronAPI) return;
+        try {
+            const files = await window.electronAPI.openFilePicker();
+            if (files && files.length > 0) {
+                setQueuedAttachments(prev => [...prev, ...files]);
+            }
+        } catch (err) {
+            console.error("Failed to attach files", err);
+        }
+    };
+
+    const handleRemoveAttachedFile = (pathToRemove: string) => {
+        setQueuedAttachments(prev => prev.filter(f => f.path !== pathToRemove));
+        if (window.electronAPI && window.electronAPI.deleteChatFiles) {
+            window.electronAPI.deleteChatFiles([pathToRemove]);
+        }
+    };
 
     // --- Slow Loader State & Timer Ref ---
     const [showSlowLoader, setShowSlowLoader] = useState(false)
@@ -399,6 +482,22 @@ const Queue: React.FC<any> = () => {
     const [mode, setMode] = useState(() => sessionStorage.getItem("moubely_mode") || "General")
     const [showModeMenu, setShowModeMenu] = useState(false)
     const [isSmartMode, setIsSmartMode] = useState(false)
+
+    // --- BRAIN/GENERATION MODELS ---
+    const [selectedModel, setSelectedModel] = useState("imagen-4-generate");
+    const [showModelMenu, setShowModelMenu] = useState(false);
+    const [isArtActive, setIsArtActive] = useState(false);
+
+    const GENERATIVE_MODELS = [
+        { id: 'imagen-4.0-generate-001', name: 'Imagen 4', type: 'image' },
+        { id: 'imagen-4.0-ultra-generate-001', name: 'Imagen 4 Ultra', type: 'image' },
+        { id: 'imagen-4.0-fast-generate-001', name: 'Imagen 4 Fast', type: 'image' },
+        { id: 'gemini-2.5-flash-image', name: 'Nano Banana', type: 'image' },
+        { id: 'gemini-3-pro-image-preview', name: 'Nano Banana Pro', type: 'image' },
+        { id: 'gemini-3.1-flash-image-preview', name: 'Nano Banana 2', type: 'image' },
+        { id: 'veo-3.1-generate-preview', name: 'Veo 3.1', type: 'video' },
+        { id: 'veo-3.1-fast-generate-preview', name: 'Veo 3.1 Fast', type: 'video' },
+    ];
 
     const [isRecording, setIsRecording] = useState(false)
     const [isPaused, setIsPaused] = useState(false)
@@ -604,6 +703,15 @@ const Queue: React.FC<any> = () => {
         if (!window.electronAPI) return;
         await Promise.all(queuedScreenshots.map(img => window.electronAPI.deleteScreenshot(img.path)));
         setQueuedScreenshots([]);
+    };
+
+    const handleClearAttachments = async () => {
+        if (!window.electronAPI) return;
+        if (queuedAttachments.length > 0) {
+            const paths = queuedAttachments.map(a => a.path);
+            await window.electronAPI.deleteChatFiles(paths);
+            setQueuedAttachments([]);
+        }
     };
 
     useEffect(() => {
@@ -1283,7 +1391,7 @@ const Queue: React.FC<any> = () => {
     const deleteChat = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
         const chatToDelete = pastChats.find(c => c.id === id);
-        if (chatToDelete && window.electronAPI && window.electronAPI.deleteChatImages) {
+        if (chatToDelete && window.electronAPI && window.electronAPI.deleteChatFiles) {
             const allImagePaths: string[] = [];
             chatToDelete.messages?.forEach(m => {
                 if (m.queuedScreenshots) {
@@ -1291,7 +1399,7 @@ const Queue: React.FC<any> = () => {
                 }
             });
             if (allImagePaths.length > 0) {
-                window.electronAPI.deleteChatImages(allImagePaths);
+                window.electronAPI.deleteChatFiles(allImagePaths);
             }
         }
 
@@ -1518,10 +1626,13 @@ const Queue: React.FC<any> = () => {
         if (!window.electronAPI) return;
 
         const textToSend = overrideText || input
-        const imagesToSend = queuedScreenshots;
-        const hasImages = imagesToSend.length > 0;
+        const attachmentsToSend = [
+            ...queuedScreenshots.map(s => ({ path: s.path, type: 'image' })),
+            ...queuedAttachments
+        ];
+        const hasAttachments = attachmentsToSend.length > 0;
 
-        if (!textToSend.trim() && !hasImages) return
+        if (!textToSend.trim() && !hasAttachments) return
 
         const now = Date.now();
         const aiMsgId = `${now}-ai`;
@@ -1532,8 +1643,9 @@ const Queue: React.FC<any> = () => {
             {
                 id: userId,
                 role: "user",
-                text: textToSend || (hasImages ? `Analyze ${imagesToSend.length} screens.` : ""),
-                queuedScreenshots: hasImages ? imagesToSend : undefined,
+                text: textToSend || (hasAttachments ? `Analyze ${attachmentsToSend.length} attachments.` : ""),
+                queuedScreenshots: queuedScreenshots.length > 0 ? queuedScreenshots : undefined,
+                queuedAttachments: queuedAttachments.length > 0 ? queuedAttachments : undefined,
                 timestamp: Date.now()
             },
             {
@@ -1549,7 +1661,7 @@ const Queue: React.FC<any> = () => {
         setInput("")
 
         setIsThinking(true)
-        setThinkingStep(hasImages ? `Vision processing ${imagesToSend.length} screens...` : "Thinking...")
+        setThinkingStep(hasAttachments ? `Vision processing ${attachmentsToSend.length} attachments...` : "Thinking...")
         isAtBottomRef.current = true;
 
         setShowSlowLoader(false);
@@ -1562,32 +1674,49 @@ const Queue: React.FC<any> = () => {
             isInMeeting: isRecording || showPostMeeting,
             meetingTranscript: transcriptLogs.map(t => t.text).join("\n"),
             uploadedFilesContent: "",
-            userImage: hasImages ? imagesToSend[0].preview : undefined
+            userImage: queuedScreenshots.length > 0 ? queuedScreenshots[0].preview : undefined
         };
 
         const finalPrompt = preparePayload(textToSend, contextData);
 
         try {
             let fullResponse = "";
+            const isMediaModel = isArtActive;
+            let generatedMedia: any = null;
 
-            const args = {
-                message: finalPrompt,
-                mode: mode,
-                history: messages.map(m => ({ role: m.role, text: m.text })),
-                type: "general",
-                isCandidateMode: mode === 'Student'
-            };
-
-            if (hasImages) {
-                const imagePaths = imagesToSend.map(i => i.path);
-                fullResponse = await window.electronAPI.chatWithImage(finalPrompt, imagePaths)
+            if (isMediaModel) {
+                const activeModelObj = GENERATIVE_MODELS.find(m => m.id === selectedModel);
+                setThinkingStep(`Generating ${activeModelObj?.type || 'Art'}...`);
+                const result = await window.electronAPI.generateMedia({ prompt: textToSend, model: selectedModel });
+                generatedMedia = result;
+                fullResponse = ""; // Raw media only, no repeated text
             } else {
-                fullResponse = await window.electronAPI.invoke("gemini-chat", args)
+                const args = {
+                    message: finalPrompt,
+                    mode: mode,
+                    history: messages.map(m => ({ role: m.role, text: m.text })),
+                    type: "general",
+                    isCandidateMode: mode === 'Student'
+                };
+
+                if (hasAttachments) {
+                    fullResponse = await window.electronAPI.chatWithAttachments(finalPrompt, attachmentsToSend, "answer")
+                } else {
+                    fullResponse = await window.electronAPI.invoke("gemini-chat", args)
+                }
             }
 
-            const finalMessages = newMessages.map(m =>
-                m.id === aiMsgId ? { ...m, text: fullResponse, isStreaming: false } : m
-            );
+            const finalMessages = newMessages.map(m => {
+                if (m.id === aiMsgId) {
+                    return {
+                        ...m,
+                        text: fullResponse,
+                        isStreaming: false,
+                        queuedAttachments: generatedMedia ? [{ name: "Generated " + generatedMedia.type, path: generatedMedia.localUri, type: generatedMedia.type }] : undefined
+                    };
+                }
+                return m;
+            });
             setMessages(finalMessages);
 
             // Save to Local History
@@ -1602,8 +1731,9 @@ const Queue: React.FC<any> = () => {
             setShowSlowLoader(false);
             setIsThinking(false);
 
-            if (hasImages) {
+            if (hasAttachments) {
                 setQueuedScreenshots([]);
+                setQueuedAttachments([]);
             }
         }
     }
@@ -1650,13 +1780,13 @@ const Queue: React.FC<any> = () => {
             case "recap": userDisplayMessage = "Recap the discussion."; break;
         }
 
-        const hasImages = queuedScreenshots.length > 0;
+        const hasAttachments = queuedScreenshots.length > 0 || queuedAttachments.length > 0;
         const now = Date.now();
         const userId = `${now}-user`;
         const aiMsgId = `${now}-ai`;
 
-        if (hasImages) {
-            userDisplayMessage += " (Screenshots attached)";
+        if (hasAttachments) {
+            userDisplayMessage += " (Attachments included)";
         }
 
         const initialMessages: Message[] = [
@@ -1665,7 +1795,8 @@ const Queue: React.FC<any> = () => {
                 id: userId,
                 role: "user",
                 text: userDisplayMessage,
-                queuedScreenshots: hasImages ? [...queuedScreenshots] : undefined,
+                queuedScreenshots: queuedScreenshots.length > 0 ? [...queuedScreenshots] : undefined,
+                queuedAttachments: queuedAttachments.length > 0 ? [...queuedAttachments] : undefined,
                 timestamp: now
             },
             { id: aiMsgId, role: "ai", text: "", timestamp: now, isStreaming: true }
@@ -1678,15 +1809,19 @@ const Queue: React.FC<any> = () => {
             const isCandidateMode = actionType === 'answer' || mode === 'Student';
             let response = "";
 
-            if (hasImages) {
-                const imagePaths = queuedScreenshots.map(i => i.path);
-                // Use chatWithImage for visual context
-                response = await window.electronAPI.chatWithImage(
+            if (hasAttachments) {
+                const attachmentsToSend = [
+                    ...queuedScreenshots.map(s => ({ path: s.path, type: 'image' })),
+                    ...queuedAttachments
+                ];
+                // Use chatWithAttachments for visual context
+                response = await window.electronAPI.chatWithAttachments(
                     transcriptText || userDisplayMessage,
-                    imagePaths,
+                    attachmentsToSend,
                     actionType as any
                 );
                 setQueuedScreenshots([]);
+                setQueuedAttachments([]);
             } else {
                 response = await window.electronAPI.invoke("gemini-chat", {
                     message: transcriptText || "Context from files",
@@ -1731,7 +1866,7 @@ const Queue: React.FC<any> = () => {
         setTimeout(() => { isUrgentRef.current = false; }, 10000);
 
         // 2. Prepare Context (Images or Transcript)
-        const hasImages = queuedScreenshots.length > 0;
+        const hasAttachments = queuedScreenshots.length > 0 || queuedAttachments.length > 0;
         let contextText = transcriptLogs.map(t => t.text).join(" ");
 
         if (!contextText.trim() && messages.length > 0) {
@@ -1751,7 +1886,7 @@ const Queue: React.FC<any> = () => {
         const now = Date.now();
         const aiMsgId = `${now}-ai`;
         const userId = `${now}-user`;
-        const userDisplayMessage = hasImages ? "Solve this coding problem (Screenshots attached)." : "Solve this coding problem based on the discussion.";
+        const userDisplayMessage = hasAttachments ? "Solve this coding problem (Attachments included)." : "Solve this coding problem based on the discussion.";
 
         const initialMessages: Message[] = [
             ...messages,
@@ -1759,7 +1894,8 @@ const Queue: React.FC<any> = () => {
                 id: userId,
                 role: "user",
                 text: userDisplayMessage,
-                queuedScreenshots: hasImages ? queuedScreenshots : undefined,
+                queuedScreenshots: queuedScreenshots.length > 0 ? [...queuedScreenshots] : undefined,
+                queuedAttachments: queuedAttachments.length > 0 ? [...queuedAttachments] : undefined,
                 timestamp: now
             },
             { id: aiMsgId, role: "ai", text: "", timestamp: now, isStreaming: true }
@@ -1770,16 +1906,20 @@ const Queue: React.FC<any> = () => {
         try {
             let response = "";
 
-            if (hasImages) {
+            if (hasAttachments) {
                 // --- PATH A: VISION BRAIN (Screenshots Attached) ---
                 // Pass "solve" type so the backend uses the 6-section STAR prompt with Post-Code Analysis
-                const imagePaths = queuedScreenshots.map(i => i.path);
-                response = await window.electronAPI.chatWithImage(
-                    "Solve the coding problem shown in these images.",
-                    imagePaths,
+                const attachmentsToSend = [
+                    ...queuedScreenshots.map(s => ({ path: s.path, type: 'image' })),
+                    ...queuedAttachments
+                ];
+                response = await window.electronAPI.chatWithAttachments(
+                    "Solve the coding problem shown in these attachments.",
+                    attachmentsToSend,
                     "solve"
                 );
                 setQueuedScreenshots([]);
+                setQueuedAttachments([]);
 
             } else {
                 // --- PATH B: TEXT BRAIN (Transcript Only) ---
@@ -1812,8 +1952,8 @@ const Queue: React.FC<any> = () => {
 
     return (
         <div className={`moubely-window ${isExpanded ? 'expanded' : ''} flex flex-col h-full relative overflow-hidden`}>
-            {fullscreenImage && <ImageLightbox src={fullscreenImage} onClose={() => setFullscreenImage(null)} />}
-            {hoverImage && !fullscreenImage && (
+            {fullscreenFile && <UniversalMediaLightbox file={fullscreenFile} onClose={() => setFullscreenFile(null)} />}
+            {hoverImage && !fullscreenFile && (
                 <div className="absolute inset-0 z-[500] pointer-events-none flex items-center justify-center bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-200">
                     <img
                         src={hoverImage}
@@ -2006,20 +2146,64 @@ const Queue: React.FC<any> = () => {
                                         {messages.map((msg) => (
                                             <div key={msg.id} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                                                 {msg.role === "user" && (
-                                                    <div className={`group relative ${editingMsgId === msg.id ? 'w-full max-w-full flex justify-end' : 'max-w-[85%]'}`}>
-                                                        {msg.queuedScreenshots && msg.queuedScreenshots.length > 0 && (
-                                                            <div className={`mb-2 grid gap-2 ${msg.queuedScreenshots.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                                                {msg.queuedScreenshots.map((img, index) => (
-                                                                    <img
-                                                                        key={index}
-                                                                        src={img.preview}
-                                                                        alt={`Screenshot ${index + 1}`}
-                                                                        className="rounded-lg border border-white/10 max-w-full h-auto max-h-[200px] object-cover bg-black/20 cursor-pointer hover:opacity-90 transition-opacity"
-                                                                        onClick={(e) => { e.stopPropagation(); setFullscreenImage(img.preview); }}
-                                                                    />
-                                                                ))}
-                                                            </div>
-                                                        )}
+                                                    <div className={`group relative w-full max-w-[85%] sm:max-w-[80%] flex flex-col items-end`}>
+                                                        {(() => {
+                                                            const visualMedia = [
+                                                                ...(msg.queuedScreenshots || []).map(s => ({ preview: s.preview, originalPath: s.path, type: 'image' })),
+                                                                ...(msg.queuedAttachments || []).filter(a => a.type === 'image' || a.type === 'video').map(a => ({ preview: getResolvedMediaUrl(a), originalPath: a.path, type: a.type }))
+                                                            ];
+                                                            const textMedia = (msg.queuedAttachments || []).filter(a => a.type !== 'image' && a.type !== 'video');
+
+                                                            return (
+                                                                <>
+                                                                    {(visualMedia.length > 0 || textMedia.length > 0) && (
+                                                                        <div className="mb-3 flex flex-wrap gap-2 w-full justify-end items-start">
+                                                                            {visualMedia.map((media, index) => {
+                                                                                const sizeClass = visualMedia.length === 1 && textMedia.length === 0 ? 'w-full max-w-[400px]' : 'w-[calc(50%-4px)]';
+                                                                                return media.type === 'video' ? (
+                                                                                    <div key={index} className={`relative rounded-lg overflow-hidden border border-white/10 bg-black/20 cursor-pointer hover:opacity-90 transition-opacity shrink-0 ${sizeClass}`} onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath, localPath: media.preview, type: 'video' }); }}>
+                                                                                        <video src={media.preview} className="w-full h-[140px] sm:h-[160px] object-cover pointer-events-none" />
+                                                                                        <div className="absolute inset-0 flex items-center justify-center bg-black/30"><Play size={24} className="text-white opacity-80" /></div>
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <img
+                                                                                        key={index}
+                                                                                        src={media.preview}
+                                                                                        alt={`Visual Media ${index + 1}`}
+                                                                                        className={`rounded-lg border border-white/10 bg-black/20 cursor-pointer hover:opacity-90 transition-opacity h-[140px] sm:h-[160px] object-cover shrink-0 ${sizeClass}`}
+                                                                                        onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath, localPath: media.preview, type: 'image' }); }}
+                                                                                    />
+                                                                                );
+                                                                            })}
+
+                                                                            {textMedia.length > 0 && (
+                                                                                <div className={`flex flex-col gap-2 ${visualMedia.length === 0 ? 'w-full justify-end items-end' : 'w-[calc(50%-4px)]'} min-h-[40px] justify-start`}>
+                                                                                    {textMedia.map((file, idx) => {
+                                                                                        const useLocal = getResolvedMediaUrl(file);
+                                                                                        return (
+                                                                                            <div
+                                                                                                key={idx}
+                                                                                                className="flex shrink-0 items-center justify-between gap-2 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 shadow-sm transition-all cursor-pointer h-fit w-full"
+                                                                                                onMouseEnter={(e) => { setHoverAttachment(file); setHoverRect(e.currentTarget.getBoundingClientRect()); }}
+                                                                                                onMouseLeave={() => { setHoverAttachment(null); setHoverRect(null); }}
+                                                                                                onClick={() => setFullscreenFile({ path: file.path, localPath: useLocal, type: file.type, name: file.name })}
+                                                                                            >
+                                                                                                <div className="flex items-center gap-2 overflow-hidden">
+                                                                                                    <div className="p-1 bg-white/5 rounded-md shrink-0">
+                                                                                                        {file.type === 'pdf' ? <FileText size={14} className="text-red-400" /> : <Code size={14} className="text-blue-400" />}
+                                                                                                    </div>
+                                                                                                    <span className="text-[11px] text-gray-200 truncate font-medium leading-none">{file.name}</span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            );
+                                                        })()}
 
                                                         {editingMsgId === msg.id ? (
                                                             <div className="flex flex-col gap-3 bg-[#1a1a1a] p-3 rounded-xl border border-blue-500/50 w-[95vw] sm:w-[500px] md:w-[600px] max-w-full shadow-2xl relative z-10">
@@ -2041,11 +2225,8 @@ const Queue: React.FC<any> = () => {
                                                                 </div>
                                                             </div>
                                                         ) : (
-                                                            <>
-                                                                <div className="user-bubble text-left relative">
-                                                                    <CollapsibleUserMessage text={msg.text} />
-                                                                </div>
-                                                                <div className="absolute top-1/2 -left-16 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <div className="flex items-center gap-3 w-full justify-end">
+                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                                                     <button
                                                                         onClick={() => handleCopyUserMessage(msg.id, msg.text)}
                                                                         className={`p-1.5 transition-colors rounded-full ${copiedId === msg.id ? 'text-green-400 bg-green-400/10' : 'text-gray-500 hover:text-white bg-black/40'}`}
@@ -2054,21 +2235,62 @@ const Queue: React.FC<any> = () => {
                                                                     </button>
                                                                     <button onClick={() => handleStartEdit(msg)} className="p-1.5 text-gray-400 hover:text-white bg-black/40 rounded-full"><Edit2 size={12} /></button>
                                                                 </div>
-                                                            </>
+                                                                <div className="user-bubble text-left relative max-w-full">
+                                                                    <CollapsibleUserMessage text={msg.text} />
+                                                                </div>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 )}
                                                 {msg.role === "ai" && (
-                                                    <div className="ai-message max-w-[95%] group flex flex-col items-start space-y-1">
-                                                        <MessageContent text={msg.text} />
-                                                        <div className="flex items-center mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button
-                                                                onClick={() => handleCopyAiMessage(msg.id, msg.text)}
-                                                                className={`flex items-center gap-1.5 px-2 py-1 transition-colors rounded-md text-xs font-medium ${copiedId === msg.id ? 'text-green-400 bg-green-500/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                                                            >
-                                                                {copiedId === msg.id ? <CheckCheck size={13} /> : <Copy size={13} />}
-                                                                <span>{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
-                                                            </button>
+                                                    <div className="flex gap-4 items-start w-full">
+                                                        <div className="shrink-0 flex items-center justify-center mt-0.5">
+                                                            <img src={moubelyIcon} alt="Moubely AI" className="w-[28px] h-[28px] rounded-xl shadow-lg border border-white/10 object-contain p-0.5 bg-black/40" />
+                                                        </div>
+                                                        <div className="ai-message w-full group flex flex-col items-start space-y-1">
+                                                            {(() => {
+                                                                const visualMedia = [
+                                                                    ...(msg.queuedScreenshots || []).map(s => ({ preview: s.preview, originalPath: s.path, type: 'image' })),
+                                                                    ...(msg.queuedAttachments || []).filter(a => a.type === 'image' || a.type === 'video').map(a => ({ preview: getResolvedMediaUrl(a), originalPath: a.path, type: a.type }))
+                                                                ];
+                                                                const textMedia = (msg.queuedAttachments || []).filter(a => a.type !== 'image' && a.type !== 'video');
+
+                                                                return (
+                                                                    <>
+                                                                        {(visualMedia.length > 0 || textMedia.length > 0) && (
+                                                                            <div className="mb-3 flex flex-wrap gap-2 w-full justify-start items-start">
+                                                                                {visualMedia.map((media, index) => {
+                                                                                    const sizeClass = visualMedia.length === 1 && textMedia.length === 0 ? 'w-full max-w-[400px]' : 'w-[calc(50%-4px)]';
+                                                                                    return media.type === 'video' ? (
+                                                                                        <div key={index} className={`relative rounded-lg overflow-hidden border border-white/10 bg-black/20 cursor-pointer hover:opacity-90 transition-opacity shrink-0 ${sizeClass}`} onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath, localPath: media.preview, type: 'video' }); }}>
+                                                                                            <video src={media.preview} className="w-full h-[140px] sm:h-[160px] object-cover pointer-events-none" />
+                                                                                            <div className="absolute inset-0 flex items-center justify-center bg-black/30"><Play size={24} className="text-white opacity-80" /></div>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <img
+                                                                                            key={index}
+                                                                                            src={media.preview}
+                                                                                            alt={`Generated Media ${index + 1}`}
+                                                                                            className={`rounded-lg border border-white/10 bg-black/20 cursor-pointer hover:opacity-90 transition-opacity h-[140px] sm:h-[160px] object-cover shrink-0 ${sizeClass}`}
+                                                                                            onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath, localPath: media.preview, type: 'image' }); }}
+                                                                                        />
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        )}
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                            <MessageContent text={msg.text} />
+                                                            <div className="flex items-center mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button
+                                                                    onClick={() => handleCopyAiMessage(msg.id, msg.text)}
+                                                                    className={`flex items-center gap-1.5 px-2 py-1 transition-colors rounded-md text-xs font-medium ${copiedId === msg.id ? 'text-green-400 bg-green-500/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                >
+                                                                    {copiedId === msg.id ? <CheckCheck size={13} /> : <Copy size={13} />}
+                                                                    <span>{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 )}
@@ -2299,7 +2521,7 @@ const Queue: React.FC<any> = () => {
                                                     src={img.preview}
                                                     className="w-10 h-8 rounded object-cover border border-white/10 cursor-pointer hover:opacity-80 transition-opacity"
                                                     alt={`Queued Image ${index + 1}`}
-                                                    onClick={(e) => { e.stopPropagation(); setFullscreenImage(img.preview); setHoverImage(null); }}
+                                                    onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: img.preview, type: 'image', localPath: img.path }); setHoverImage(null); }}
                                                     onMouseEnter={() => setHoverImage(img.preview)}
                                                     onMouseLeave={() => setHoverImage(null)}
                                                 />
@@ -2320,34 +2542,218 @@ const Queue: React.FC<any> = () => {
                                     </div>
                                 )}
 
-                                <div className="relative mb-3 w-full">
-                                    <textarea ref={textareaRef} value={input} onFocus={handleInputFocus} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); handleSend(); } }} onPaste={async (e) => {
-                                        const items = e.clipboardData?.items;
-                                        if (!items) return;
-                                        for (let i = 0; i < items.length; i++) {
-                                            if (items[i].type.indexOf('image') !== -1) {
-                                                e.preventDefault();
-                                                const file = items[i].getAsFile();
-                                                if (file && window.electronAPI && window.electronAPI.saveChatImage) {
-                                                    const arrayBuffer = await file.arrayBuffer();
-                                                    const ext = file.name.split('.').pop() || 'png';
-                                                    try {
-                                                        const protocolUrl = await window.electronAPI.saveChatImage(arrayBuffer, ext);
-                                                        setQueuedScreenshots(prev => {
-                                                            const newQueue = [...prev, { path: protocolUrl, preview: protocolUrl }];
-                                                            if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
-                                                            return newQueue;
-                                                        });
-                                                    } catch (err) { console.error("Failed to save pasted image", err); }
+                                {queuedAttachments.length > 0 && (
+                                    <div className="mb-3 flex items-center gap-3 p-2 bg-white/5 border border-white/10 rounded-xl overflow-x-auto w-full">
+                                        <span className="text-xs text-gray-400 font-medium whitespace-nowrap">{queuedAttachments.length} attached:</span>
+                                        {queuedAttachments.map((file) => {
+                                            const isVideo = file.type === 'video';
+                                            const isPDF = file.type === 'pdf';
+                                            const isImage = file.type === 'image';
+                                            const isCode = file.type === 'text' && (file.name.endsWith('.js') || file.name.endsWith('.ts') || file.name.endsWith('.py') || file.name.endsWith('.cs'));
+
+                                            return (
+                                                <div
+                                                    key={file.path}
+                                                    className="relative group shrink-0 flex items-center justify-between border border-white/5 bg-white/10 rounded-lg hover:bg-white/20 transition-colors pr-2"
+                                                >
+                                                    <div
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-lg cursor-pointer"
+                                                        onMouseEnter={(e) => { setHoverAttachment(file); setHoverRect(e.currentTarget.getBoundingClientRect()); }}
+                                                        onMouseLeave={() => { setHoverAttachment(null); setHoverRect(null); }}
+                                                        onClick={() => setFullscreenFile({ ...file, localPath: file.localPath || file.path })}
+                                                    >
+                                                        {isVideo ? <Video size={14} className="text-purple-400 drop-shadow-sm" /> :
+                                                            isPDF ? <FileText size={14} className="text-red-400 drop-shadow-sm" /> :
+                                                                isImage ? <Image size={14} className="text-emerald-400 drop-shadow-sm" /> :
+                                                                    isCode ? <Code size={14} className="text-blue-400 drop-shadow-sm" /> :
+                                                                        <FileText size={14} className="text-gray-400" />}
+                                                        <span className="text-[10px] text-gray-200 max-w-[80px] truncate">{file.name}</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleRemoveAttachedFile(file.path); }}
+                                                        className="absolute -top-2 -right-2 p-0.5 bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                                                    >
+                                                        <X size={10} className="text-white" />
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                        <button
+                                            onClick={handleClearAttachments}
+                                            className="flex items-center gap-1 text-red-400 text-xs hover:text-red-300 transition-colors whitespace-nowrap ml-auto"
+                                        >
+                                            <Trash2 size={12} /> Clear All
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* UNIVERSAL HOVER PREVIEW PORTAL */}
+                                {hoverAttachment && (
+                                    <div
+                                        className="fixed z-50 pointer-events-none animate-in fade-in zoom-in-95 duration-200"
+                                        style={(() => {
+                                            if (!hoverRect) return { bottom: '140px', left: '50%', transform: 'translateX(-50%)' };
+                                            const margin = 12;
+                                            const windowHeight = window.innerHeight;
+                                            const windowWidth = window.innerWidth;
+                                            const previewWidth = 320;
+
+                                            // Prefer LEFT if trigger is on the right half of the screen
+                                            const isOnRight = hoverRect.left > windowWidth / 2;
+
+                                            let style: React.CSSProperties = { position: 'fixed' };
+
+                                            if (isOnRight) {
+                                                // Place to the left of the pill
+                                                style.right = `${windowWidth - hoverRect.left + margin}px`;
+                                                style.bottom = `${Math.min(windowHeight - hoverRect.bottom, windowHeight - 320)}px`;
+                                            } else {
+                                                // Place above the pill (for queue mostly)
+                                                style.bottom = `${windowHeight - hoverRect.top + margin}px`;
+                                                style.left = `${Math.max(margin, Math.min(hoverRect.left, windowWidth - previewWidth - margin))}px`;
+                                            }
+
+                                            return style;
+                                        })()}
+                                    >
+                                        <div className="bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-w-[320px] w-screen">
+                                            <div className="w-full aspect-video bg-black/40 flex items-center justify-center overflow-hidden">
+                                                {(() => {
+                                                    const hoverSrc = getResolvedMediaUrl(hoverAttachment);
+
+                                                    if (hoverAttachment.type === 'video') {
+                                                        return (
+                                                            <video
+                                                                src={hoverSrc}
+                                                                autoPlay
+                                                                muted
+                                                                loop
+                                                                className="w-full h-full object-contain"
+                                                            />
+                                                        );
+                                                    } else if (hoverAttachment.type === 'pdf') {
+                                                        return (
+                                                            <iframe
+                                                                src={`${hoverSrc}#toolbar=0&view=FitH`}
+                                                                className="w-full h-full border-none pointer-events-none scale-[1.0] origin-top bg-white"
+                                                                title="PDF Hover"
+                                                            />
+                                                        );
+                                                    } else if (hoverAttachment.type === 'image') {
+                                                        return (
+                                                            <img
+                                                                src={hoverSrc}
+                                                                className="w-full h-full object-contain shadow-inner"
+                                                                alt="Preview"
+                                                            />
+                                                        );
+                                                    } else if (hoverAttachment.type === 'text') {
+                                                        return <TextFilePreview url={hoverSrc} />;
+                                                    } else {
+                                                        return (
+                                                            <div className="flex flex-col items-center gap-2 p-10">
+                                                                <Code size={40} className="text-blue-500 opacity-40" />
+                                                                <span className="text-[10px] text-gray-500 font-mono">Source File</span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                })()}
+                                            </div>
+                                            <div className="p-3 border-t border-white/5 flex flex-col gap-1">
+                                                <span className="text-xs text-white font-semibold truncate leading-none">{hoverAttachment.name}</span>
+                                                <span className="text-[9px] text-gray-500 uppercase tracking-widest font-bold">
+                                                    {hoverAttachment.type.replace('_', ' ')}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="mb-3 w-full bg-white/5 hover:bg-white/10 focus-within:bg-white/10 border border-white/10 focus-within:border-white/20 rounded-2xl transition-all shadow-lg flex items-center px-1">
+                                    <div className="flex items-center gap-1 px-1 shrink-0">
+                                        <button onClick={handleAttachFile} className="p-2 text-gray-400 hover:text-blue-400 cursor-pointer transition-colors" title={isStealth ? undefined : "Attach File"}>
+                                            <Plus size={18} />
+                                        </button>
+
+                                        <div className="relative flex items-center">
+                                            <button
+                                                onClick={() => {
+                                                    if (isArtActive) {
+                                                        setIsArtActive(false);
+                                                        setShowModelMenu(false);
+                                                    } else {
+                                                        setShowModelMenu(!showModelMenu);
+                                                    }
+                                                }}
+                                                className={`p-2 rounded-xl transition-all ${isArtActive
+                                                    ? 'text-yellow-400 bg-yellow-400/10 shadow-[0_0_15px_rgba(250,204,21,0.2)] active-art-pulse'
+                                                    : 'text-gray-500 hover:text-white hover:bg-white/5'
+                                                    }`}
+                                                title={isStealth ? undefined : (isArtActive ? "Reset to Text Mode" : "Generate Art & Video")}
+                                            >
+                                                <Sparkles size={18} />
+                                            </button>
+
+                                            {showModelMenu && (
+                                                <div className="absolute bottom-full left-0 mb-4 w-56 bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1 z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2">
+                                                    <div className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1 bg-white/5">Studio Models</div>
+                                                    {GENERATIVE_MODELS.map((m) => (
+                                                        <button
+                                                            key={m.id}
+                                                            onClick={() => {
+                                                                setSelectedModel(m.id);
+                                                                setIsArtActive(true);
+                                                                setShowModelMenu(false);
+                                                            }}
+                                                            className={`w-full text-left px-4 py-2.5 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${selectedModel === m.id && isArtActive ? 'text-blue-400 bg-white/10' : 'text-gray-300 hover:text-white'}`}
+                                                        >
+                                                            <span>{m.name}</span>
+                                                            <span className="text-[9px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">{m.type}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <textarea
+                                        ref={textareaRef}
+                                        value={input}
+                                        onFocus={handleInputFocus}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); handleSend(); } }}
+                                        onPaste={async (e) => {
+                                            const items = e.clipboardData?.items;
+                                            if (!items) return;
+                                            for (let i = 0; i < items.length; i++) {
+                                                if (items[i].type.indexOf('image') !== -1) {
+                                                    e.preventDefault();
+                                                    const file = items[i].getAsFile();
+                                                    if (file && window.electronAPI && window.electronAPI.saveChatFile) {
+                                                        const arrayBuffer = await file.arrayBuffer();
+                                                        const ext = file.name.split('.').pop() || 'png';
+                                                        try {
+                                                            const protocolUrl = await window.electronAPI.saveChatFile(arrayBuffer, ext);
+                                                            setQueuedScreenshots(prev => {
+                                                                const newQueue = [...prev, { path: protocolUrl, preview: protocolUrl }];
+                                                                if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
+                                                                return newQueue;
+                                                            });
+                                                        } catch (err) { console.error("Failed to save pasted image", err); }
+                                                    }
                                                 }
                                             }
-                                        }
-                                    }} placeholder={showPostMeeting ? "Ask about the meeting..." : "Ask about your screen..."} rows={1} className="w-full bg-white/5 hover:bg-white/10 focus:bg-white/10 border border-white/10 focus:border-white/20 rounded-2xl px-5 py-4 pr-24 text-sm text-gray-100 placeholder-gray-500 outline-none transition-all shadow-lg resize-none overflow-y-auto" style={{ minHeight: '52px', maxHeight: '150px' }} />
+                                        }}
+                                        placeholder={showPostMeeting ? "Ask about the meeting..." : "Ask about your screen..."}
+                                        rows={1}
+                                        className="flex-1 bg-transparent py-4 px-2 text-sm text-gray-100 placeholder-gray-500 outline-none resize-none overflow-y-auto"
+                                        style={{ minHeight: '52px', maxHeight: '150px' }}
+                                    />
 
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                    <div className="flex items-center gap-1.5 px-3 shrink-0">
                                         <button
                                             onClick={toggleDictation}
-                                            className={`p-2 rounded-full transition-colors relative flex items-center justify-center ${isDictating
+                                            className={`p-2 rounded-full transition-colors flex items-center justify-center ${isDictating
                                                 ? 'text-[#60a5fa] bg-[#60a5fa]/10 gemini-mic-active'
                                                 : 'hover:bg-white/10 text-gray-400 hover:text-white'
                                                 }`}
@@ -2365,7 +2771,7 @@ const Queue: React.FC<any> = () => {
                                                 <div className="w-3.5 h-3.5 bg-current rounded-[2px]" />
                                             </button>
                                         ) : (
-                                            (input.length > 0 || queuedScreenshots.length > 0) && (
+                                            (input.length > 0 || queuedScreenshots.length > 0 || queuedAttachments.length > 0) && (
                                                 <button onClick={() => handleSend()} className="p-2 bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors">
                                                     <Send size={16} className="text-white" />
                                                 </button>

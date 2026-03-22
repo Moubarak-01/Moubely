@@ -1,8 +1,7 @@
 import path from "node:path"
 import fs from "node:fs"
-import { app } from "electron"
+import { app, desktopCapturer, screen } from "electron"
 import { v4 as uuidv4 } from "uuid"
-import screenshot from "screenshot-desktop"
 import sharp from "sharp"
 
 export class ScreenshotHelper {
@@ -98,7 +97,27 @@ export class ScreenshotHelper {
       const targetDir = this.view === "queue" ? this.screenshotDir : this.extraScreenshotDir;
       const screenshotPath = path.join(targetDir, `${uuidv4()}.png`)
 
-      await screenshot({ filename: screenshotPath })
+      // NATIVE ELECTRON CAPTURE (Bypasses Device Guard .exe blocking)
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const scaleFactor = primaryDisplay.scaleFactor;
+      const width = primaryDisplay.size.width * scaleFactor;
+      const height = primaryDisplay.size.height * scaleFactor;
+
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width, height }
+      });
+
+      if (!sources || sources.length === 0) {
+        throw new Error("No screens found to capture.");
+      }
+
+      // Grab the primary screen (usually the first one)
+      const source = sources[0];
+      const imageBuffer = source.thumbnail.toPNG();
+
+      fs.writeFileSync(screenshotPath, imageBuffer);
+
       return screenshotPath
     } catch (error: any) {
       console.error("[ScreenshotHelper] ❌ Error taking screenshot:", error)
