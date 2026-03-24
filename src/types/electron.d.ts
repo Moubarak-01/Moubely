@@ -66,6 +66,9 @@ export interface ElectronAPI {
   switchToGemini: (key?: string) => Promise<any>
   testLlmConnection: () => Promise<any>
 
+  downloadMedia: (url: string, filename: string) => Promise<{ success: boolean; path?: string; error?: string }>
+  resetSavePath: () => Promise<{ success: boolean; error?: string }>
+
   // Live Mode removed
 }
 

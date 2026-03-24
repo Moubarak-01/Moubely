@@ -360,4 +360,76 @@ export function initializeIpcHandlers(appState: AppState) {
       return { success: false, error: error.message };
     }
   });
+
+  // --- 7. DOWNLOAD HANDLERS ---
+  ipcMain.handle('download-media', async (event, { url, filename }) => {
+    try {
+      const userDataPath = app.getPath('userData');
+      const settingsPath = path.join(userDataPath, 'moubely_settings.json');
+      let settings: any = {};
+      if (fs.existsSync(settingsPath)) {
+        settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+      }
+
+      let savePath = settings.downloadPath;
+
+      if (!savePath || !fs.existsSync(savePath)) {
+        const result: any = await dialog.showOpenDialog({
+          title: 'Select Download Folder',
+          properties: ['openDirectory']
+        });
+
+        if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+          return { success: false, error: 'Download canceled: No folder selected.' };
+        }
+
+        savePath = result.filePaths[0];
+        settings.downloadPath = savePath;
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+        logIPC('download-media', `New save path set: ${savePath}`);
+      }
+
+      // Resolve the source file path
+      let sourceFilePath = "";
+      if (url.startsWith('moubely-local://')) {
+        sourceFilePath = decodeURIComponent(url.replace('moubely-local://', ''));
+      } else if (url.startsWith('moubely://')) {
+        // Fix: correctly handle the two-slash/three-slash variation and local protocol mapping
+        const pathPart = url.replace('moubely://', '');
+        sourceFilePath = path.join(userDataPath, 'moubely_attachments', pathPart);
+      } else {
+        sourceFilePath = url;
+      }
+
+      if (!fs.existsSync(sourceFilePath)) {
+        return { success: false, error: `Source file not found: ${sourceFilePath}` };
+      }
+
+      const destPath = path.join(savePath, filename);
+      fs.copyFileSync(sourceFilePath, destPath);
+
+      logIPC('download-media', `✅ Downloaded to: ${destPath}`);
+      return { success: true, path: destPath };
+    } catch (error: any) {
+      console.error(`[IPC ⚡] ❌ Download Failed:`, error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('reset-save-path', async () => {
+    try {
+      const userDataPath = app.getPath('userData');
+      const settingsPath = path.join(userDataPath, 'moubely_settings.json');
+      if (fs.existsSync(settingsPath)) {
+        const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        delete settings.downloadPath;
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+        logIPC('reset-save-path', '✅ Path cleared');
+      }
+      return { success: true };
+    } catch (error: any) {
+      console.error(`[IPC ⚡] ❌ Reset Path Failed:`, error);
+      return { success: false, error: error.message };
+    }
+  });
 }

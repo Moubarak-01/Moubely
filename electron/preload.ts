@@ -97,4 +97,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   togglePrivateMode: () => ipcRenderer.invoke("toggle-private-mode"),
   getPrivateMode: () => ipcRenderer.invoke("get-private-mode"),
   getBackgroundCursor: () => ipcRenderer.invoke("get-background-cursor"),
+
+  downloadMedia: (url: string, filename: string) => ipcRenderer.invoke("download-media", { url, filename }),
+  resetSavePath: () => ipcRenderer.invoke("reset-save-path"),
 })

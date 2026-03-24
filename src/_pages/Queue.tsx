@@ -7,7 +7,7 @@ import {
     Scaling, Copy, Check, CheckCheck, Trash2, Mail,
     Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
     Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw, Plus, Maximize,
-    Video, Image, Code, Maximize2
+    Video, Image, Code, Maximize2, Download
 } from "lucide-react"
 import moubelyIcon from "../../assets/Moubely_icon.png"
 
@@ -18,6 +18,9 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/atom-one-dark.css';
+
+import 'highlight.js/styles/atom-one-dark.css';
+import { SkeletonMedia } from "../components/ui/SkeletonMedia";
 
 // --- TYPES ---
 interface ScreenshotData {
@@ -33,6 +36,7 @@ interface Message {
     queuedAttachments?: { name: string; path: string; type: string, localPath?: string }[];
     timestamp: number
     isStreaming?: boolean
+    isMedia?: boolean
 }
 
 interface TranscriptItem {
@@ -57,6 +61,7 @@ interface ChatSession {
     response: string;
     messages?: Message[];
     images?: ScreenshotData[];
+    lastMedia?: { path: string; type: string; localPath?: string };
 }
 
 interface ChatContext {
@@ -342,6 +347,12 @@ const getResolvedMediaUrl = (file: { path: string, localPath?: string }): string
         const filename = decoded.split(/[/\\]/).pop();
         return `http://127.0.0.1:5181/attachments/${filename}`;
     }
+
+    // Fallback: If it's an absolute local path without a protocol, wrap it in moubely-local://
+    if (!resolvedSrc.startsWith('http') && !resolvedSrc.startsWith('moubely') && !resolvedSrc.startsWith('data:') && (resolvedSrc.includes(':') || resolvedSrc.startsWith('/') || resolvedSrc.startsWith('\\'))) {
+        return `moubely-local://${encodeURIComponent(resolvedSrc)}`;
+    }
+
     return resolvedSrc;
 };
 
@@ -358,7 +369,12 @@ const TextFilePreview = ({ url }: { url: string }) => {
 };
 
 // --- UNIVERSAL MEDIA LIGHTBOX COMPONENT ---
-const UniversalMediaLightbox = ({ file, onClose }: { file: { path: string, type: string, name?: string, localPath?: string }, onClose: () => void }) => {
+const UniversalMediaLightbox = ({ file, onClose, onDownload, savedId }: {
+    file: { path: string, type: string, name?: string, localPath?: string },
+    onClose: () => void,
+    onDownload: (url: string, name: string, id: string) => void,
+    savedId: string | null
+}) => {
     const [scale, setScale] = useState(1);
     const [pos, setPos] = useState({ x: 0, y: 0 });
     const isDragging = useRef(false);
@@ -394,6 +410,15 @@ const UniversalMediaLightbox = ({ file, onClose }: { file: { path: string, type:
                 {file.type === 'image' && (
                     <button onClick={() => { setScale(1); setPos({ x: 0, y: 0 }); }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur">
                         <Maximize size={20} />
+                    </button>
+                )}
+                {(file.type === 'image' || file.type === 'video') && (
+                    <button
+                        onClick={() => onDownload(file.localPath || file.path, file.name || 'exported_media', 'lightbox')}
+                        className={`p-2 rounded-full backdrop-blur transition-all ${savedId === 'lightbox' ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                        title="Save to folder"
+                    >
+                        {savedId === 'lightbox' ? <Check size={20} /> : <Download size={20} />}
                     </button>
                 )}
                 <button onClick={onClose} className="p-2 bg-white/10 hover:bg-red-500/80 rounded-full text-white backdrop-blur transition-colors">
@@ -449,6 +474,9 @@ const Queue: React.FC<any> = () => {
     const [messages, setMessages] = useState<Message[]>([])
     const [isThinking, setIsThinking] = useState(false)
     const [thinkingStep, setThinkingStep] = useState("")
+
+    // --- DOWNLOAD FEEDBACK ---
+    const [savedId, setSavedId] = useState<string | null>(null);
 
     // --- Multi-Screenshot State ---
     const [queuedScreenshots, setQueuedScreenshots] = useState<ScreenshotData[]>([]);
@@ -1300,31 +1328,56 @@ const Queue: React.FC<any> = () => {
         );
 
         const aiMsgId = `${Date.now()}-ai`;
-        initialMessages.push({ id: aiMsgId, role: "ai", text: "", timestamp: Date.now(), isStreaming: true });
+        initialMessages.push({
+            id: aiMsgId,
+            role: "ai",
+            text: "",
+            timestamp: Date.now(),
+            isStreaming: true,
+            isMedia: isArtActive
+        });
 
         setMessages(initialMessages);
 
         setIsThinking(true);
-        setThinkingStep("Regenerating response...");
+        setThinkingStep(isArtActive ? "Generating Art..." : "Regenerating response...");
 
-        // Prepare context similar to handleSend
         const contextData = {
             isInMeeting: isRecording || showPostMeeting,
             meetingTranscript: transcriptLogs.map(t => t.text).join("\n"),
             uploadedFilesContent: "",
-            userImage: undefined // Images probably attached to the message? Simplified for now.
+            userImage: undefined
         };
         const finalPrompt = preparePayload(editText, contextData);
 
         try {
-            const response = await window.electronAPI.invoke("gemini-chat", {
-                message: finalPrompt,
-                mode: mode,
-                history: messages.slice(0, msgIndex).map(m => ({ role: m.role, text: m.text })),
-                type: "general",
-                isCandidateMode: mode === 'Student'
+            let fullResponse = "";
+            let generatedMedia = null;
+
+            if (isArtActive) {
+                const result = await window.electronAPI.generateMedia({ prompt: editText, model: selectedModel });
+                generatedMedia = result;
+            } else {
+                fullResponse = await window.electronAPI.invoke("gemini-chat", {
+                    message: finalPrompt,
+                    mode: mode,
+                    history: initialMessages.slice(0, -1).map(m => ({ role: m.role, text: m.text })),
+                    type: "general",
+                    isCandidateMode: mode === 'Student'
+                });
+            }
+
+            const finalMessages = initialMessages.map(m => {
+                if (m.id === aiMsgId) {
+                    return {
+                        ...m,
+                        text: fullResponse,
+                        isStreaming: false,
+                        queuedAttachments: generatedMedia ? [{ name: "Generated " + generatedMedia.type, path: generatedMedia.localUri, type: generatedMedia.type }] : undefined
+                    };
+                }
+                return m;
             });
-            const finalMessages = initialMessages.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m);
             setMessages(finalMessages);
             saveChatToHistory(finalMessages);
         } catch (e: any) {
@@ -1406,6 +1459,38 @@ const Queue: React.FC<any> = () => {
         const u = pastChats.filter(c => c.id !== id);
         setPastChats(u);
         localStorage.setItem('moubely_chats', JSON.stringify(u));
+    };
+
+    const handleDownloadMedia = async (url: string, promptText: string, msgId?: string) => {
+        if (!window.electronAPI) return;
+        const filenamePrefix = promptText
+            .toLowerCase()
+            .replace(/[^a-z0-9\s]/g, '')
+            .split(/\s+/)
+            .filter(w => w.length > 0)
+            .slice(0, 5)
+            .join('_');
+        const extension = url.toLowerCase().endsWith('mp4') ? 'mp4' : 'jpg';
+        const filename = `${filenamePrefix || 'generated_media'}_${Date.now()}.${extension}`;
+        try {
+            const result = await window.electronAPI.downloadMedia(url, filename);
+            if (result.success) {
+                if (msgId) {
+                    setSavedId(msgId);
+                    setTimeout(() => setSavedId(null), 2000);
+                }
+            } else if (result.error && !result.error.includes('canceled')) {
+                console.error("Download failed:", result.error);
+            }
+        } catch (e) {
+            console.error("Download execution error:", e);
+        }
+    };
+
+    const handleResetDownloadPath = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!window.electronAPI) return;
+        await window.electronAPI.resetSavePath();
     };
 
     const handleClearLoadedSession = () => {
@@ -1571,9 +1656,17 @@ const Queue: React.FC<any> = () => {
         const firstUserMessage = presetTitle || messagesToSave.find(m => m.role === 'user')?.text || "Chat Session";
         const lastAiMessage = messagesToSave.filter(m => m.role === 'ai').pop()?.text || "";
 
+        // Extract last generated media for thumbnail preview
+        const lastMediaMsg = [...messagesToSave].reverse().find(m => m.role === 'ai' && m.queuedAttachments && m.queuedAttachments.length > 0);
+        const lastMedia = lastMediaMsg && lastMediaMsg.queuedAttachments ? {
+            path: lastMediaMsg.queuedAttachments[0].path,
+            type: lastMediaMsg.queuedAttachments[0].type,
+            localPath: lastMediaMsg.queuedAttachments[0].localPath
+        } : undefined;
+
         let activeSessionId = sessionIdArg !== undefined ? sessionIdArg : loadedSessionId;
 
-        // If not loaded from history, create a new session
+        // If not loaded from history and not already initialized eagerly, create a new session
         if (!activeSessionId) {
             activeSessionId = Date.now().toString();
             setLoadedSessionId(activeSessionId);
@@ -1588,7 +1681,8 @@ const Queue: React.FC<any> = () => {
                 updated[existingIndex] = {
                     ...updated[existingIndex],
                     response: lastAiMessage,
-                    messages: messagesToSave
+                    messages: messagesToSave,
+                    lastMedia: lastMedia || updated[existingIndex].lastMedia
                 };
                 localStorage.setItem('moubely_chats', JSON.stringify(updated));
                 return updated;
@@ -1599,7 +1693,8 @@ const Queue: React.FC<any> = () => {
                     date: parseInt(activeSessionId) || Date.now(),
                     prompt: firstUserMessage,
                     response: lastAiMessage,
-                    messages: messagesToSave
+                    messages: messagesToSave,
+                    lastMedia: lastMedia
                 };
                 const updated = [newChat, ...prev];
                 localStorage.setItem('moubely_chats', JSON.stringify(updated));
@@ -1633,6 +1728,15 @@ const Queue: React.FC<any> = () => {
         const hasAttachments = attachmentsToSend.length > 0;
 
         if (!textToSend.trim() && !hasAttachments) return
+        if (isThinking) return;
+
+        // Eager Session Initialization
+        let currentSessionId = loadedSessionId;
+        if (!currentSessionId) {
+            currentSessionId = Date.now().toString();
+            setLoadedSessionId(currentSessionId);
+            setLoadedSessionType("Chat");
+        }
 
         const now = Date.now();
         const aiMsgId = `${now}-ai`;
@@ -1653,7 +1757,8 @@ const Queue: React.FC<any> = () => {
                 role: "ai",
                 text: "",
                 timestamp: Date.now(),
-                isStreaming: true
+                isStreaming: true,
+                isMedia: isArtActive
             }
         ];
 
@@ -1746,6 +1851,16 @@ const Queue: React.FC<any> = () => {
         isUrgentRef.current = true;
         // Reset back to Casual after 10s
         setTimeout(() => { isUrgentRef.current = false; }, 10000);
+
+        if (isThinking) return;
+
+        // Eager Session Initialization
+        let currentSessionId = loadedSessionId;
+        if (!currentSessionId) {
+            currentSessionId = Date.now().toString();
+            setLoadedSessionId(currentSessionId);
+            setLoadedSessionType("Chat");
+        }
 
         // 1. Get Context
         let transcriptText = transcriptLogs.map(t => t.text).join(" ");
@@ -1865,6 +1980,16 @@ const Queue: React.FC<any> = () => {
         isUrgentRef.current = true;
         setTimeout(() => { isUrgentRef.current = false; }, 10000);
 
+        if (isThinking) return;
+
+        // Eager Session Initialization
+        let currentSessionId = loadedSessionId;
+        if (!currentSessionId) {
+            currentSessionId = Date.now().toString();
+            setLoadedSessionId(currentSessionId);
+            setLoadedSessionType("Chat");
+        }
+
         // 2. Prepare Context (Images or Transcript)
         const hasAttachments = queuedScreenshots.length > 0 || queuedAttachments.length > 0;
         let contextText = transcriptLogs.map(t => t.text).join(" ");
@@ -1952,7 +2077,14 @@ const Queue: React.FC<any> = () => {
 
     return (
         <div className={`moubely-window ${isExpanded ? 'expanded' : ''} flex flex-col h-full relative overflow-hidden`}>
-            {fullscreenFile && <UniversalMediaLightbox file={fullscreenFile} onClose={() => setFullscreenFile(null)} />}
+            {fullscreenFile && (
+                <UniversalMediaLightbox
+                    file={fullscreenFile}
+                    onClose={() => setFullscreenFile(null)}
+                    onDownload={handleDownloadMedia}
+                    savedId={savedId}
+                />
+            )}
             {hoverImage && !fullscreenFile && (
                 <div className="absolute inset-0 z-[500] pointer-events-none flex items-center justify-center bg-black/50 backdrop-blur-[2px] animate-in fade-in duration-200">
                     <img
@@ -2084,42 +2216,48 @@ const Queue: React.FC<any> = () => {
                         <div className="flex justify-center items-center gap-3 px-3 py-3 border-b border-white/5 bg-black/20 shrink-0 overflow-x-auto no-scrollbar">
                             <button
                                 onClick={() => triggerAssistAction("assist")}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 text-xs font-medium transition-colors border border-blue-500/10"
+                                disabled={isThinking}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 text-xs font-medium transition-colors border border-blue-500/10 ${isThinking ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <Sparkles size={13} /> <span>Assist</span>
                             </button>
 
                             <button
                                 onClick={() => triggerAssistAction("reply")}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-medium transition-colors border border-emerald-500/10"
+                                disabled={isThinking}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-medium transition-colors border border-emerald-500/10 ${isThinking ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <MessageCircle size={13} /> <span>Reply</span>
                             </button>
 
                             <button
                                 onClick={() => triggerAssistAction("answer")}
-                                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 text-xs font-bold transition-all border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)] ring-1 ring-purple-500/20"
+                                disabled={isThinking}
+                                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 text-xs font-bold transition-all border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)] ring-1 ring-purple-500/20 ${isThinking ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <Zap size={13} className="fill-purple-400/50" /> <span>Answer</span>
                             </button>
 
                             <button
                                 onClick={triggerSolveAction}
-                                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 text-xs font-bold transition-all border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/20"
+                                disabled={isThinking}
+                                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 text-xs font-bold transition-all border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/20 ${isThinking ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <Terminal size={13} className="fill-indigo-400/50" /> <span>Solve</span>
                             </button>
 
                             <button
                                 onClick={() => triggerAssistAction("ask")}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 text-xs font-medium transition-colors border border-orange-500/10"
+                                disabled={isThinking}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 text-xs font-medium transition-colors border border-orange-500/10 ${isThinking ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <HelpCircle size={13} /> <span>Ask</span>
                             </button>
 
                             <button
                                 onClick={() => triggerAssistAction("recap")}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium transition-colors border border-white/5"
+                                disabled={isThinking}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium transition-colors border border-white/5 ${isThinking ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <FileText size={13} /> <span>Recap</span>
                             </button>
@@ -2257,6 +2395,11 @@ const Queue: React.FC<any> = () => {
 
                                                                 return (
                                                                     <>
+                                                                        {msg.isStreaming && msg.isMedia && (
+                                                                            <div className="mb-3 w-full max-w-[400px]">
+                                                                                <SkeletonMedia type={GENERATIVE_MODELS.find(m => m.id === selectedModel)?.type as any || 'image'} />
+                                                                            </div>
+                                                                        )}
                                                                         {(visualMedia.length > 0 || textMedia.length > 0) && (
                                                                             <div className="mb-3 flex flex-wrap gap-2 w-full justify-start items-start">
                                                                                 {visualMedia.map((media, index) => {
@@ -2290,13 +2433,24 @@ const Queue: React.FC<any> = () => {
                                                                     {copiedId === msg.id ? <CheckCheck size={13} /> : <Copy size={13} />}
                                                                     <span>{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
                                                                 </button>
+                                                                {msg.queuedAttachments && msg.queuedAttachments.length > 0 && (
+                                                                    <button
+                                                                        onClick={() => handleDownloadMedia(msg.queuedAttachments![0].path, msg.text, msg.id)}
+                                                                        onContextMenu={handleResetDownloadPath}
+                                                                        className={`flex items-center gap-1.5 px-2 py-1 transition-colors rounded-md text-xs font-medium ${savedId === msg.id ? 'text-green-400 bg-green-500/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                        title="Download (Right-click to reset folder)"
+                                                                    >
+                                                                        {savedId === msg.id ? <Check size={13} /> : <Download size={13} />}
+                                                                        <span>{savedId === msg.id ? 'Saved!' : 'Save'}</span>
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
                                                 )}
                                             </div>
                                         ))}
-                                        {showSlowLoader && (
+                                        {showSlowLoader && !isArtActive && (
                                             <div className="flex items-center gap-3 text-sm text-gray-400 pl-1">
                                                 <Loader2 size={16} className="animate-spin text-blue-400" />
                                                 <span className="animate-pulse">{thinkingStep}</span>
@@ -2408,8 +2562,34 @@ const Queue: React.FC<any> = () => {
                                                             )}
                                                         </div>
                                                         {expandedChats[chat.id] && (
-                                                            <div className="mt-4 pt-4 border-t border-white/10 animate-in fade-in slide-in-from-top-2 duration-200">
-                                                                <div className="bg-black/40 rounded-lg p-4 border border-white/5 text-sm overflow-x-auto">
+                                                            <div className="mt-4 pt-4 border-t border-white/10 animate-in fade-in slide-in-from-top-2 duration-200 flex flex-col items-center">
+                                                                {chat.lastMedia && (
+                                                                    <div 
+                                                                        className="mb-6 w-full max-w-[400px] aspect-video sm:aspect-auto sm:min-h-[200px] rounded-2xl overflow-hidden border border-white/10 bg-black/40 shadow-2xl cursor-pointer hover:opacity-90 transition-all group/media relative"
+                                                                        onClick={(e) => { e.stopPropagation(); setFullscreenFile(chat.lastMedia!); }}
+                                                                    >
+                                                                        {chat.lastMedia.type === 'video' ? (
+                                                                            <div className="w-full h-full flex items-center justify-center bg-black">
+                                                                                <video src={getResolvedMediaUrl(chat.lastMedia)} className="max-w-full max-h-[300px] pointer-events-none" />
+                                                                                <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover/media:bg-black/40 transition-colors">
+                                                                                    <Play size={40} className="text-white opacity-60 group-hover/media:opacity-100 transition-opacity" />
+                                                                                </div>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <img 
+                                                                                src={getResolvedMediaUrl(chat.lastMedia)} 
+                                                                                className="w-full h-auto max-h-[400px] object-contain mx-auto" 
+                                                                                alt="Session Media"
+                                                                            />
+                                                                        )}
+                                                                        <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover/media:opacity-100 transition-opacity">
+                                                                            <div className="flex items-center gap-2 text-[10px] text-white/70 font-medium">
+                                                                                <Maximize2 size={10} /> Click to expand
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                <div className="w-full bg-black/40 rounded-lg p-4 border border-white/5 text-sm overflow-x-auto text-left">
                                                                     <MessageContent text={chat.response} />
                                                                 </div>
                                                             </div>
@@ -2719,6 +2899,7 @@ const Queue: React.FC<any> = () => {
                                     <textarea
                                         ref={textareaRef}
                                         value={input}
+                                        disabled={isThinking}
                                         onFocus={handleInputFocus}
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); handleSend(); } }}
