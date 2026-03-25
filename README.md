@@ -15,7 +15,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-2.3-yellow?style=for-the-badge" alt="Version" />
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-1.0.0-green?style=for-the-badge" alt="Version" />
   <img src="https://img.shields.io/badge/Electron-33-47848F?style=for-the-badge&logo=electron" alt="Electron" />
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react" alt="React" />
   <img src="https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript" alt="TypeScript" />
@@ -61,11 +62,11 @@ Moubely is an advanced, always-on-top AI productivity hub designed for seamless 
 
 ---
 
-## ✅ Version Comparison: What's New in v2.3?
+## ✅ Version Comparison: Transition to Production (v1.0.0)
 
 We have shifted from a static, premium-first architecture to a universal, open-model-first engine with enhanced visual output, stealth, and a **Fluid Centered Architecture**.
 
-| Feature                 | v2.2 (Old)               | **v2.3 (Current)**                                           |
+| Feature                 | Beta / MVP               | **v1.0.0 (Stable)**                                          |
 | :---------------------- | :----------------------- | :----------------------------------------------------------- |
 | **Model Roster**        | 18-Model Waterfall       | **20+ Model Waterfall** (Llama 405B, GPT-OSS 120B)           |
 | **History Logic**       | One record per message   | **Unified Chat Sessions** (Threaded)                         |
@@ -113,7 +114,7 @@ Our custom orchestration engine manages 20+ models. If one provider hits a rate 
 
 ### ⚖️ Centered Conversation Architecture
 
-Moubely v2.3 introduces a structural refactor ensuring all chat, email, and meeting recap interfaces maintain perfect visual balance. Using a unified `max-w-3xl mx-auto` constraint, content is anchored in the user's primary focus zone, significantly improving scannability and professional aesthetic.
+Moubely v1.0.0 introduces a structural refactor ensuring all chat, email, and meeting recap interfaces maintain perfect visual balance. Using a unified `max-w-3xl mx-auto` constraint, content is anchored in the user's primary focus zone, significantly improving scannability and professional aesthetic.
 
 ### 👻 Private Mode & Scroll Portal
 
@@ -129,7 +130,7 @@ Moubely doesn't just answer; it represents. By grounding responses in a user's s
 
 ### 🏗️ Premium Onboarding & Identity Setup
 
-Moubely v2.3 features a complete overhaul of the first-run experience. The new 3-step wizard allows users to craft their identity, define their digital twin's persona, and securely configure their AI "powers" through a glassmorphism interface.
+Moubely v1.0.0 features a complete overhaul of the first-run experience. The new 3-step wizard allows users to craft their identity, define their digital twin's persona, and securely configure their AI "powers" through a glassmorphism interface.
 
 ### 🔐 Hardware-Encrypted Security (safeStorage)
 
@@ -144,6 +145,8 @@ We have integrated **OCR Space** to handle complex document analysis. Whether it
 ## 🛠️ System Architecture: The "Resilient Controller"
 
 Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioritizes elite reasoning models before falling back to faster or local resources.
+
+**Production Build (v1.0.0):** This release unifies the text, vision, and media generation engines under a single secure gateway.
 
 ### 📐 Orchestration Flow (Data Pipeline)
 
@@ -193,7 +196,7 @@ graph TD
 
 ### The "Brains" (Chat & Logic) 🧠
 
-**New in v2.3:** We now prioritize elite, massive-parameter reasoning models (405B+) to ensure the highest possible logical accuracy before falling back to fast efficiency models.
+**New in v1.0.0:** We now prioritize elite, massive-parameter reasoning models (405B+) to ensure the highest possible logical accuracy before falling back to fast efficiency models.
 
 | Tier                           | Models                                                                                             |
 | :----------------------------- | :------------------------------------------------------------------------------------------------- |
@@ -500,6 +503,33 @@ graph TD
 
 </details>
 
+<details>
+<summary><strong>31. The Unified AI Hydration Bridge</strong></summary>
+
+**Problem:** The media engine (Art Mode) and text engine (Chat) were operating as separate instances. Saving API keys in the settings would update the chat, but Art Mode would still return "API Key Not Configured" until a full app restart.
+
+**Solution:** Integrated `GenerationHelper` into the global `AppState` and implemented a **Live Synchronization Bridge**. This ensures that any change to the secure credential store is propagated to all AI engines (text, image, and video) simultaneously and without a restart.
+
+</details>
+
+<details>
+<summary><strong>32. Secure Credential Cold-Start (Async Flow)</strong></summary>
+
+**Problem:** On initial launch, the app would sometimes enter an "Onboarding Loop" because the AI helper attempted to initialize before the encrypted keys were fully decrypted from disk.
+
+**Solution:** Refactored the core lifecycle to be **Transaction-Safe**. The app now uses an `async loadApiKeys` sequence that blocks AI engine registration until credentials are confirmed, ensuring a smooth transition from Setup to Active Workspace.
+
+</details>
+
+<details>
+<summary><strong>33. OCR Space Migration (Text Recovery)</strong></summary>
+
+**Problem:** Standard PDF libraries failed on scanned documents, and using elite models for OCR was cost-prohibitive for large files.
+
+**Solution:** Replaced the legacy OpenAI integration with a dedicated **OCR Space** engine. This provides a specialized "Text Recovery" lane for complex vision-to-text tasks, allowing the main LLMs to focus on reasoning rather than character recognition.
+
+</details>
+
 ---
 
 ### 📦 Installation & Setup
@@ -573,33 +603,6 @@ npm start
 ```
 
 _This command automatically launches the Vite Dev Server, Electron Backend, and Local Whisper Server._
-
-<details>
-<summary><strong>31. The Unified AI Hydration Bridge</strong></summary>
-
-**Problem:** The media engine (Art Mode) and text engine (Chat) were operating as separate instances. Saving API keys in the settings would update the chat, but Art Mode would still return "API Key Not Configured" until a full app restart.
-
-**Solution:** Integrated `GenerationHelper` into the global `AppState` and implemented a **Live Synchronization Bridge**. This ensures that any change to the secure credential store is propagated to all AI engines (text, image, and video) simultaneously and without a restart.
-
-</details>
-
-<details>
-<summary><strong>32. Secure Credential Cold-Start (Async Flow)</strong></summary>
-
-**Problem:** On initial launch, the app would sometimes enter an "Onboarding Loop" because the AI helper attempted to initialize before the encrypted keys were fully decrypted from disk.
-
-**Solution:** Refactored the core lifecycle to be **Transaction-Safe**. The app now uses an `async loadApiKeys` sequence that blocks AI engine registration until credentials are confirmed, ensuring a smooth transition from Setup to Active Workspace.
-
-</details>
-
-<details>
-<summary><strong>33. OCR Space Migration (Text Recovery)</strong></summary>
-
-**Problem:** Standard PDF libraries failed on scanned documents, and using elite models for OCR was cost-prohibitive for large files.
-
-**Solution:** Replaced the legacy OpenAI integration with a dedicated **OCR Space** engine. This provides a specialized "Text Recovery" lane for complex vision-to-text tasks, allowing the main LLMs to focus on reasoning rather than character recognition.
-
-</details>
 
 ---
 
