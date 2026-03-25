@@ -145,6 +145,52 @@ We have integrated **OCR Space** to handle complex document analysis. Whether it
 
 Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioritizes elite reasoning models before falling back to faster or local resources.
 
+### 📐 Orchestration Flow (Data Pipeline)
+
+```mermaid
+graph TD
+    subgraph "Frontend Interface (React)"
+        UI["User Keyboard / Mic / Screen"]
+        Buffer["State Manager (Zustand)"]
+    end
+
+    subgraph "Bridge (IPC Layer)"
+        IPC["Electron Context Bridge"]
+    end
+
+    subgraph "Backend Engine (Electron Main)"
+        Handler["IPC Logic Handlers"]
+        Vault["Hardware Wallet (safeStorage)"]
+        Water["Waterfall Controller (LLMHelper)"]
+        Art["Media Dispatcher (Art Studio)"]
+    end
+
+    subgraph "External Intelligence"
+        Gemini["Google Gemini (Primary)"]
+        Groq["Groq Cloud (Audio / Fast Chat)"]
+        OR["OpenRouter (Reasoning Tiers)"]
+        OCR["OCR Space (PDF Engine)"]
+        Local["Local Whisper (Private Audio)"]
+    end
+
+    %% Flow Connections
+    UI --> Buffer
+    Buffer -->|invoke| IPC
+    IPC --> Handler
+    Handler --> Vault
+    Vault -->|Hydrate Keys| Water
+    Water -->|Tier 1| Gemini
+    Water -->|Tier 2 Fallback| OR
+    Handler --> Art
+    Art -->|Diffusion| Gemini
+    Handler -->|Transcription| Local
+    Local -->|Timeout Fallback| Groq
+
+    %% Response Loop
+    Gemini -.->|Stream Tokens| IPC
+    IPC -.->|UI Update| UI
+```
+
 ### The "Brains" (Chat & Logic) 🧠
 
 **New in v2.3:** We now prioritize elite, massive-parameter reasoning models (405B+) to ensure the highest possible logical accuracy before falling back to fast efficiency models.
