@@ -463,7 +463,6 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 For the easiest experience, go to the [**Latest Releases**](https://github.com/Moubarak-01/Moubely/releases/latest) and download:
 
 - **`Moubely.Setup.1.0.0.exe`**: Standard Windows installer (creates shortcuts and sets up everything automatically).
-- **`Moubely.1.0.0.exe`**: Portable version (runs instantly without installation).
 
 #### Developer Setup (Build from Source)
 
