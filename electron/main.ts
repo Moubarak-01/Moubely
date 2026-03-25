@@ -1,7 +1,9 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, protocol, net } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, protocol, net, safeStorage } from 'electron';
 import path from 'path';
+import fs from 'fs';
 import { initializeIpcHandlers } from "./ipcHandlers"
 import { WindowHelper } from "./WindowHelper"
+import { GenerationHelper } from "./GenerationHelper"
 import { ScreenshotHelper } from "./ScreenshotHelper"
 import { ShortcutsHelper } from "./shortcuts"
 import { ProcessingHelper } from "./ProcessingHelper"
@@ -22,6 +24,7 @@ export class AppState {
   private screenshotHelper: ScreenshotHelper
   public shortcutsHelper: ShortcutsHelper
   public processingHelper: ProcessingHelper
+  public generationHelper: GenerationHelper
   public cursorHelper: CursorHelper
   private tray: any = null
 
@@ -49,11 +52,18 @@ export class AppState {
 
     this.screenshotHelper = new ScreenshotHelper(this.view)
     this.processingHelper = new ProcessingHelper(this)
+    this.generationHelper = new GenerationHelper()
     this.windowHelper = new WindowHelper(this)
     this.shortcutsHelper = new ShortcutsHelper(this)
     this.cursorHelper = new CursorHelper()
 
     AppState.instance = this
+  }
+
+  public async refreshProcessingHelper() {
+    console.log("[AppState] 🔄 Refreshing Processing Helper with new keys...");
+    this.processingHelper = new ProcessingHelper(this);
+    await loadApiKeys(this);
   }
 
   public static getInstance(): AppState {
@@ -119,13 +129,27 @@ export class AppState {
 
   public createTray() {
     if (this.tray !== null) return
-    const image = nativeImage.createEmpty()
-    let trayImage = image
-    try { trayImage = nativeImage.createFromBuffer(Buffer.alloc(0)) } catch (e) { }
-    this.tray = new Tray(trayImage)
+    
+    // Path to the tray icon (using the same logic as the window icon)
+    const isDev = !app.isPackaged || process.env.NODE_ENV === 'development';
+    const iconPath = isDev 
+      ? path.join(__dirname, "../assets/Moubely_icon.png")
+      : path.join(process.resourcesPath, "assets/Moubely_icon.png")
+      
+    const trayIcon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+    
+    this.tray = new Tray(trayIcon)
     const contextMenu = Menu.buildFromTemplate([
       { label: 'Show Moubely', click: () => { this.centerAndShowWindow() } },
       { label: 'Toggle Window', click: () => { this.toggleMainWindow() } },
+      { label: 'API Settings', click: () => { 
+        const win = this.getMainWindow();
+        if (win) {
+          win.webContents.send("reset-view"); // Reset state
+          win.loadURL(this.windowHelper.getStartUrl() + "#/settings");
+          this.centerAndShowWindow();
+        }
+      }},
       { type: 'separator' },
       { label: 'Quit', accelerator: 'Command+Q', click: () => { app.quit() } }
     ])
@@ -139,10 +163,58 @@ export class AppState {
   public getHasDebugged(): boolean { return this.hasDebugged }
 }
 
+/**
+ * Loads and decrypts API keys from the user data directory,
+ * then updates the LLMHelper instance.
+ */
+async function loadApiKeys(appState: AppState) {
+  try {
+    const userDataPath = app.getPath('userData');
+    const keysPath = path.join(userDataPath, 'api_keys.json');
+
+    if (!fs.existsSync(keysPath)) {
+      console.log("[Main] ℹ️ No custom API keys found.");
+      return;
+    }
+
+    const encryptedData = JSON.parse(fs.readFileSync(keysPath, 'utf-8'));
+    const decryptedKeys: { [key: string]: string } = {};
+
+    for (const [provider, encryptedValue] of Object.entries(encryptedData)) {
+      if (typeof encryptedValue === 'string') {
+        if (safeStorage.isEncryptionAvailable()) {
+          try {
+            const buffer = Buffer.from(encryptedValue, 'base64');
+            decryptedKeys[provider] = safeStorage.decryptString(buffer);
+          } catch (e) {
+            console.error(`[Main] ❌ Decryption failed for ${provider}`);
+          }
+        } else {
+          decryptedKeys[provider] = encryptedValue as string;
+        }
+      }
+    }
+
+    const llmHelper = (appState.processingHelper as any).llmHelper;
+    if (llmHelper && Object.keys(decryptedKeys).length > 0) {
+      llmHelper.updateApiKeys(decryptedKeys);
+      if (decryptedKeys.gemini) {
+        appState.generationHelper.setApiKey(decryptedKeys.gemini);
+      }
+      console.log("[Main] 🔐 Applied User API Keys on Startup");
+    }
+  } catch (error) {
+    console.error("[Main] ❌ Failed to load API keys on startup:", error);
+  }
+}
+
 async function initializeApp() {
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     const appState = AppState.getInstance()
     initializeIpcHandlers(appState)
+    
+    // Load and apply user-provided API keys immediately after IPC setup
+    await loadApiKeys(appState)
 
     console.log("App is ready")
     console.log("Initializing App components...")

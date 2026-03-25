@@ -8,6 +8,7 @@ import Debug from "./_pages/Debug"
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Header from './components/Header'
 import { ProfileSettings } from "./_pages/ProfileSettings";
+import { Onboarding } from "./_pages/Onboarding";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: Infinity, cacheTime: Infinity } }
@@ -21,6 +22,15 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!window.electronAPI) return;
+
+    // Check if API keys are configured
+    window.electronAPI.checkLLMConfig().then((isConfigured: boolean) => {
+      console.log(`[App] 🔑 LLM Configured: ${isConfigured}`);
+      if (!isConfigured) {
+        console.log("[App] ⚠️ Redirecting to Onboarding (No API Keys)");
+        window.location.hash = "#/onboarding";
+      }
+    });
 
     // 1. Initial State Sync
     window.electronAPI.getStealthMode().then((enabled: boolean) => {
@@ -76,6 +86,7 @@ const App: React.FC = () => {
                 <Route path="/solutions" element={<Solutions setView={setView} />} />
                 <Route path="/debug" element={<Debug isProcessing={false} setIsProcessing={() => { }} />} />
                 <Route path="/settings" element={<ProfileSettings />} />
+                <Route path="/onboarding" element={<Onboarding />} />
               </Routes>
             </Router>
             <ToastViewport />

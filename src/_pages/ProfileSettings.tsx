@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 
 // Interfaces for our data types
 interface StoryMapping {
@@ -16,6 +17,17 @@ interface UserProfile {
   storyMappings: StoryMapping[];
 }
 
+interface ApiKeys {
+  gemini: string;
+  openrouter: string;
+  ocrspace: string;
+  groq: string;
+  perplexity: string;
+  github: string;
+  nvidia: string;
+  notion: string;
+}
+
 export const ProfileSettings: React.FC = () => {
   const [formData, setFormData] = useState<UserProfile>({
     targetPersona: "High School Graduate",
@@ -25,45 +37,90 @@ export const ProfileSettings: React.FC = () => {
     storyMappings: []
   });
 
-  const [activeTab, setActiveTab] = useState<'persona' | 'stories'>('persona');
+  const [apiKeys, setApiKeys] = useState<ApiKeys>({
+    gemini: "",
+    openrouter: "",
+    ocrspace: "",
+    groq: "",
+    perplexity: "",
+    github: "",
+    nvidia: "",
+    notion: ""
+  });
+
+  const [activeTab, setActiveTab] = useState<'persona' | 'stories' | 'apikeys'>('persona');
   const [editingStory, setEditingStory] = useState<StoryMapping | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
+
+  const toggleKeyVisibility = (key: string) => {
+    const next = new Set(visibleKeys);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setVisibleKeys(next);
+  };
 
   // Load profile on mount
   useEffect(() => {
-    const loadProfile = async () => {
+    const loadData = async () => {
       try {
         const profile = await window.electronAPI.getUserProfile();
         if (profile) {
-          // Merge loaded profile with defaults to ensure all fields exist
-          // Default to empty array if storyMappings is undefined
           setFormData(prev => ({
             ...prev,
             ...profile,
             storyMappings: Array.isArray(profile.storyMappings) ? profile.storyMappings : []
           }));
         }
+
+        const keys = await window.electronAPI.getApiKeys();
+        if (keys) {
+          setApiKeys(prev => ({
+            ...prev,
+            ...keys
+          }));
+        }
       } catch (e) {
-        console.error("Failed to load profile", e);
+        console.error("Failed to load settings", e);
       }
     };
-    loadProfile();
+    loadData();
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setApiKeys({ ...apiKeys, [e.target.name]: e.target.value });
+  };
+
   const handleSave = async () => {
     setSaveStatus('saving');
     try {
-      const response = await window.electronAPI.saveUserProfile(formData);
-      if (response.success) {
-        setSaveStatus('success');
-        setTimeout(() => setSaveStatus('idle'), 2000);
+      if (activeTab === 'apikeys') {
+        const response = await window.electronAPI.saveApiKeys(apiKeys);
+        if (response.success) {
+          setSaveStatus('success');
+          setTimeout(() => {
+            setSaveStatus('idle');
+            // Redirect back to queue after successful key entry
+            window.location.hash = '#/queue';
+            window.location.reload(); 
+          }, 1500);
+        } else {
+          setSaveStatus('error');
+          setTimeout(() => setSaveStatus('idle'), 3000);
+        }
       } else {
-        setSaveStatus('error');
-        setTimeout(() => setSaveStatus('idle'), 3000);
+        const response = await window.electronAPI.saveUserProfile(formData);
+        if (response.success) {
+          setSaveStatus('success');
+          setTimeout(() => setSaveStatus('idle'), 2000);
+        } else {
+          setSaveStatus('error');
+          setTimeout(() => setSaveStatus('idle'), 3000);
+        }
       }
     } catch (error) {
       console.error(error);
@@ -142,6 +199,12 @@ export const ProfileSettings: React.FC = () => {
         >
           📖 Stories & Pivots ({formData.storyMappings.length})
         </button>
+        <button
+          onClick={() => setActiveTab('apikeys')}
+          className={`pb-2 px-2 font-bold ${activeTab === 'apikeys' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-white/40 hover:text-white'}`}
+        >
+          🔑 API Keys
+        </button>
       </div>
 
       {activeTab === 'persona' ? (
@@ -188,7 +251,7 @@ export const ProfileSettings: React.FC = () => {
                   'Save Persona'}
           </button>
         </div>
-      ) : (
+      ) : activeTab === 'stories' ? (
         /* STORIES TAB */
         <div className="space-y-6">
           {!editingStory ? (
@@ -284,6 +347,111 @@ export const ProfileSettings: React.FC = () => {
                     '💾 Save All Changes'}
             </button>
           )}
+        </div>
+      ) : (
+        /* API KEYS TAB */
+        <div className="space-y-6 max-w-2xl">
+          <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-lg mb-6">
+            <p className="text-sm text-blue-200">
+              🔒 <strong>Security Note:</strong> Your API keys are encrypted using system-level hardware security (Electron safeStorage) before being saved to your disk.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <label className="block mb-1 font-semibold text-xs uppercase tracking-wider text-white/40">Gemini API Key</label>
+                <div className="relative group">
+                  <input type={visibleKeys.has('gemini') ? "text" : "password"} name="gemini" value={apiKeys.gemini} onChange={handleApiKeyChange} className="w-full p-2 rounded bg-black/10 border border-white/5 outline-none focus:border-blue-500/50 transition-colors pr-10" placeholder="AI Studio Key..." />
+                  <button onClick={() => toggleKeyVisibility('gemini')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/60 transition-colors">
+                    {visibleKeys.has('gemini') ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block mb-1 font-semibold text-xs uppercase tracking-wider text-white/40">OpenRouter Key</label>
+                <div className="relative group">
+                  <input type={visibleKeys.has('openrouter') ? "text" : "password"} name="openrouter" value={apiKeys.openrouter} onChange={handleApiKeyChange} className="w-full p-2 rounded bg-black/10 border border-white/5 outline-none focus:border-blue-500/50 transition-colors pr-10" placeholder="sk-or-v1-..." />
+                  <button onClick={() => toggleKeyVisibility('openrouter')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/60 transition-colors">
+                    {visibleKeys.has('openrouter') ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block mb-1 font-semibold text-xs uppercase tracking-wider text-white/40">OCR Space Key</label>
+                <div className="relative group">
+                  <input type={visibleKeys.has('ocrspace') ? "text" : "password"} name="ocrspace" value={apiKeys.ocrspace} onChange={handleApiKeyChange} className="w-full p-2 rounded bg-black/10 border border-white/5 outline-none focus:border-blue-500/50 transition-colors pr-10" placeholder="K8..." />
+                  <button onClick={() => toggleKeyVisibility('ocrspace')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/60 transition-colors">
+                    {visibleKeys.has('ocrspace') ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block mb-1 font-semibold text-xs uppercase tracking-wider text-white/40">Groq Key</label>
+                <div className="relative group">
+                  <input type={visibleKeys.has('groq') ? "text" : "password"} name="groq" value={apiKeys.groq} onChange={handleApiKeyChange} className="w-full p-2 rounded bg-black/10 border border-white/5 outline-none focus:border-blue-500/50 transition-colors pr-10" placeholder="gsk_..." />
+                  <button onClick={() => toggleKeyVisibility('groq')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/60 transition-colors">
+                    {visibleKeys.has('groq') ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block mb-1 font-semibold text-xs uppercase tracking-wider text-white/40">Perplexity Key</label>
+                <div className="relative group">
+                  <input type={visibleKeys.has('perplexity') ? "text" : "password"} name="perplexity" value={apiKeys.perplexity} onChange={handleApiKeyChange} className="w-full p-2 rounded bg-black/10 border border-white/5 outline-none focus:border-blue-500/50 transition-colors pr-10" placeholder="pplx-..." />
+                  <button onClick={() => toggleKeyVisibility('perplexity')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/60 transition-colors">
+                    {visibleKeys.has('perplexity') ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block mb-1 font-semibold text-xs uppercase tracking-wider text-white/40">GitHub Token</label>
+                <div className="relative group">
+                  <input type={visibleKeys.has('github') ? "text" : "password"} name="github" value={apiKeys.github} onChange={handleApiKeyChange} className="w-full p-2 rounded bg-black/10 border border-white/5 outline-none focus:border-blue-500/50 transition-colors pr-10" placeholder="ghp_..." />
+                  <button onClick={() => toggleKeyVisibility('github')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/60 transition-colors">
+                    {visibleKeys.has('github') ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block mb-1 font-semibold text-xs uppercase tracking-wider text-white/40">NVIDIA Key</label>
+                <div className="relative group">
+                  <input type={visibleKeys.has('nvidia') ? "text" : "password"} name="nvidia" value={apiKeys.nvidia} onChange={handleApiKeyChange} className="w-full p-2 rounded bg-black/10 border border-white/5 outline-none focus:border-blue-500/50 transition-colors pr-10" placeholder="nvapi-..." />
+                  <button onClick={() => toggleKeyVisibility('nvidia')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/60 transition-colors">
+                    {visibleKeys.has('nvidia') ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block mb-1 font-semibold text-xs uppercase tracking-wider text-white/40">Notion Token</label>
+                <div className="relative group">
+                  <input type={visibleKeys.has('notion') ? "text" : "password"} name="notion" value={apiKeys.notion} onChange={handleApiKeyChange} className="w-full p-2 rounded bg-black/10 border border-white/5 outline-none focus:border-blue-500/50 transition-colors pr-10" placeholder="secret_..." />
+                  <button onClick={() => toggleKeyVisibility('notion')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-white/60 transition-colors">
+                    {visibleKeys.has('notion') ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-6">
+            <button
+              onClick={handleSave}
+              disabled={saveStatus === 'saving'}
+              className={`w-full py-4 rounded font-bold transition-colors shadow-lg text-lg ${saveStatus === 'success' ? 'bg-green-500 hover:bg-green-400 shadow-green-900/20' :
+                saveStatus === 'error' ? 'bg-red-500 hover:bg-red-400 shadow-red-900/20' :
+                  'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20'
+                }`}
+            >
+              {saveStatus === 'saving' ? 'Encrypting & Saving...' :
+                saveStatus === 'success' ? '✅ Keys Secured!' :
+                  saveStatus === 'error' ? '❌ Save Failed' :
+                    '🔒 Secure & Save API Keys'}
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -1,8 +1,14 @@
 import { AppState } from "./main"
 import { LLMHelper } from "./LLMHelper"
-import dotenv from "dotenv"
+import path from "node:path"
+import { app } from "electron"
 
-dotenv.config()
+const isDev = !app.isPackaged || process.env.NODE_ENV === "development"
+
+if (isDev) {
+  const envPath = path.join(__dirname, "../.env")
+  require("dotenv").config({ path: envPath })
+}
 
 export class ProcessingHelper {
   private appState: AppState
@@ -19,10 +25,11 @@ export class ProcessingHelper {
     } else {
       console.log("[Processing] ☁️ Initializing with Cloud APIs");
       const apiKey = process.env.GEMINI_API_KEY
-      if (!apiKey) throw new Error("GEMINI_API_KEY missing")
+      if (!apiKey) {
+        console.log("[Processing] ℹ️ No GEMINI_API_KEY found in environment. Waiting for user input in settings.");
+      }
       this.llmHelper = new LLMHelper(apiKey, false)
-    }
-  }
+    }  }
 
   public async processScreenshots(): Promise<void> {
     console.log("[Processing] 🚀 Processing Screenshots triggered");

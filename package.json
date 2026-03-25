@@ -1,18 +1,18 @@
 {
   "name": "moubely",
   "version": "1.0.0",
-  "main": "./dist-electron/main.js",
+  "main": "dist-electron/main.js",
   "description": "Moubely - Intelligent Desktop Assistant",
   "author": "Moubarak",
   "scripts": {
     "clean": "rimraf dist dist-electron",
     "dev": "vite",
-    "build": "npm run clean && tsc && vite build",
+    "build": "npm run clean && tsc && tsc -p electron/tsconfig.json && vite build",
     "preview": "vite preview",
     "postinstall": "cross-env SHARP_IGNORE_GLOBAL_LIBVIPS=1 npm rebuild sharp",
     "electron:dev": "tsc -p electron/tsconfig.json && cross-env NODE_ENV=development electron .",
     "electron:build": "tsc -p electron/tsconfig.json && cross-env NODE_ENV=production electron .",
-    "app:dev": "concurrently \"npm run dev -- --port 5180\" \"wait-on http://localhost:5180 && npm run electron:dev\" \"node local-whisper-server.mjs\"",
+    "app:dev": "concurrently \"npm run dev -- --port 5180\" \"wait-on http://localhost:5180 && npm run electron:dev\"",
     "app:build": "npm run build && electron-builder",
     "watch": "tsc -p electron/tsconfig.json --watch",
     "start": "npm run app:dev",
@@ -24,6 +24,7 @@
   "build": {
     "appId": "com.electron.moubely",
     "productName": "Moubely",
+    "asar": true,
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
@@ -38,6 +39,14 @@
       {
         "from": "assets/",
         "to": "assets/"
+      },
+      {
+        "from": "node_modules/ffmpeg-static/",
+        "to": "node_modules/ffmpeg-static/",
+        "filter": [
+          "ffmpeg",
+          "ffmpeg.exe"
+        ]
       }
     ],
     "mac": {
@@ -72,7 +81,8 @@
         }
       ],
       "icon": "assets/Moubely_icon.png",
-      "requestedExecutionLevel": "asInvoker"
+      "requestedExecutionLevel": "asInvoker",
+      "signingHashAlgorithms": null
     },
     "linux": {
       "target": [
@@ -97,14 +107,7 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "YOUR_GITHUB_USERNAME",
-        "repo": "moubely-repo"
-      }
-    ]
+    }
   },
   "keywords": [],
   "license": "ISC",
@@ -155,6 +158,7 @@
     "clsx": "^2.1.1",
     "cors": "^2.8.6",
     "diff": "^7.0.0",
+    "dotenv": "^17.3.1",
     "express": "^4.22.1",
     "ffmpeg-static": "^5.3.0",
     "fluent-ffmpeg": "^2.1.3",

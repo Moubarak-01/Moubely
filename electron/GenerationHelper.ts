@@ -26,6 +26,10 @@ export class GenerationHelper {
         }
     }
 
+    public setApiKey(apiKey: string) {
+        this.geminiKey = apiKey;
+    }
+
     /**
      * Determines if a model string is a generative media model
      */

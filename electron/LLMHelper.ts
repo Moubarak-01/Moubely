@@ -9,6 +9,7 @@ import { app } from "electron"
 import axios from "axios"
 import FormData from "form-data"
 import http from "http"
+import { WhisperHelper } from "./WhisperHelper"
 
 // CRITICAL: Keep connection open to prevent ECONNRESET
 const httpAgent = new http.Agent({ keepAlive: true });
@@ -115,6 +116,7 @@ export class LLMHelper {
     private perplexityClient: OpenAI | null = null
     private openRouterClient: OpenAI | null = null
     private openaiClient: OpenAI | null = null
+    private ocrSpaceKey: string = ""
     private nvidiaClient: OpenAI | null = null
     private notionClient: NotionClient | null = null
 
@@ -154,6 +156,18 @@ export class LLMHelper {
         this.initializeProviders(apiKey);
     }
 
+    public isConfigured(): boolean {
+        return !!(
+            this.genAI || 
+            this.openRouterClient || 
+            this.nvidiaClient || 
+            this.openaiClient || 
+            this.groqClient || 
+            this.perplexityClient || 
+            this.githubClient
+        );
+    }
+
     private initializeProviders(geminiKey?: string) {
         if (process.env.NOTION_TOKEN) this.notionClient = new NotionClient({ auth: process.env.NOTION_TOKEN });
         if (geminiKey) {
@@ -187,6 +201,7 @@ export class LLMHelper {
         }
 
         if (process.env.OPENAI_API_KEY) this.openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, dangerouslyAllowBrowser: true });
+        this.ocrSpaceKey = process.env.OCR_SPACE_API_KEY || "";
     }
 
     private cleanResponse(text: string): string {
@@ -697,12 +712,12 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
             console.warn("[LLM] ❌ Local PDF Parse Exception. Switching to Cloud OCR...");
         }
 
-        if (process.env.OCR_SPACE_API_KEY) {
+        if (this.ocrSpaceKey) {
             console.log("[LLM] 🔍 Triggering Cloud OCR Recovery (OCR.Space)...");
             try {
                 const formData = new FormData();
                 formData.append('file', buffer, { filename: 'file.pdf', contentType: 'application/pdf' });
-                formData.append('apikey', process.env.OCR_SPACE_API_KEY);
+                formData.append('apikey', this.ocrSpaceKey);
                 formData.append('language', 'eng');
                 formData.append('isOverlayRequired', 'false');
                 formData.append('filetype', 'PDF');
@@ -1003,28 +1018,21 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
     }
 
     public async analyzeAudioFile(audioPath: string, isUrgent: boolean = false, timestamp?: number): Promise<{ text: string, timestamp: number }> {
-        const localTimeout = isUrgent ? 1000 : 40000;
         const speedLabel = isUrgent ? "⚡ URGENT" : "🐢 CASUAL";
 
         if (!isUrgent) {
             try {
-                console.log(`[LLM] 🎙️ Attempting Local Whisper (${speedLabel} - Timeout: ${localTimeout}ms)...`);
-                const form = new FormData();
-                form.append('file', fs.createReadStream(audioPath));
-                const response = await axios.post('http://localhost:3000/v1/audio/transcriptions', form, {
-                    headers: form.getHeaders(),
-                    timeout: localTimeout,
-                    httpAgent: httpAgent
-                });
-                const text = response.data?.text?.trim();
+                console.log(`[LLM] 🎙️ Attempting Native Local Whisper (${speedLabel})...`);
+                
+                const text = await WhisperHelper.transcribe(audioPath);
+                
                 if (text) {
                     console.log(`[LLM] ✅ Local Whisper Success: "${text.slice(0, 30)}..."`);
                     this.sessionTranscript += `\n[${new Date().toLocaleTimeString()}] ${text}`;
                     return { text: text, timestamp: timestamp || Date.now() };
                 }
             } catch (e: any) {
-                if (e.code === 'ECONNABORTED') console.warn(`[LLM] ⏱️ Local Whisper Timed Out (${localTimeout}ms). Switching to Cloud...`);
-                else console.warn(`[LLM] ⚠️ Local Whisper Failed: ${e.message}. Switching to Cloud...`);
+                console.warn(`[LLM] ⚠️ Local Whisper Failed: ${e.message}. Switching to Cloud...`);
             }
         } else {
             console.log(`[LLM] ⚡ Smart Mode (Urgent): Skipping Local Whisper, using Cloud Provider...`);
@@ -1051,7 +1059,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
 
     public async analyzeAudioFromBase64(base64Data: string, mimeType: string, isUrgent: boolean = false, timestamp?: number) {
         if (!base64Data || base64Data.length < 100) return { text: "", timestamp: Date.now() };
-        const tempPath = path.join(os.tmpdir(), `temp_audio_${Date.now()}.wav`);
+        const tempPath = path.join(os.tmpdir(), `moubely_audio_${Date.now()}.wav`);
         try {
             await fs.promises.writeFile(tempPath, Buffer.from(base64Data, 'base64'));
             const result = await this.analyzeAudioFile(tempPath, isUrgent, timestamp);
@@ -1142,4 +1150,40 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
     }
 
     public async switchToGemini(apiKey?: string) { if (apiKey) this.initializeProviders(apiKey); }
+
+    public updateApiKeys(keys: { [key: string]: string }) {
+        console.log("[LLM] 🔐 Updating API Clients with User Keys...");
+        
+        if (keys.gemini) {
+            this.genAI = new GoogleGenerativeAI(keys.gemini);
+            this.fileManager = new GoogleAIFileManager(keys.gemini);
+        }
+
+        if (keys.openrouter) {
+            this.openRouterClient = new OpenAI({
+                baseURL: "https://openrouter.ai/api/v1",
+                apiKey: keys.openrouter,
+                dangerouslyAllowBrowser: true,
+                defaultHeaders: {
+                    "HTTP-Referer": "https://moubely.app",
+                    "X-Title": "Moubely"
+                }
+            });
+        }
+
+        if (keys.ocrspace) this.ocrSpaceKey = keys.ocrspace;
+        if (keys.groq) this.groqClient = new OpenAI({ baseURL: "https://api.groq.com/openai/v1", apiKey: keys.groq, dangerouslyAllowBrowser: true });
+        if (keys.perplexity) this.perplexityClient = new OpenAI({ baseURL: "https://api.perplexity.ai", apiKey: keys.perplexity, dangerouslyAllowBrowser: true });
+        if (keys.github) this.githubClient = new OpenAI({ baseURL: "https://models.inference.ai.azure.com", apiKey: keys.github, dangerouslyAllowBrowser: true });
+        if (keys.nvidia) {
+            this.nvidiaClient = new OpenAI({
+                baseURL: "https://integrate.api.nvidia.com/v1",
+                apiKey: keys.nvidia,
+                dangerouslyAllowBrowser: true
+            });
+        }
+        if (keys.notion) this.notionClient = new NotionClient({ auth: keys.notion });
+        
+        console.log("[LLM] ✅ API Clients Updated Successfully");
+    }
 }

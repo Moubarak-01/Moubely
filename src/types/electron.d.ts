@@ -58,10 +58,13 @@ export interface ElectronAPI {
   saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => Promise<boolean>
   saveUserProfile: (profileData: any) => Promise<{ success: boolean }>;
   getUserProfile: () => Promise<any>;
+  saveApiKeys: (keys: any) => Promise<{ success: boolean; error?: string }>;
+  getApiKeys: () => Promise<any>;
 
   // LLM Configuration (ALL WERE MISSING)
-  getCurrentLlmConfig: () => Promise<any>
-  getAvailableOllamaModels: () => Promise<string[]>
+  getCurrentLlmConfig: () => Promise<any>;
+  checkLLMConfig: () => Promise<boolean>;
+  getAvailableOllamaModels: () => Promise<string[]>;
   switchToOllama: (model: string, url: string) => Promise<any>
   switchToGemini: (key?: string) => Promise<any>
   testLlmConnection: () => Promise<any>

@@ -1,4 +1,4 @@
-import { ipcMain, app, desktopCapturer, shell, dialog } from "electron";
+import { ipcMain, app, desktopCapturer, shell, dialog, safeStorage } from "electron";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
@@ -14,7 +14,81 @@ const logIPC = (channel: string, details: string = "") => {
 export function initializeIpcHandlers(appState: AppState) {
   // Access the LLMHelper through the processingHelper existing in AppState
   const llmHelper = (appState.processingHelper as any).llmHelper;
-  const generationHelper = new GenerationHelper();
+
+  // --- 0. SECURE API KEY HANDLERS ---
+  ipcMain.handle('save-api-keys', async (event, keys) => {
+    try {
+      const userDataPath = app.getPath('userData');
+      const keysPath = path.join(userDataPath, 'api_keys.json');
+      
+      const encryptedKeys: { [key: string]: string } = {};
+      
+      for (const [provider, key] of Object.entries(keys)) {
+        if (typeof key === 'string' && key.trim() !== '') {
+          // Encrypt each key before saving
+          if (safeStorage.isEncryptionAvailable()) {
+            const encryptedBuffer = safeStorage.encryptString(key);
+            encryptedKeys[provider] = encryptedBuffer.toString('base64');
+          } else {
+            // Fallback for systems where encryption isn't available (rare)
+            encryptedKeys[provider] = key;
+          }
+        }
+      }
+
+      fs.writeFileSync(keysPath, JSON.stringify(encryptedKeys, null, 2));
+      
+      // Update the active LLMHelper instance immediately
+      if (llmHelper) {
+        llmHelper.updateApiKeys(keys);
+      }
+      
+      if (keys.gemini) {
+        appState.generationHelper.setApiKey(keys.gemini);
+      }
+      
+      // IMPORTANT: Refresh processing helper to use new keys for all tasks
+      await appState.refreshProcessingHelper();
+      
+      logIPC('save-api-keys', '✅ API Keys encrypted and saved.');
+      return { success: true };
+    } catch (error: any) {
+      console.error(`[IPC ⚡] ❌ API Key Save Failed:`, error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('get-api-keys', async () => {
+    try {
+      const userDataPath = app.getPath('userData');
+      const keysPath = path.join(userDataPath, 'api_keys.json');
+      
+      if (!fs.existsSync(keysPath)) return {};
+      
+      const encryptedData = JSON.parse(fs.readFileSync(keysPath, 'utf-8'));
+      const decryptedKeys: { [key: string]: string } = {};
+      
+      for (const [provider, encryptedValue] of Object.entries(encryptedData)) {
+        if (typeof encryptedValue === 'string') {
+          if (safeStorage.isEncryptionAvailable()) {
+            try {
+              const buffer = Buffer.from(encryptedValue, 'base64');
+              decryptedKeys[provider] = safeStorage.decryptString(buffer);
+            } catch (e) {
+              console.error(`[IPC ⚡] Decryption failed for ${provider}`);
+            }
+          } else {
+            decryptedKeys[provider] = encryptedValue as string;
+          }
+        }
+      }
+      
+      return decryptedKeys;
+    } catch (error) {
+      console.error(`[IPC ⚡] ❌ API Key Load Failed:`, error);
+      return {};
+    }
+  });
 
   ipcMain.handle('save-user-profile', async (event, profileData) => {
     try {
@@ -104,6 +178,10 @@ export function initializeIpcHandlers(appState: AppState) {
     return await appState.cursorHelper.getBackgroundCursor();
   });
 
+  ipcMain.handle("check-llm-config", () => {
+    return appState.processingHelper.getLLMHelper().isConfigured();
+  });
+
   ipcMain.handle("get-stealth-mode", () => {
     return appState.getIsStealthMode();
   });
@@ -129,7 +207,7 @@ export function initializeIpcHandlers(appState: AppState) {
   ipcMain.handle("generate-media", async (event, args) => {
     try {
       logIPC("generate-media", `Model: ${args.model} | Prompt: ${args.prompt.substring(0, 30)}...`);
-      return await generationHelper.generateMedia(args);
+      return await appState.generationHelper.generateMedia(args);
     } catch (error: any) {
       console.error(`[IPC ⚡] ❌ Generation Error:`, error);
       throw error;

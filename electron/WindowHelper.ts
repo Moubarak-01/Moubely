@@ -1,9 +1,22 @@
-import { BrowserWindow, screen } from "electron"
+import { BrowserWindow, screen, app } from "electron"
 import { AppState } from "./main"
 import path from "node:path"
+import { pathToFileURL } from "node:url"
 
-const isDev = process.env.NODE_ENV === "development"
-const startUrl = isDev ? "http://localhost:5180" : `file://${path.join(__dirname, "../dist/index.html")}`
+const isDev = !app.isPackaged || process.env.NODE_ENV === "development"
+const startUrl = isDev 
+  ? "http://localhost:5180" 
+  : pathToFileURL(path.join(app.getAppPath(), "dist/index.html")).toString()
+
+console.log(`[WindowHelper] 🚀 Environment: ${isDev ? "Development" : "Production"}`);
+console.log(`[WindowHelper] 📍 Start URL: ${startUrl}`);
+
+// Icon path should work in both dev and prod
+const iconPath = isDev 
+  ? path.join(__dirname, "../assets/Moubely_icon.png")
+  : path.join(process.resourcesPath, "assets/Moubely_icon.png")
+
+console.log(`[WindowHelper] 🖼️ Icon Path: ${iconPath}`);
 
 export class WindowHelper {
   private mainWindow: BrowserWindow | null = null
@@ -78,6 +91,7 @@ export class WindowHelper {
   public createWindow(): void {
     if (this.mainWindow !== null) return
 
+    console.log("[WindowHelper] 🏗️ Creating Main Window...");
     const { width: screenWidth, x: screenX, y: screenY } = screen.getPrimaryDisplay().workArea;
     const bladeWidth = 600; // Startup width
 
@@ -102,7 +116,7 @@ export class WindowHelper {
       backgroundColor: "#00000000",
       resizable: true, // ✅ ENABLED: User can now drag-resize from edges/corners
       movable: true,
-      icon: path.join(__dirname, "../assets/Moubely_icon.png"),
+      icon: iconPath,
     })
 
     // Immediately sync mouse events state based on private mode
@@ -121,16 +135,23 @@ export class WindowHelper {
       this.mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     }
 
-    this.mainWindow.setSkipTaskbar(true)
-    this.mainWindow.loadURL(startUrl).catch(console.error)
+    // Taskbar visibility will be managed by Stealth Mode
+    this.mainWindow.setSkipTaskbar(isStealth)
+    this.mainWindow.loadURL(startUrl).catch((err) => {
+      console.error(`[WindowHelper] ❌ Failed to load URL: ${err}`);
+    })
 
     this.mainWindow.once('ready-to-show', () => {
+      console.log("[WindowHelper] ✨ Window Ready to Show");
       setTimeout(() => {
         this.centerAndShowWindow()
       }, 100);
     })
 
-    this.mainWindow.on("closed", () => { this.mainWindow = null })
+    this.mainWindow.on("closed", () => { 
+      console.log("[WindowHelper] 🔴 Window Closed");
+      this.mainWindow = null 
+    })
   }
 
   // --- STEALTH LOGIC (Content Protection) ---
@@ -140,6 +161,7 @@ export class WindowHelper {
     // enabled = true  -> Protected (Hidden from recording)
     // enabled = false -> Unprotected (Visible in recording)
     this.mainWindow.setContentProtection(enabled)
+    this.mainWindow.setSkipTaskbar(enabled)
 
     if (process.platform === "darwin") {
       this.mainWindow.setHiddenInMissionControl(enabled)
@@ -156,6 +178,7 @@ export class WindowHelper {
   }
 
   public getMainWindow() { return this.mainWindow }
+  public getStartUrl() { return startUrl }
   public isVisible() { return this.mainWindow?.isVisible() ?? false }
   public hideMainWindow() { this.mainWindow?.hide() }
   public showMainWindow() { this.mainWindow?.showInactive() }
@@ -164,6 +187,7 @@ export class WindowHelper {
   public centerAndShowWindow() {
     if (!this.mainWindow) return;
 
+    console.log("[WindowHelper] 🔭 Centering and Showing Window...");
     // Position at Top-Center
     const { width: screenWidth, x: screenX, y: screenY } = screen.getPrimaryDisplay().workArea;
     const [currentWidth] = this.mainWindow.getSize();

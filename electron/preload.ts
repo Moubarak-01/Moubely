@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   saveChatFile: (ab: ArrayBuffer, ext: string, name?: string) => ipcRenderer.invoke("save-chat-file", ab, ext, name),
   deleteChatFiles: (urls: string[]) => ipcRenderer.invoke("delete-chat-files", urls),
   openFilePicker: () => ipcRenderer.invoke("open-file-picker"),
+  saveApiKeys: (keys: any) => ipcRenderer.invoke("save-api-keys", keys),
+  getApiKeys: () => ipcRenderer.invoke("get-api-keys"),
 
   transcribeDictation: (base64Audio: string, mimeType: string) => ipcRenderer.invoke("transcribe-dictation", base64Audio, mimeType),
   cancelChat: () => ipcRenderer.invoke("cancel-gemini-chat"),
@@ -79,6 +81,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   quitApp: () => ipcRenderer.invoke("quit-app"),
 
   getCurrentLlmConfig: () => ipcRenderer.invoke("get-current-llm-config"),
+  checkLLMConfig: () => ipcRenderer.invoke("check-llm-config"),
   getAvailableOllamaModels: () => ipcRenderer.invoke("get-available-ollama-models"),
   switchToOllama: (m: string, u: string) => ipcRenderer.invoke("switch-to-ollama", m, u),
   switchToGemini: (k: string) => ipcRenderer.invoke("switch-to-gemini", k),
