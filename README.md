@@ -5,6 +5,12 @@
 <h1 align="center">Moubely ✨</h1>
 
 <p align="center">
+  <a href="https://github.com/Moubarak-01/Moubely/releases/latest">
+    <img src="https://img.shields.io/badge/Download-Latest%20Release-blue?style=for-the-badge&logo=github" alt="Download Now" />
+  </a>
+</p>
+
+<p align="center">
   <i>A privacy-first, always-on-top AI orchestrator for high-performance workflows</i>
 </p>
 
@@ -48,6 +54,10 @@ Moubely is an advanced, always-on-top AI productivity hub designed for seamless 
 - 🎨 **Art Studio (Multi-Modal)**: Built-in creation engine for generating high-fidelity images and videos using Imagen 4, Nano Banana, and Veo 3.1
 - 🔁 **Asynchronous Media Polling**: Integrated LRO (Long Running Operation) controller that polls and downloads physical video artifacts in the background
 - 🫧 **Zero-Overhead Studio**: Streamlined creation lane that delivers raw media artifacts without redundant AI text interjections
+- 🏗️ **Premium Onboarding Wizard**: Beautiful 3-step setup (Identity, Persona, API Powers) for a first-class first-run experience
+- 🔐 **Hardware-Encrypted Secrets**: Industry-standard protection for API keys using Electron's `safeStorage` (OS-level encryption)
+- 📄 **OCR Space Integration**: Advanced cloud-based PDF recovery and high-accuracy text extraction from scanned documents
+- 🌉 **Unified AI Hydration**: Breakthrough synchronization bridge ensures chat and media engines share the same secure credentials instantly
 
 ---
 
@@ -55,54 +65,79 @@ Moubely is an advanced, always-on-top AI productivity hub designed for seamless 
 
 We have shifted from a static, premium-first architecture to a universal, open-model-first engine with enhanced visual output, stealth, and a **Fluid Centered Architecture**.
 
-| Feature | v2.2 (Old) | **v2.3 (Current)** |
-| :--- | :--- | :--- |
-| **Model Roster** | 18-Model Waterfall | **20+ Model Waterfall** (Llama 405B, GPT-OSS 120B) |
-| **History Logic** | One record per message | **Unified Chat Sessions** (Threaded) |
-| **Vision Logic** | Manual routing | **Global Vision Sync** (All actions see pixels) |
-| **Privacy Engineering** | Entangled Stealth | **Decoupled Protection** (OBS hiding vs. Click Pass-through) |
-| **Interaction Layer** | Manual Toggles | **Scroll Portal** (Atomic Ctrl+Hover Interaction) |
-| **Layout Philosophy** | Left-Aligned Fluid | **Centered Communication Architecture** (Max-Width Unified) |
-| **Input Modality** | Text-Centric | **Hybrid (Voice Dictation + Auto-Expansive Editor)** |
-| **Geometry Logic** | Auto-Resize Loops | **Deterministic Persistence** (Mode-Independent Memory) |
-| **Session UX** | Static date-based titles | **AI-Generated Concise Titles** (< 6 words) |
-| **Truncation** | Standard overflow | **Smart line-clamp-5** with floating toggle |
-| **Media Creation**| None | **Art Studio** (Imagen 4, Veo 3.1, Nano Banana) |
+| Feature                 | v2.2 (Old)               | **v2.3 (Current)**                                           |
+| :---------------------- | :----------------------- | :----------------------------------------------------------- |
+| **Model Roster**        | 18-Model Waterfall       | **20+ Model Waterfall** (Llama 405B, GPT-OSS 120B)           |
+| **History Logic**       | One record per message   | **Unified Chat Sessions** (Threaded)                         |
+| **Vision Logic**        | Manual routing           | **Global Vision Sync** (All actions see pixels)              |
+| **Privacy Engineering** | Entangled Stealth        | **Decoupled Protection** (OBS hiding vs. Click Pass-through) |
+| **Interaction Layer**   | Manual Toggles           | **Scroll Portal** (Atomic Ctrl+Hover Interaction)            |
+| **Layout Philosophy**   | Left-Aligned Fluid       | **Centered Communication Architecture** (Max-Width Unified)  |
+| **Input Modality**      | Text-Centric             | **Hybrid (Voice Dictation + Auto-Expansive Editor)**         |
+| **Geometry Logic**      | Auto-Resize Loops        | **Deterministic Persistence** (Mode-Independent Memory)      |
+| **Session UX**          | Static date-based titles | **AI-Generated Concise Titles** (< 6 words)                  |
+| **Truncation**          | Standard overflow        | **Smart line-clamp-5** with floating toggle                  |
+| **Media Creation**      | None                     | **Art Studio** (Imagen 4, Veo 3.1, Nano Banana)              |
+| **Setup Flow**          | Environment Variables    | **Premium 3-Step Wizard** (Identity + Persona + Keys)        |
+| **Data Security**       | Plaintext Environment    | **Hardware-Encrypted** (Electron `safeStorage`)              |
+| **OCR Engine**          | Local Basic              | **OCR Space Pro** (High-Accuracy PDF Recovery)               |
+| **Key Sync**            | Handled Separately       | **Unified AI Bridge** (Instant Multi-Engine Rehydration)     |
 
 ---
 
 ## 🚀 Core Features
 
 ### 👁️ Privacy-Centric Workspace
+
 Toggle instantly between **Background Mode** (system tray/minimized) and **Active Workspace** (standard window), ensuring the tool is available for high-velocity workflows but strictly non-intrusive when focus is required.
 
 ### 📸 Contextual Vision (Multi-Shot)
+
 Instantly snap screenshots (`Ctrl + H`). Repeated presses **queue up to 12 screenshots** for multi-context analysis. Moubely "sees" your screen using a multi-model approach.
 
 ### 🧠 Resilient Multi-Provider LLM Controller
+
 Our custom orchestration engine manages 20+ models. If one provider hits a rate limit or API error (e.g., 402 or 429), the controller automatically routes the request to the next available tier, ensuring business continuity.
 
 ### 🎙️ Hybrid Meeting Copilot
+
 - **Local-First Transcription**: Powered by a custom **Local Whisper Server** (Tiny.en) running directly on your machine
 - **Cloud Fallback**: Automatically switches to **Groq** if the local server gets too busy or if **Smart Mode** is enabled
-- **Universal Digital Twin**: Uses the **STAR method** to provide spoken-word answers based on *your* specific profile data
+- **Universal Digital Twin**: Uses the **STAR method** to provide spoken-word answers based on _your_ specific profile data
 - **Automated Workflow**: Single command (`npm start`) launches Frontend, Backend, and Local Whisper Server simultaneously
 
 ### ⚡ RAG-based Personal Knowledge Management
+
 - **Context Grounding**: The system strictly adheres to the user's provided knowledge base (Technical Documentation, Project Notes)
 - **Hallucination Reduction**: Forces the AI to ALWAYS validate answers against your provided context files (RAG), significantly reducing generic AI responses in favor of project-specific accuracy
 
 ### ⚖️ Centered Conversation Architecture
+
 Moubely v2.3 introduces a structural refactor ensuring all chat, email, and meeting recap interfaces maintain perfect visual balance. Using a unified `max-w-3xl mx-auto` constraint, content is anchored in the user's primary focus zone, significantly improving scannability and professional aesthetic.
 
 ### 👻 Private Mode & Scroll Portal
+
 Implemented a highly specialized **Input Passthrough** mode (`Shift + A`). While the window becomes 100% transparent to system-level clicks for underlying workflow access, our **Scroll Portal** logic allows users to "solidify" the viewport temporarily using `Ctrl + Hover` for seamless history navigation without exiting Private Mode.
 
 ### 🏹 Strict Arrow Mode (Universal Stealth)
+
 Engineered an absolute CSS lock that forces a global `default-arrow` cursor across all DOM elements. This eliminates "pointer leakage": common visual tell-tales like I-beams over inputs that might otherwise reveal the application's presence during captured screen recordings or high-stakes screen sharing.
 
 ### 🧠 Personal Digital Twin (STAR Implementation)
+
 Moubely doesn't just answer; it represents. By grounding responses in a user's specific `profile_data.json`, the AI adopts a professional persona that matches your unique background, leveraging the **STAR method** to ensure responses are grounded in verified user facts.
+
+### 🏗️ Premium Onboarding & Identity Setup
+
+Moubely v2.3 features a complete overhaul of the first-run experience. The new 3-step wizard allows users to craft their identity, define their digital twin's persona, and securely configure their AI "powers" through a glassmorphism interface.
+
+### 🔐 Hardware-Encrypted Security (safeStorage)
+
+Security is no longer an afterthought. Moubely now utilizes Electron's `safeStorage` API to encrypt your API keys using hardware-level keys provided by your OS (Windows DPAPI). This ensures that even if your storage files are stolen, your credentials remain unreadable.
+
+### 📄 Advanced PDF Engineering (OCR Space)
+
+We have integrated **OCR Space** to handle complex document analysis. Whether it's a blurry screenshot or a multi-page scanned PDF, Moubely can now extract text with near-perfect accuracy to fuel your RAG context.
 
 ---
 
@@ -114,36 +149,36 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 
 **New in v2.3:** We now prioritize elite, massive-parameter reasoning models (405B+) to ensure the highest possible logical accuracy before falling back to fast efficiency models.
 
-| Tier | Models |
-| :--- | :--- |
-| **Tier 1: Heavy Lifters** | **Hermes 3 Llama 405B**, Llama 3.3 70B, **GPT-OSS 120B**, **Qwen 3 Next 80B**, Cosmos Nemotron 34B |
-| **Tier 2: Fast Multi-Model** | **Gemma 3 Family (27B - 1B)** |
-| **Tier 3: Google Performance** | Gemini 3.0 Pro, Gemini 3 Flash, Gemini 2.5 Flash, Nemotron 3 Nano |
-| **Tier 4: Specialized Tiers** | **Step 3.5 Flash**, Solar Pro 3, Claude 4.5 Haiku, Claude 3.7 Sonnet (Thinking) |
-| **Tier 5: Deep Safety Net** | Llama 3.2 3B, Trinity Mini, Liquid LFM 1.2B, Perplexity Sonar |
+| Tier                           | Models                                                                                             |
+| :----------------------------- | :------------------------------------------------------------------------------------------------- |
+| **Tier 1: Heavy Lifters**      | **Hermes 3 Llama 405B**, Llama 3.3 70B, **GPT-OSS 120B**, **Qwen 3 Next 80B**, Cosmos Nemotron 34B |
+| **Tier 2: Fast Multi-Model**   | **Gemma 3 Family (27B - 1B)**                                                                      |
+| **Tier 3: Google Performance** | Gemini 3.0 Pro, Gemini 3 Flash, Gemini 2.5 Flash, Nemotron 3 Nano                                  |
+| **Tier 4: Specialized Tiers**  | **Step 3.5 Flash**, Solar Pro 3, Claude 4.5 Haiku, Claude 3.7 Sonnet (Thinking)                    |
+| **Tier 5: Deep Safety Net**    | Llama 3.2 3B, Trinity Mini, Liquid LFM 1.2B, Perplexity Sonar                                      |
 
 ### The "Eyes" (Vision) 👁️
 
-| Tier | Models |
-| :--- | :--- |
-| **Tier 1: Elite Vision** | **Gemini 3.1 Pro**, Gemini 3.0 Pro, Claude 4.5 Opus, Claude 3.7 Sonnet (Reasoning) |
-| **Tier 2: Fast & Reliable** | Gemini 3 Flash, Gemini 2.5 Flash, Claude 4.5 Haiku, Mistral Small Vision |
-| **Tier 3: Backups** | Mistral Large 2 (Nvidia), GPT-4o, Perplexity Vision |
+| Tier                        | Models                                                                             |
+| :-------------------------- | :--------------------------------------------------------------------------------- |
+| **Tier 1: Elite Vision**    | **Gemini 3.1 Pro**, Gemini 3.0 Pro, Claude 4.5 Opus, Claude 3.7 Sonnet (Reasoning) |
+| **Tier 2: Fast & Reliable** | Gemini 3 Flash, Gemini 2.5 Flash, Claude 4.5 Haiku, Mistral Small Vision           |
+| **Tier 3: Backups**         | Mistral Large 2 (Nvidia), GPT-4o, Perplexity Vision                                |
 
 ### The "Hands" (Creation - Art Studio) 🎨
 
-| Model | Type | Protocol |
-| :--- | :--- | :--- |
-| **Veo 3.1** | Physical Video | `predictLongRunning` (Asynchronous Polling + Direct URI) |
-| **Imagen 4** | High-Fidelity Art| `predict` (bytesBase64Encoded) |
-| **Nano Banana**| Fast Generation | `generateContent` (Natural Data Discovery) |
+| Model           | Type              | Protocol                                                 |
+| :-------------- | :---------------- | :------------------------------------------------------- |
+| **Veo 3.1**     | Physical Video    | `predictLongRunning` (Asynchronous Polling + Direct URI) |
+| **Imagen 4**    | High-Fidelity Art | `predict` (bytesBase64Encoded)                           |
+| **Nano Banana** | Fast Generation   | `generateContent` (Natural Data Discovery)               |
 
 ### The "Ears" (Audio) 👂
 
-| Type | Description |
-| :--- | :--- |
-| **Local Whisper** | Primary. Uses `Xenova/whisper-tiny.en` running locally on port 3000 |
-| **Groq (Whisper-Large-V3)** | Instant cloud fallback if the local queue times out or fails |
+| Type                        | Description                                                         |
+| :-------------------------- | :------------------------------------------------------------------ |
+| **Local Whisper**           | Primary. Uses `Xenova/whisper-tiny.en` running locally on port 3000 |
+| **Groq (Whisper-Large-V3)** | Instant cloud fallback if the local queue times out or fails        |
 
 ---
 
@@ -155,6 +190,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** The AI was reliably generating code but skipping the crucial final analysis step for image-based submissions because the "Solve" system prompt was never actually being sent to the vision endpoint.
 
 **Solution:** Updated the IPC pipeline and `LLMHelper.ts` to explicitly route a `type='solve'` parameter for screenshot-based coding problems, mapping it to a strict 6-section STAR prompt.
+
 </details>
 
 <details>
@@ -163,6 +199,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Strict prompt instructions to output `<mark>` tags for yellow highlighting were being neutralized by React Markdown's secure sanitization, resulting in literal, unstyled HTML tags appearing on the UI.
 
 **Solution:** Built a **Custom Render Interceptor** in `AIResponse.tsx` that intercepts the standard Markdown AST (Abstract Syntax Tree). It identifies specific target phrases (e.g., `**Say:**`, `**Type:**`, `**Situation:**`) at the DOM generation level and dynamically wraps them in custom Tailwind background utility classes (`bg-yellow-500/20`). This preserves strict XSS security while achieving native, color-coded aesthetic highlighting across all models.
+
 </details>
 
 <details>
@@ -171,6 +208,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** By defaulting all output to Python, users submitting Java, C++, or TypeScript screenshots experienced high friction having to manually translate the solution.
 
 **Solution:** Implemented **Visual Context Language Detection**. The vision prompt now instructs the model to scan the UI (e.g., dropdowns, syntax structures) in the provided screenshot to automatically infer the target language, falling back to Python only when fully ambiguous.
+
 </details>
 
 <details>
@@ -179,6 +217,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Gemini 3.0 and Perplexity APIs strictly require the first message in the chat history to be from the `user`. Our app sometimes started history with an AI greeting (`role: model`), causing 100% failure rates.
 
 **Solution:** Implemented **History Sanitization** in `LLMHelper.ts`. Before sending any request, the code scans the history array, finds the index of the first `user` message, and slices everything before it.
+
 </details>
 
 <details>
@@ -187,6 +226,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** The "Solve" button was blindly sending requests to the `gemini-chat` (Text) endpoint, even when screenshots were attached.
 
 **Solution:** Implemented **Split Routing** in `Queue.tsx`. The function now checks `if (hasImages)` and routes to the correct endpoint.
+
 </details>
 
 <details>
@@ -195,6 +235,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Every single user interaction created a new, isolated entry in the History database, making it impossible to follow a multi-turn conversation or reload context.
 
 **Solution:** Refactored the storage schema to use `ChatSession` objects. The system now checks for `loadedSessionId`; if active, new messages are appended to an array within a single record, enabling full threaded history restoration.
+
 </details>
 
 <details>
@@ -203,6 +244,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Vision support was hardcoded exclusively for the "Solve" button. Quick actions like "Assist" or "Ask" ignored the screenshot queue, forcing users to manually double-prompt.
 
 **Solution:** Generalized the `triggerAssistAction` pipeline. It now dynamically checks the screenshot buffer; if occupied, it automatically switches the IPC call from `gemini-chat` to `chat-with-image`, injecting the prompt with visual context.
+
 </details>
 
 <details>
@@ -211,6 +253,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Despite a "stealth" UI, native browser/Electron `title` attributes would trigger OS-level tooltips on hover, which are captured by screen recording software and reveal the tool's presence.
 
 **Solution:** Conducted a global audit to purge the `title` attribute from the entire DOM. Replaced critical feedback with custom, non-native floating elements and micro-animations that stay within the app's coordinate space.
+
 </details>
 
 <details>
@@ -219,6 +262,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Date-based history titles are non-descriptive, requiring users to open every session to find specific information.
 
 **Solution:** Implemented a background "Title Generator" hook. Upon sending the first message of a new session, an invisible sub-request is sent to Gemini to distill the user's intent into a 5-6 word title.
+
 </details>
 
 <details>
@@ -227,6 +271,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Long prompts cluttered the chat bubble, but simple `overflow: hidden` made copy-pasting impossible.
 
 **Solution:** Engineered a `<CollapsibleUserMessage />` component using Tailwind's `line-clamp-5`. It preserves whitespace formatting exactly as typed while providing a floating chevron toggle for expansion.
+
 </details>
 
 <details>
@@ -235,6 +280,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Standard Electron windows capture mouse events even when entirely transparent, creating "ghost bounds" that interfere with underlying desktop applications and block clicks.
 
 **Solution:** Engineered a robust DWM (Desktop Window Manager) hit-test workaround leveraging explicit `setBounds` recalculations paired with synchronized opacity flutters (`win.setOpacity`). Combined with dynamic `win.setIgnoreMouseEvents` fallback handlers, this guarantees a zero-latency seamless cross-application experience.
+
 </details>
 
 <details>
@@ -243,6 +289,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Groq (Cloud) processed faster than Local Whisper, causing transcripts to appear out of order.
 
 **Solution:** Implemented a **Ticket System** with timestamps to ensure perfect chronological order.
+
 </details>
 
 <details>
@@ -251,6 +298,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Large Language Models often drift into generic or hallucinated answers when asked specific domain questions.
 
 **Solution:** Added a **"Pivot Rule" RAG Layer** that forces the model to ground its answers in the provided knowledge base files.
+
 </details>
 
 <details>
@@ -259,6 +307,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** The app would start with no window visible at all due to Electron transparency bugs.
 
 **Solution:** Implemented an aggressive `ready-to-show` callback with explicit `win.focus()`.
+
 </details>
 
 <details>
@@ -267,6 +316,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** The app would hang on startup because `Main` and `IPC Handlers` were importing each other.
 
 **Solution:** Refactored the architecture to use **Type-Only Imports** (`import type`).
+
 </details>
 
 <details>
@@ -275,6 +325,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Reasoning models output their internal monologue (`<think>...`), cluttering the chat.
 
 **Solution:** Implemented a **Universal Response Cleaner** to filter out thought tags in real-time.
+
 </details>
 
 <details>
@@ -283,6 +334,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Models would ignore "soft" instructions to use specific formatting and revert to standard outputs.
 
 **Solution:** Injected **5 Contextual Anchors** (Tone, References, Format) directly into the `systemContext` block, making them strictly adhered to by the model.
+
 </details>
 
 <details>
@@ -291,6 +343,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Fixed 2.5s chunks were too short for context, and 10s chunks were too slow for conversation.
 
 **Solution:** Implemented **Variance-Based Silence Detection**. The app analyzes the audio waveform; if it detects silence >3s, it forces an early transcription.
+
 </details>
 
 <details>
@@ -299,6 +352,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** The prompts appeared static, limiting the app to one user.
 
 **Solution:** Architecture refactor to use **Dynamic Profile Loading**. The prompt in code is just a template; the content is loaded from `user_profile.json` at runtime.
+
 </details>
 
 <details>
@@ -307,6 +361,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Smaller models often ignore "soft" instructions to use specific markdown bolding for scannability, leading to plain, "blank-looking" answers.
 
 **Solution:** Implemented a **Regex-Based Auto-Highlighter** fallback. The system now post-processes every response, automatically wrapping project keywords, technical terms, and percentage values in `**` if the model fails to do so.
+
 </details>
 
 <details>
@@ -315,6 +370,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** To prioritize stealth, the app used to boot invisibly, which often led users to believe the application had failed to launch.
 
 **Solution:** Inverted the initial boot logic. Moubely now spawns in a **Visible State** by default, allowing the user to confirm system readiness before manually toggling into **Stealth Mode** using the integrated hotkey.
+
 </details>
 
 <details>
@@ -323,6 +379,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Centering content in an Electron window using standard CSS (`mx-auto`) creates large empty logical hitboxes flanking the content. These invisible areas would block clicks directed at underlying apps.
 
 **Solution:** Engineered a **Dynamic Interactive Layering System**. We decoupled visual alignment from the interaction handler. By precisely calculating viewport bounds and dynamically updating Electron's `setIgnoreMouseEvents` specifically for the X-axis margins, we ensured the app feels visually balanced while physically remaining non-blocking.
+
 </details>
 
 <details>
@@ -331,6 +388,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Injecting transcribed text into an active React `textarea` often causes state overwrites where user typing and async transcription collide, leading to cursor jumps.
 
 **Solution:** Implemented a **Synchronized State Buffer Manager**. The dictation handler takes an atomic snapshot of current input upon microphone closure, performs a clean string append, and forces a cursor refocus event to the end of the new string.
+
 </details>
 
 <details>
@@ -339,6 +397,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Standard Electron windows trigger recursive resize events when switching between "Expanded" and "Shrink" modes, as the OS layout engine and the App disagree on final bounds.
 
 **Solution:** Built a **Hard-Boundary Controller** in `WindowHelper.ts`. It utilizes isolated memory states. Instead of listening to resize events, it forcefully overrides boundaries during transitions using `setMinimumSize` and `setMaximumSize` locks at the process level.
+
 </details>
 
 <details>
@@ -347,6 +406,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** True ghost windows (click-through) are physically unreachable for scrolling history.
 
 **Solution:** Developed a **Modifier-Driven Hit-Test Override**. By leveraging Electron's `forward` flag with `setIgnoreMouseEvents`, we tracked mouse coordinates in a transparent state. Combining this with a low-level listener for the `Ctrl` key allowed us to "solidify" the interaction target only on-demand.
+
 </details>
 
 <details>
@@ -355,6 +415,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** A fixed-height edit input is either too large for simple fixes or too small for thorough prompt revisions.
 
 **Solution:** Built a **Ref-based Auto-Resizer**. The edit textarea starts at a single line (40px). As text is added, it dynamically recalculates `scrollHeight` and expands the UI container up to a 120px limit before transitioning into a scroll view.
+
 </details>
 
 <details>
@@ -363,6 +424,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Google AI Studio uses three distinct API protocols for media generation. Imagen 4, Veo 3.1, and Nano Banana (Gemini) each reject the others' payload structures and endpoint types.
 
 **Solution:** Engineered a **Triple-Lane Dispatcher** in `GenerationHelper.ts`. It intelligently routes requests between `predict` (Imagen), `predictLongRunning` (Veo), and `generateContent` (Banana) lanes based on the model string, ensuring zero-latency protocol switching.
+
 </details>
 
 <details>
@@ -371,6 +433,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Video generation is a heavy process that can take up to 2-3 minutes, meaning a standard HTTP request would time out long before the physical file is ready.
 
 **Solution:** Implemented an **Automated Polling Loop** for the Veo engine. Moubely now spawns a background observer that checks Google’s "Operation Status" every 5 seconds, maintaining state until the server reports "Done," allowing the user to continue chatting while their cinematic render finishes.
+
 </details>
 
 <details>
@@ -379,6 +442,7 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** Unlike images which return base64 bytes, Veo 3.1 returns a high-speed temporary download URI that expires quickly and requires authenticated access.
 
 **Solution:** Built a **High-Speed Artifact Downloader**. Upon receiving the "Done" signal, the engine immediately initiates a binary stream from the provided URI using the user's API key, saving the physical `.mp4` file directly to the local Moubely studio for native rendering.
+
 </details>
 
 <details>
@@ -387,13 +451,21 @@ Moubely uses a **Smart Routing Engine** in `electron/LLMHelper.ts` that prioriti
 **Problem:** In the Fluid Centered Architecture, user messages with long text or large attachments would sometimes "bleed" over the AI's visual margin, creating layout overlaps and breaking the professional aesthetic.
 
 **Solution:** Restored a hard **85% Max-Width Constraint** paired with `ml-auto` specifically for the User message container. This enforces a permanent "Yellow Line" safety margin, ensuring user content stays strictly on the right side of the communication bridge.
+
 </details>
 
 ---
 
-## 📦 Installation & Setup
+### 📦 Installation & Setup
 
-### Prerequisites
+#### Direct Download (Recommended)
+
+For the easiest experience, go to the [**Latest Releases**](https://github.com/Moubarak-01/Moubely/releases/latest) and download:
+
+- **`Moubely.Setup.1.0.0.exe`**: Standard Windows installer (creates shortcuts and sets up everything automatically).
+- **`Moubely.1.0.0.exe`**: Portable version (runs instantly without installation).
+
+#### Developer Setup (Build from Source)
 
 - Node.js v18 or higher
 - npm or yarn
@@ -416,15 +488,15 @@ npm install
 
 ### Required API Keys
 
-| Service | Variable Name | Get Key Here |
-| :--- | :--- | :--- |
-| **Google Gemini** | `GEMINI_API_KEY` | [Get Key](https://aistudio.google.com/app/apikey) |
-| **GitHub** | `GITHUB_TOKEN` | [Get Token](https://github.com/settings/tokens) |
-| **Groq** | `GROQ_API_KEY` | [Get Key](https://console.groq.com/keys) |
-| **Perplexity** | `PERPLEXITY_API_KEY` | [Get Key](https://www.perplexity.ai/settings/api) |
-| **OpenRouter** | `OPENROUTER_API_KEY` | [Get Key](https://openrouter.ai/keys) |
-| **NVIDIA NIM** | `NVIDIA_API_KEY` | [Get Key](https://build.nvidia.com) |
-| **OCR Space** | `OCR_SPACE_API_KEY` | [Get Key](https://ocr.space/ocrapi) |
+| Service           | Variable Name        | Get Key Here                                      |
+| :---------------- | :------------------- | :------------------------------------------------ |
+| **Google Gemini** | `GEMINI_API_KEY`     | [Get Key](https://aistudio.google.com/app/apikey) |
+| **GitHub**        | `GITHUB_TOKEN`       | [Get Token](https://github.com/settings/tokens)   |
+| **Groq**          | `GROQ_API_KEY`       | [Get Key](https://console.groq.com/keys)          |
+| **Perplexity**    | `PERPLEXITY_API_KEY` | [Get Key](https://www.perplexity.ai/settings/api) |
+| **OpenRouter**    | `OPENROUTER_API_KEY` | [Get Key](https://openrouter.ai/keys)             |
+| **NVIDIA NIM**    | `NVIDIA_API_KEY`     | [Get Key](https://build.nvidia.com)               |
+| **OCR Space**     | `OCR_SPACE_API_KEY`  | [Get Key](https://ocr.space/ocrapi)               |
 
 Create a `.env` file in the root directory and paste the following:
 
@@ -454,7 +526,35 @@ OCR_SPACE_API_KEY=your_key_here
 ```bash
 npm start
 ```
-*This command automatically launches the Vite Dev Server, Electron Backend, and Local Whisper Server.*
+
+_This command automatically launches the Vite Dev Server, Electron Backend, and Local Whisper Server._
+
+<details>
+<summary><strong>31. The Unified AI Hydration Bridge</strong></summary>
+
+**Problem:** The media engine (Art Mode) and text engine (Chat) were operating as separate instances. Saving API keys in the settings would update the chat, but Art Mode would still return "API Key Not Configured" until a full app restart.
+
+**Solution:** Integrated `GenerationHelper` into the global `AppState` and implemented a **Live Synchronization Bridge**. This ensures that any change to the secure credential store is propagated to all AI engines (text, image, and video) simultaneously and without a restart.
+
+</details>
+
+<details>
+<summary><strong>32. Secure Credential Cold-Start (Async Flow)</strong></summary>
+
+**Problem:** On initial launch, the app would sometimes enter an "Onboarding Loop" because the AI helper attempted to initialize before the encrypted keys were fully decrypted from disk.
+
+**Solution:** Refactored the core lifecycle to be **Transaction-Safe**. The app now uses an `async loadApiKeys` sequence that blocks AI engine registration until credentials are confirmed, ensuring a smooth transition from Setup to Active Workspace.
+
+</details>
+
+<details>
+<summary><strong>33. OCR Space Migration (Text Recovery)</strong></summary>
+
+**Problem:** Standard PDF libraries failed on scanned documents, and using elite models for OCR was cost-prohibitive for large files.
+
+**Solution:** Replaced the legacy OpenAI integration with a dedicated **OCR Space** engine. This provides a specialized "Text Recovery" lane for complex vision-to-text tasks, allowing the main LLMs to focus on reasoning rather than character recognition.
+
+</details>
 
 ---
 
@@ -505,6 +605,7 @@ This project is licensed under the **MIT License**.
 ### 🛡️ Mandatory Attribution
 
 If you clone, fork, or use any logic from this repository (especially the **Resilient Controller** or **Window Management Systems**), you are **legally required** to:
+
 - Retain the original copyright notice in the `LICENSE` file
 - Provide a visible link back to this [Moubely Repository](https://github.com/Moubarak-01/Moubely)
 - Acknowledge **Moubarak-01** as the original author
@@ -514,6 +615,7 @@ If you clone, fork, or use any logic from this repository (especially the **Resi
 ## 👨‍💻 Author
 
 **Moubarak**
+
 - GitHub: [@Moubarak-01](https://github.com/Moubarak-01)
 
 ---
