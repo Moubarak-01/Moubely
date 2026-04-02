@@ -37,25 +37,25 @@ async function safePdfParse(buffer: Buffer) {
 
 // --- 1. THE EXPANDED WATERFALL BRAINS ---
 const CHAT_MODELS = [
-
     // --- TIER 1: THE HEAVY LIFTERS (Advanced Reasoning & Logic) ---
     { type: 'openrouter', model: 'nousresearch/hermes-3-llama-3.1-405b:free', name: 'Hermes 3 Llama 405B' },
     { type: 'openrouter', model: 'qwen/qwen3-next-80b-a3b-instruct:free', name: 'Qwen 3 Next 80B' },
 
     // --- TIER 2 : FAST & OPEN (Gemma 3 / Flash / Lite) ---
-    { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
-    { type: 'gemini', model: 'gemini-2.0-flash-lite-preview-02-05', name: 'Gemini 2.0 Flash Lite' },
-    { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
     { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B' },
     { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B' },
     { type: 'gemini', model: 'gemma-3-4b-it', name: 'Gemma 3 4B' },
-    { type: 'gemini', model: 'gemma-3-2b-it', name: 'Gemma 3 2B' },
+    { type: 'gemini', model: 'gemma-3-2b-it', name: 'Gemma 3 2B' }, // ADDED: 14.4K RPD
     { type: 'gemini', model: 'gemma-3-1b-it', name: 'Gemma 3 1B' },
+    { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
+    { type: 'gemini', model: 'gemini-2.0-flash-lite-preview-02-05', name: 'Gemini 2.0 Flash Lite' }, // ZERO RPD
+    { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' }, // ZERO RPD,
 
     // --- TIER 3: Gemini ---
-    { type: 'gemini', model: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+    { type: 'gemini', model: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' }, // ADDED: 500 RPD
     { type: 'openrouter', model: 'nvidia/nemotron-3-nano-30b-a3b:free', name: 'Nvidia Nemotron 3 Nano' },
+    { type: 'gemini', model: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' }, // ZERO RPD,
 
     // --- TIER 4: EFFICIENCY & SPECIALIZED ---
     { type: 'openrouter', model: 'stepfun/step-3.5-flash:free', name: 'Step 3.5 Flash' },
@@ -81,22 +81,23 @@ const CHAT_MODELS = [
     { type: 'groq', model: 'llama-3.3-70b-versatile', name: 'Groq Llama 3.3' },
     { type: 'perplexity', model: 'sonar-reasoning-pro', name: 'Sonar Reasoning Pro' },
     { type: 'perplexity', model: 'sonar', name: 'Sonar' }
-
 ];
 
 // --- 2. THE EYES (Vision Waterfall) ---
 const VISION_MODELS = [
     // --- TIER 1: ELITE VISION ---
-    { type: 'gemini', model: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview' },
-    { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro' },
-    { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
-    { type: 'gemini', model: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-    { type: 'openrouter', model: 'anthropic/claude-opus-4.5', name: 'Claude 4.5 Opus (Vision)' },
-    { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Reasoning Vision)' },
-
-    // --- TIER 2: FAST & RELIABLE ---
+    { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B (Vision)' }, // Moved up for reliability
+    { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B (Vision)' }, // Added as extra backup
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
+    { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
+    { type: 'openrouter', model: 'anthropic/claude-opus-4.5', name: 'Claude 4.5 Opus (Vision)' },
+    { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Reasoning Vision)' },
+    { type: 'gemini', model: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview' }, // ZERO RPD
+    { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro' }, // ZERO RPD
+    { type: 'gemini', model: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' }, // ZERO RPD,
+
+    // --- TIER 2: FAST & RELIABLE ---
     { type: 'openrouter', model: 'anthropic/claude-sonnet-4.5', name: 'Claude 4.5 Sonnet (Vision)' },
     { type: 'openrouter', model: 'anthropic/claude-haiku-4.5', name: 'Claude 4.5 Haiku (Fast Vision)' },
     { type: 'openrouter', model: 'mistralai/mistral-small-3.1-24b-instruct:free', name: 'Mistral Small Vision' },
@@ -107,6 +108,7 @@ const VISION_MODELS = [
     { type: 'github', model: 'gpt-4o' },
     { type: 'perplexity', model: 'sonar-reasoning-pro' },
 ];
+
 
 export class LLMHelper {
     private genAI: GoogleGenerativeAI | null = null
@@ -344,7 +346,11 @@ export class LLMHelper {
 
     **Complete Code Block:**
        (Provide 2 newlines after the header, then code)
-       Provide the full, clean, and 100% correct code block. DO NOT add any extra text or analysis inside this section.
+       Provide the full, clean, and 100% correct code block.
+       CRITICAL RULES FOR THE FINAL CODE:
+       1. You MUST wrap the code in the exact class/function structure shown in the screenshot (e.g., \`class Solution:\` with a typed \`def\` method for Python, or \`class Solution { public:\` for C++). Do NOT just output loose functions if a class was provided.
+       2. Ensure all types, imports, and self-references are exactly as expected by the environment.
+       DO NOT add any extra text or analysis inside this section.
 
     ⚠️ CRITICAL: DO NOT STOP after the code block. You MUST continue to the Post-Code Analysis.
 
@@ -830,6 +836,11 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     finalSystemInstruction += studentAugmentation;
                 }
 
+                // [NEW] MODEL-SPECIFIC PROMPT OVERRIDES FOR SMALLER MODELS
+                if (type === 'solve' && (config.model.includes('gemma') || config.model.includes('llama') || config.model.includes('mistral') || config.model.includes('qwen') || config.model.includes('trinity'))) {
+                    finalSystemInstruction += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 CRITICAL INSTRUCTION FOR SMALLER MODELS (HARD ENFORCEMENT)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nWhen executing the Line-by-Line solution in the "Action:" section:\n1. DO NOT dump the entire solution (e.g., the full \`class Solution\`) inside a single **Type:** block.\n2. You MUST break the code logically. For example:\n   - First **Say:** explain the initial variables. First **Type:** define ONLY those initial variables.\n   - Second **Say:** explain the loop. Second **Type:** write ONLY the loop syntax.\n   - Third **Say:** explain the inside of the loop. Third **Type:** write ONLY the inside of the loop.\n3. The ONLY place the fully combined code should be written is inside the "Complete Code Block:" section at the very end.\nIF YOU PUT THE ENTIRE SOLUTION IN ONE "Type:" BLOCK DURING THE ACTION PHASE, YOU FAIL.\n`;
+                }
+
                 let fullResponse = "";
 
                 if (config.type === 'gemini') {
@@ -960,15 +971,23 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
         }
 
         if (this.sessionTranscript) visionPrompt += `\n\nContext: ${this.sessionTranscript}`;
-        const textPart = { type: "text", text: visionPrompt };
 
         for (const config of VISION_MODELS) {
             try {
+                let currentVisionPrompt = visionPrompt;
+                
+                // [NEW] MODEL-SPECIFIC PROMPT OVERRIDES FOR SMALLER MODELS
+                if (type === 'solve' && (config.model.includes('gemma') || config.model.includes('llama') || config.model.includes('mistral') || config.model.includes('qwen') || config.model.includes('trinity'))) {
+                    currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 CRITICAL INSTRUCTION FOR SMALLER MODELS (HARD ENFORCEMENT)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nWhen executing the Line-by-Line solution in the "Action:" section:\n1. DO NOT dump the entire solution (e.g., the full \`class Solution\`) inside a single **Type:** block.\n2. You MUST break the code logically. For example:\n   - First **Say:** explain the initial variables. First **Type:** define ONLY those initial variables.\n   - Second **Say:** explain the loop. Second **Type:** write ONLY the loop syntax.\n   - Third **Say:** explain the inside of the loop. Third **Type:** write ONLY the inside of the loop.\n3. The ONLY place the fully combined code should be written is inside the "Complete Code Block:" section at the very end.\nIF YOU PUT THE ENTIRE SOLUTION IN ONE "Type:" BLOCK DURING THE ACTION PHASE, YOU FAIL.\n`;
+                }
+                
+                const textPart = { type: "text", text: currentVisionPrompt };
+
                 let fullResponse = "";
                 if (config.type === 'gemini') {
                     if (!this.genAI) continue;
                     const model = this.genAI.getGenerativeModel({ model: config.model });
-                    const result = await model.generateContentStream([{ text: visionPrompt }, ...geminiParts]);
+                    const result = await model.generateContentStream([{ text: currentVisionPrompt }, ...geminiParts]);
                     for await (const chunk of result.stream) {
                         if (this.isAborted) {
                             console.log(`[LLM] 🛑 Generation aborted by user.`);
@@ -991,7 +1010,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     if (client) {
                         const heavyAttachmentsCount = attachments.filter(a => a.type !== 'image' && a.type !== 'text').length;
                         const fallbackTextPart = heavyAttachmentsCount > 0
-                            ? { type: "text", text: `${visionPrompt}\n\n[SYSTEM WARNING: The user attached ${heavyAttachmentsCount} heavy file(s) that your current API backend lacks the native ingestion support for. Please gracefully inform the user you can only see images and pure text scripts.]` }
+                            ? { type: "text", text: `${currentVisionPrompt}\n\n[SYSTEM WARNING: The user attached ${heavyAttachmentsCount} heavy file(s) that your current API backend lacks the native ingestion support for. Please gracefully inform the user you can only see images and pure text scripts.]` }
                             : textPart;
 
                         const stream = await client.chat.completions.create({

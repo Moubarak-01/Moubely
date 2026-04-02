@@ -775,7 +775,6 @@ const Queue: React.FC<any> = () => {
                     }
                     return prev;
                 });
-                setIsThinking(false);
                 // isAtBottomRef.current = true;  <-- CORRECT: Commented out to allow scrolling up
             });
         }
@@ -2424,6 +2423,12 @@ const Queue: React.FC<any> = () => {
                                                                     </>
                                                                 );
                                                             })()}
+                                                            {msg.isStreaming && showSlowLoader && !isArtActive && (
+                                                                <div className="flex items-center gap-3 text-sm text-gray-400 pt-1">
+                                                                    <Loader2 size={16} className="animate-spin text-blue-400" />
+                                                                    <span className="animate-pulse">{thinkingStep}</span>
+                                                                </div>
+                                                            )}
                                                             <MessageContent text={msg.text} />
                                                             <div className="flex items-center mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                 <button
@@ -2450,12 +2455,6 @@ const Queue: React.FC<any> = () => {
                                                 )}
                                             </div>
                                         ))}
-                                        {showSlowLoader && !isArtActive && (
-                                            <div className="flex items-center gap-3 text-sm text-gray-400 pl-1">
-                                                <Loader2 size={16} className="animate-spin text-blue-400" />
-                                                <span className="animate-pulse">{thinkingStep}</span>
-                                            </div>
-                                        )}
                                         <div ref={chatEndRef} />
                                     </div>
                                 </div>
