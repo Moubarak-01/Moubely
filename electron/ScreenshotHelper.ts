@@ -3,6 +3,7 @@ import fs from "node:fs"
 import { app, desktopCapturer, screen } from "electron"
 import { v4 as uuidv4 } from "uuid"
 import sharp from "sharp"
+import screenshot from "screenshot-desktop"
 
 export class ScreenshotHelper {
   private screenshotQueue: string[] = []
@@ -97,24 +98,34 @@ export class ScreenshotHelper {
       const targetDir = this.view === "queue" ? this.screenshotDir : this.extraScreenshotDir;
       const screenshotPath = path.join(targetDir, `${uuidv4()}.png`)
 
-      // NATIVE ELECTRON CAPTURE (Bypasses Device Guard .exe blocking)
-      const primaryDisplay = screen.getPrimaryDisplay();
-      const scaleFactor = primaryDisplay.scaleFactor;
-      const width = primaryDisplay.size.width * scaleFactor;
-      const height = primaryDisplay.size.height * scaleFactor;
+      // Fowlle the Mouse approach: Get the display where the cursor currently is
+      const cursorPoint = screen.getCursorScreenPoint();
+      const targetDisplay = screen.getDisplayNearestPoint(cursorPoint);
+      
+      // Determine array order from Electron
+      const allDisplays = screen.getAllDisplays();
+      const targetIndex = allDisplays.findIndex(d => d.id === targetDisplay.id);
 
-      const sources = await desktopCapturer.getSources({
-        types: ['screen'],
-        thumbnailSize: { width, height }
-      });
+      // Fetch displays strictly from the native screenshot engine
+      const screenshotDisplays = await screenshot.listDisplays();
 
-      if (!sources || sources.length === 0) {
-        throw new Error("No screens found to capture.");
+      if (!screenshotDisplays || screenshotDisplays.length === 0) {
+        throw new Error("No screens found to capture by native engine.");
       }
 
-      // Grab the primary screen (usually the first one)
-      const source = sources[0];
-      const imageBuffer = source.thumbnail.toPNG();
+      // Map the array indices (this correctly bypasses hardware GPU boundaries)
+      let finalTargetScreen = screenshotDisplays[0];
+      if (targetIndex >= 0 && targetIndex < screenshotDisplays.length) {
+          finalTargetScreen = screenshotDisplays[targetIndex];
+      }
+
+      console.log(`\n=== 🖥️ MOUBELY SCREEN CAPTURE TELEMETRY ===`);
+      console.log(`📍 Mouse is on Display Index: ${targetIndex} (ID: ${targetDisplay.id})`);
+      console.log(`📸 Native engine mapped to: ${finalTargetScreen.name || finalTargetScreen.id}`);
+      console.log(`============================================================\n`);
+
+      // Trigger the native screenshot explicitly on that matched screen
+      const imageBuffer = await screenshot({ screen: finalTargetScreen.id, format: "png" });
 
       fs.writeFileSync(screenshotPath, imageBuffer);
 
