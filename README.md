@@ -530,6 +530,24 @@ graph TD
 
 </details>
 
+<details>
+<summary><strong>34. The "Premature Stream" UI Flicker</strong></summary>
+
+**Problem:** When streaming chunks from smaller LLMs (like Gemma or Llama), the UI's "Thinking..." loader would immediately reset itself before the stream finished, causing jarring visual flickering and improper line breaks.
+
+**Solution:** Refactored the `onTokenReceived` event in the frontend. We pushed the responsibility of clearing the `isThinking` state strictly to the backend's explicit `onStreamComplete` webhook. Additionally, we repositioned the loader spinner inline with the messages to maintain a perfectly flush chat flow.
+
+</details>
+
+<details>
+<summary><strong>35. Hardware GPU Boundaries & The Zoom Screen-Share Hijack</strong></summary>
+
+**Problem:** Electron's native `desktopCapturer` was failing on multi-monitor setups. When a Hybrid GPU (Nvidia Optimus) was active or Zoom screen-sharing intersected the Desktop Window Manager, the OS completely deleted physical screens from its internal enumeration buffer, causing Moubely to take screenshots of the wrong display.
+
+**Solution:** Engineered an **OS-Level Capture Subversion Strategy**. We ripped out Electron's WebRTC capture module and integrated `screenshot-desktop`, a native engine. By implementing an **Array Index Mirror**—tracking the OS enumeration index of the mouse pointer and explicitly commanding the native Windows screenshot API to target that exact array index—we bypassed all hardware boundaries and fully restored resilient "Follow-the-Mouse" capabilities.
+
+</details>
+
 ---
 
 ### 📦 Installation & Setup
