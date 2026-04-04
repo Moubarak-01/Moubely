@@ -195,6 +195,41 @@ const AudioVisualizer = ({ audioContext, source }: { audioContext: AudioContext 
 
 // --- HELPER: Message Content Renderer ---
 const MessageContent: React.FC<{ text: string }> = ({ text }) => {
+    // 1. Hide the <think> scratchpad in real-time.
+    let cleanedText = text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '');
+
+    // 2. THE BULLETPROOF REGEX TRAPDOOR:
+    // We explicitly look for a TRUE Situation header (must be at the start of a line, no bullet points allowed).
+    const situationMatch = cleanedText.match(/(?:^|\n)\s*(?:#*\s*)?(?:\*\*Situation:\*\*|Situation:)/i);
+    let didSnap = false;
+    if (situationMatch && situationMatch.index !== undefined) {
+        cleanedText = cleanedText.substring(situationMatch.index).trim();
+        didSnap = true;
+    } else {
+        cleanedText = cleanedText.trim();
+    }
+
+    // 3. THE YAP DETECTOR + FAILSAFE:
+    // If models like Gemma refuse to use <think> and instead vomit prompt instructions, we track the keywords.
+    const isYapping = /Problem:|S\.T\.A\.R\.|Analogy-heavy|High School Graduate|Crucial Rules/i.test(cleanedText);
+    // FAILSAFE: If the AI yaps for more than 400 chars and completely forgot the Situation header, we abort the spinner to prevent infinite loading.
+    const isRunawayYap = isYapping && cleanedText.length > 400 && !didSnap;
+
+    // 4. Show the spinner if thinking OR if safely yapping without a true Situation match yet.
+    const isThinkingActive = 
+        (!cleanedText && text.includes('<think>')) || 
+        (text.includes('<think>') && !text.includes('</think>') && !didSnap) ||
+        (isYapping && !didSnap && !isRunawayYap);
+
+    if (isThinkingActive) {
+        return (
+            <div className="flex items-center gap-2 text-gray-300 opacity-90 text-sm py-1 font-medium tracking-wide">
+                <Loader2 size={15} className="animate-spin text-blue-400" />
+                <span>Deep reasoning in progress...</span>
+            </div>
+        );
+    }
+
     return (
         <div className="text-[14px] leading-relaxed text-gray-200 markdown-content">
             <ReactMarkdown
@@ -231,7 +266,8 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
                             setIsCopied(true)
                             setTimeout(() => setIsCopied(false), 2000)
                         }
-                        return !inline ? (
+                        const isInline = typeof inline !== 'undefined' ? inline : (!match && !String(children).includes('\n'));
+                        return !isInline ? (
                             <div className="rounded-lg overflow-hidden my-3 bg-[#1e1e1e] border border-white/10 shadow-lg group relative">
                                 <div className="bg-white/5 px-3 py-1.5 text-[10px] text-gray-500 border-b border-white/5 flex justify-between items-center uppercase font-mono tracking-wider">
                                     <span>{match?.[1] || 'text'}</span>
@@ -243,7 +279,7 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
                                 <code className={`${className} block p-3 overflow-x-auto text-xs font-mono`} {...props}>{children}</code>
                             </div>
                         ) : (
-                            <code className="bg-white/10 px-1.5 py-0.5 rounded text-pink-300 text-xs font-mono border border-white/5" {...props}>{children}</code>
+                            <code className="bg-white/10 px-1.5 py-0.5 rounded text-blue-300 text-xs font-mono border border-white/5" {...props}>{children}</code>
                         )
                     }
                 }}

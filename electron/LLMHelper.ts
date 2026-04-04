@@ -85,9 +85,9 @@ const CHAT_MODELS = [
 
 // --- 2. THE EYES (Vision Waterfall) ---
 const VISION_MODELS = [
-    // --- TIER 1: ELITE VISION ---
-    { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B (Vision)' }, // Moved up for reliability
-    { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B (Vision)' }, // Added as extra backup
+    // --- TIER 1: ELITE & RELIABLE VISION (Gemma 4 Upgrade) ---
+    { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B (Vision)' }, // ADDED '-it'
+    { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B (Vision)' }, // ADDED '-a4b-it'
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
@@ -305,6 +305,8 @@ export class LLMHelper {
 
     ### 🧠 CODING QUESTIONS: "THE VIBE CHECK" (STAR FORMAT)
     
+    🚨 CRITICAL SILENT START RULE: DO NOT output any planning text, thought process, image transcription, or preamble. DO NOT write "Constraint Check" or "Task:". You MUST put all your deep logic, planning, and transcription inside a <think> ... </think> tag at the very top of your response. Then, the absolutely first text the user sees MUST be "**Situation:**". Any text outside the <think> tag that comes before "**Situation:**" is a fatal error.
+
     YOUR RESPONSE MUST CONTAIN EXACTLY 6 SECTIONS. Each section header MUST be on its own line, followed by a blank line, then the content below it. DO NOT use numbers (1., 2.) for the headers.
 
     **Situation:**
@@ -836,9 +838,8 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     finalSystemInstruction += studentAugmentation;
                 }
 
-                // [NEW] MODEL-SPECIFIC PROMPT OVERRIDES FOR SMALLER MODELS
-                if (type === 'solve' && (config.model.includes('gemma') || config.model.includes('llama') || config.model.includes('mistral') || config.model.includes('qwen') || config.model.includes('trinity'))) {
-                    finalSystemInstruction += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 CRITICAL INSTRUCTION FOR SMALLER MODELS (HARD ENFORCEMENT)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nWhen executing the Line-by-Line solution in the "Action:" section:\n1. DO NOT dump the entire solution (e.g., the full \`class Solution\`) inside a single **Type:** block.\n2. You MUST break the code logically. For example:\n   - First **Say:** explain the initial variables. First **Type:** define ONLY those initial variables.\n   - Second **Say:** explain the loop. Second **Type:** write ONLY the loop syntax.\n   - Third **Say:** explain the inside of the loop. Third **Type:** write ONLY the inside of the loop.\n3. The ONLY place the fully combined code should be written is inside the "Complete Code Block:" section at the very end.\nIF YOU PUT THE ENTIRE SOLUTION IN ONE "Type:" BLOCK DURING THE ACTION PHASE, YOU FAIL.\n`;
+                if ((type === 'solve' || type === 'answer' || isCandidateMode) && (config.model.includes('gemma') || config.model.includes('llama') || config.model.includes('mistral') || config.model.includes('gemini') || config.type === 'openrouter')) {
+                    finalSystemInstruction += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Ultra-Strict Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: You MUST fight the urge to acknowledge the prompt. Your VERY FIRST output tokens MUST be <think>. You MUST NOT output any text, restatement of rules, or greetings before the <think> tag.\n❌ BAD START: "The user wants me to... <think>"\n✅ GOOD START: "<think>[All your planning here]</think>\\n**Situation:**"\n\nSYNCHRONIZED COMMENTS RULE: Every single line of code inside your \`Type:\` blocks MUST mathematically match the code in your \`Complete Code Block\`. If you plan to put a comment (e.g., \`// Step 1: Transpose\`) in the final block, that exact comment MUST be included in your \`Type:\` snippet. No hidden additions at the end.\n\nINLINE VS. BLOCK:\n\nInline: Any single variable, function name, or property (e.g., \`grid1\`, \`dfs\`, \`is_sub\`) mentioned in your natural speech MUST be wrapped in SINGLE backticks and stay inside the sentence. NEVER give these their own line or triple backticks.\nBlocks: Only the actual logic chunks in the Action: section (using the Type: label) and the Complete Code Block: should have their own lines.\n\nNO SHORT-CIRCUIT: You MUST visit every land cell in \`grid2\`. Do not return False until the entire island is "sunk" (set to 0).\n\nEXACT 6 SECTIONS: Ensure you output exactly 6 headers. If you miss one or add a 7th, the response fails.`;
                 }
 
                 let fullResponse = "";
@@ -874,12 +875,20 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     else if (config.type === 'nvidia') client = this.nvidiaClient; // [NEW] NVIDIA Client
 
                     if (client) {
+                        const msgs: any[] = [
+                            { role: "system", content: finalSystemInstruction },
+                            ...history.map(h => ({ role: h.role === 'ai' ? 'assistant' : 'user', content: h.text })),
+                            { role: "user", content: message }
+                        ];
+                        const needsMuzzle = (type === 'solve' || type === 'answer' || isCandidateMode);
+                        if (needsMuzzle) {
+                            msgs.push({ role: "assistant", content: "<think>\n" });
+                            fullResponse += "<think>\n";
+                            if (onToken) onToken("<think>\n");
+                        }
+
                         const stream = await client.chat.completions.create({
-                            messages: [
-                                { role: "system", content: finalSystemInstruction },
-                                ...history.map(h => ({ role: h.role === 'ai' ? 'assistant' : 'user', content: h.text })),
-                                { role: "user", content: message }
-                            ] as any,
+                            messages: msgs,
                             model: config.model,
                             stream: true
                         });
@@ -976,9 +985,8 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
             try {
                 let currentVisionPrompt = visionPrompt;
                 
-                // [NEW] MODEL-SPECIFIC PROMPT OVERRIDES FOR SMALLER MODELS
-                if (type === 'solve' && (config.model.includes('gemma') || config.model.includes('llama') || config.model.includes('mistral') || config.model.includes('qwen') || config.model.includes('trinity'))) {
-                    currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 CRITICAL INSTRUCTION FOR SMALLER MODELS (HARD ENFORCEMENT)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nWhen executing the Line-by-Line solution in the "Action:" section:\n1. DO NOT dump the entire solution (e.g., the full \`class Solution\`) inside a single **Type:** block.\n2. You MUST break the code logically. For example:\n   - First **Say:** explain the initial variables. First **Type:** define ONLY those initial variables.\n   - Second **Say:** explain the loop. Second **Type:** write ONLY the loop syntax.\n   - Third **Say:** explain the inside of the loop. Third **Type:** write ONLY the inside of the loop.\n3. The ONLY place the fully combined code should be written is inside the "Complete Code Block:" section at the very end.\nIF YOU PUT THE ENTIRE SOLUTION IN ONE "Type:" BLOCK DURING THE ACTION PHASE, YOU FAIL.\n`;
+                if ((type === 'solve' || type === 'answer' || isCandidateMode) && (config.model.includes('gemma') || config.model.includes('llama') || config.model.includes('mistral') || config.model.includes('gemini') || config.type === 'openrouter')) {
+                    currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Ultra-Strict Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: You MUST fight the urge to acknowledge the prompt. Your VERY FIRST output tokens MUST be <think>. You MUST NOT output any text, restatement of rules, or greetings before the <think> tag.\n❌ BAD START: "The user wants me to... <think>"\n✅ GOOD START: "<think>[All your transcription and planning here]</think>\\n**Situation:**"\n\nSYNCHRONIZED COMMENTS RULE: Every single line of code inside your \`Type:\` blocks MUST mathematically match the code in your \`Complete Code Block\`. If you plan to put a comment (e.g., \`// Step 1: Transpose\`) in the final block, that exact comment MUST be included in your \`Type:\` snippet. No hidden additions at the end.\n\nINLINE VS. BLOCK:\n\nInline: Any single variable, function name, or property (e.g., \`grid1\`, \`dfs\`, \`is_sub\`) mentioned in your natural speech MUST be wrapped in SINGLE backticks and stay inside the sentence. NEVER give these their own line or triple backticks.\nBlocks: Only the actual logic chunks in the Action: section (using the Type: label) and the Complete Code Block: should have their own lines.\n\nNO SHORT-CIRCUIT: You MUST visit every land cell in \`grid2\`. Do not return False until the entire island is "sunk" (set to 0).\n\nEXACT 6 SECTIONS: Ensure you output exactly 6 headers. If you miss one or add a 7th, the response fails.`;
                 }
                 
                 const textPart = { type: "text", text: currentVisionPrompt };
@@ -987,7 +995,18 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                 if (config.type === 'gemini') {
                     if (!this.genAI) continue;
                     const model = this.genAI.getGenerativeModel({ model: config.model });
-                    const result = await model.generateContentStream([{ text: currentVisionPrompt }, ...geminiParts]);
+                    
+                    const needsMuzzle = (type === 'solve' || type === 'answer' || isCandidateMode);
+                    const contents = [
+                        { role: "user", parts: [{ text: currentVisionPrompt }, ...geminiParts] }
+                    ];
+                    if (needsMuzzle) {
+                        contents.push({ role: "model", parts: [{ text: "<think>\n" }] });
+                        fullResponse += "<think>\n";
+                        if (onToken) onToken("<think>\n");
+                    }
+                    
+                    const result = await model.generateContentStream({ contents: contents });
                     for await (const chunk of result.stream) {
                         if (this.isAborted) {
                             console.log(`[LLM] 🛑 Generation aborted by user.`);
@@ -1013,9 +1032,17 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                             ? { type: "text", text: `${currentVisionPrompt}\n\n[SYSTEM WARNING: The user attached ${heavyAttachmentsCount} heavy file(s) that your current API backend lacks the native ingestion support for. Please gracefully inform the user you can only see images and pure text scripts.]` }
                             : textPart;
 
+                        const msgs: any[] = [{ role: "user", content: [fallbackTextPart, ...openAIParts] }];
+                        const needsMuzzle = (type === 'solve' || type === 'answer' || isCandidateMode);
+                        if (needsMuzzle) {
+                            msgs.push({ role: "assistant", content: "<think>\n" });
+                            fullResponse += "<think>\n";
+                            if (onToken) onToken("<think>\n");
+                        }
+
                         const stream = await client.chat.completions.create({
                             model: config.model,
-                            messages: [{ role: "user", content: [fallbackTextPart, ...openAIParts] }],
+                            messages: msgs,
                             max_tokens: 4096,
                             stream: true
                         });
