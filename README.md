@@ -548,6 +548,24 @@ graph TD
 
 </details>
 
+<details>
+<summary><strong>36. The Instruction Regurgitation (Assistant Prefill)</strong></summary>
+
+**Problem:** Larger reasoning models (like Gemma) on standard endpoint adapters often suffered from "Instruction Echoing." Instead of directly solving the task inside a reasoning block, they would read the system constraints and formatting rules out loud as their first output, circumventing prompt constraints and ruining the UI S.T.A.R. flow.
+
+**Solution:** Engineered an **Assistant Prefill Injection** architecture in `LLMHelper.ts`. By intercepting the API messages array immediately before network dispatch and synthetically appending a `{ role: "assistant", content: "<think>\n" }` object, we forcefully start the LLM's response *inside* the required reasoning block, mathematically eliminating its ability to restate the prompt.
+
+</details>
+
+<details>
+<summary><strong>37. The "Thinking" Visual Dominance</strong></summary>
+
+**Problem:** By rendering both the loader icon and its explanatory text in bright blue, alongside highly contrasted pink inline code blocks, the AI's internal thought process felt visually heavier and more disruptive than its actual final answer.
+
+**Solution:** Executed a high-polish **UI De-escalation** in `Queue.tsx`. The vivid blue color was strictly isolated to the animated `Loader2` wheel while the "Deep reasoning in progress..." text was dimmed to a standard `text-gray-300`. Additionally, inline code tags were shifted from pink to a cooler `text-blue-300`, producing an elegant, lightweight scannability flow.
+
+</details>
+
 ---
 
 ### 📦 Installation & Setup
