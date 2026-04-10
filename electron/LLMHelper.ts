@@ -86,6 +86,7 @@ const CHAT_MODELS = [
 // --- 2. THE EYES (Vision Waterfall) ---
 const VISION_MODELS = [
     // --- TIER 1: ELITE & RELIABLE VISION (Gemma 4 Upgrade) ---
+    { type: 'gemini', model: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash-Lite' },
     { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B (Vision)' }, // ADDED '-it'
     { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B (Vision)' }, // ADDED '-a4b-it'
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
@@ -94,7 +95,7 @@ const VISION_MODELS = [
     { type: 'openrouter', model: 'anthropic/claude-opus-4.5', name: 'Claude 4.5 Opus (Vision)' },
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Reasoning Vision)' },
     { type: 'gemini', model: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview' }, // ZERO RPD
-    { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3.0 Pro' }, // ZERO RPD
+    { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3.0 BPro' }, // ZERO RPD
     { type: 'gemini', model: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' }, // ZERO RPD,
 
     // --- TIER 2: FAST & RELIABLE ---
