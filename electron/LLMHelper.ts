@@ -41,12 +41,9 @@ const CHAT_MODELS = [
     { type: 'openrouter', model: 'nousresearch/hermes-3-llama-3.1-405b:free', name: 'Hermes 3 Llama 405B' },
     { type: 'openrouter', model: 'qwen/qwen3-next-80b-a3b-instruct:free', name: 'Qwen 3 Next 80B' },
 
-    // --- TIER 2 : FAST & OPEN (Gemma 3 / Flash / Lite) ---
-    { type: 'gemini', model: 'gemma-3-27b-it', name: 'Gemma 3 27B' },
-    { type: 'gemini', model: 'gemma-3-12b-it', name: 'Gemma 3 12B' },
-    { type: 'gemini', model: 'gemma-3-4b-it', name: 'Gemma 3 4B' },
-    { type: 'gemini', model: 'gemma-3-2b-it', name: 'Gemma 3 2B' }, // ADDED: 14.4K RPD
-    { type: 'gemini', model: 'gemma-3-1b-it', name: 'Gemma 3 1B' },
+    // --- TIER 2 : FAST & OPEN (Gemma 4 / Flash / Lite) ---
+    { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B' },
+    { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-2.0-flash-lite-preview-02-05', name: 'Gemini 2.0 Flash Lite' }, // ZERO RPD
     { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' }, // ZERO RPD,
@@ -105,7 +102,6 @@ const VISION_MODELS = [
 
     // --- TIER 3: BACKUPS ---
     { type: 'nvidia', model: 'mistralai/mistral-large-2-instruct', name: 'Mistral Large 2 (Nvidia Vision)' },
-    { type: 'gemini', model: 'gemma-3-27b-it' },
     { type: 'github', model: 'gpt-4o' },
     { type: 'perplexity', model: 'sonar-reasoning-pro' },
 ];
