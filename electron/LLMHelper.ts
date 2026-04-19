@@ -204,8 +204,7 @@ export class LLMHelper {
     }
 
     private cleanResponse(text: string): string {
-        // 1. Remove DeepSeek reasoning tags immediately as they are never needed
-        const noThink = text.replace(/<think>[\s\S]*?<\/think>/g, "");
+        const noThink = text;
 
         // [NEW] FIX MATH FORMATTING: Convert \[ ... \] to $$ ... $$ for proper React rendering
         const fixedMath = noThink
@@ -672,13 +671,27 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
         }
 
         switch (type) {
-            case 'title': taskInstruction = "Summarize the session into one short, punchy title. Output ONLY plain text. NO headers, NO math, NO bolding. Max 6 words."; break;
-            case 'assist': taskInstruction = "Provide technical facts, documentation, or definitions."; break;
-            case 'reply': taskInstruction = "Draft a short, 2-3 sentence response."; break;
-            case 'answer': taskInstruction = "Provide a deep, comprehensive answer using the STAR method."; break;
-            case 'ask': taskInstruction = "Suggest 3-4 insightful follow-up questions. Keep each question extremely brief (maximum 3 lines per question). Do not write long or elaborate paragraphs."; break;
-            case 'recap': taskInstruction = "Summarize the conversation in 3 brief bullet points."; break;
-            default: taskInstruction = "Answer the user's request."; break;
+            case 'title':
+                taskInstruction = "Summarize the session into one short title. CRITICAL: NO <think> tags. NO markdown. Output ONLY plain text. Max 6 words.";
+                break;
+            case 'assist':
+                taskInstruction = "CRITICAL RULE: You MUST put all your reading, reasoning, and logic inside a single <think> ... </think> tag at the top of your response. THEN, output only the final answer and a strict analogy. Do NOT output raw scratchpads outside the tag.";
+                break;
+            case 'reply':
+                taskInstruction = "CRITICAL RULE: You MUST put all your logic inside a <think> ... </think> tag at the top. THEN, output exactly 2-3 conversational sentences. No fluff.";
+                break;
+            case 'answer':
+                taskInstruction = "CRITICAL RULE: You MUST put all your logic inside a <think> ... </think> tag at the top. THEN, provide a deep, comprehensive answer. Use the STAR method if applicable.";
+                break;
+            case 'ask':
+                taskInstruction = "CRITICAL RULE: You MUST put all your logic inside a <think> ... </think> tag at the top. THEN, suggest 3-4 insightful follow-up questions. Keep each question extremely brief (max 3 lines). No elaborate paragraphs.";
+                break;
+            case 'recap':
+                taskInstruction = "CRITICAL RULE: You MUST put all your logic inside a <think> ... </think> tag at the top. THEN, summarize the conversation in EXACTLY 3 brief bullet points.";
+                break;
+            default:
+                taskInstruction = "CRITICAL RULE: You MUST put all your logic inside a <think> ... </think> tag at the top. THEN, answer the user's request directly and concisely.";
+                break;
         }
 
         if (type === 'title') return taskInstruction;
@@ -844,8 +857,14 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     finalSystemInstruction += studentAugmentation;
                 }
 
-                if ((type === 'solve' || type === 'answer' || isCandidateMode) && (config.model.includes('gemma') || config.model.includes('llama') || config.model.includes('mistral') || config.model.includes('gemini') || config.type === 'openrouter')) {
+                const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist' || (type === 'general' && isCandidateMode);
+                const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
+                const isMuzzleModel = config.model.includes('gemma') || config.model.includes('llama') || config.model.includes('mistral') || config.model.includes('gemini') || config.type === 'openrouter';
+
+                if (isUltraStrictSolver && isMuzzleModel) {
                     finalSystemInstruction += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Ultra-Strict Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: You MUST fight the urge to acknowledge the prompt. Your VERY FIRST output tokens MUST be <think>. You MUST NOT output any text, restatement of rules, or greetings before the <think> tag.\n❌ BAD START: "The user wants me to... <think>"\n✅ GOOD START: "<think>[All your planning here]</think>\\n**Situation:**"\n\nSYNCHRONIZED COMMENTS RULE: Every single line of code inside your \`Type:\` blocks MUST mathematically match the code in your \`Complete Code Block\`. If you plan to put a comment (e.g., \`// Step 1: Transpose\`) in the final block, that exact comment MUST be included in your \`Type:\` snippet. No hidden additions at the end.\n\nINLINE VS. BLOCK:\n\nInline: Any single variable, function name, or property (e.g., \`grid1\`, \`dfs\`, \`is_sub\`) mentioned in your natural speech MUST be wrapped in SINGLE backticks and stay inside the sentence. NEVER give these their own line or triple backticks.\nBlocks: Only the actual logic chunks in the Action: section (using the Type: label) and the Complete Code Block: should have their own lines.\n\nNO SHORT-CIRCUIT: You MUST visit every land cell in \`grid2\`. Do not return False until the entire island is "sunk" (set to 0).\n\nEXACT 6 SECTIONS: Ensure you output exactly 6 headers. If you miss one or add a 7th, the response fails.`;
+                } else if (isShortFormAction && isMuzzleModel) {
+                    finalSystemInstruction += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Short-Form Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: Your VERY FIRST output tokens MUST be <think>. Put all your internal reasoning, scratchpads, and planning inside the <think> tag. After the </think> tag, you MUST output ONLY the final short requested text (no headers, no long fluff).`;
                 }
 
                 let fullResponse = "";
@@ -886,7 +905,9 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                             ...history.map(h => ({ role: h.role === 'ai' ? 'assistant' : 'user', content: h.text })),
                             { role: "user", content: message }
                         ];
-                        const needsMuzzle = (type === 'solve' || type === 'answer' || isCandidateMode);
+                        const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist' || (type === 'general' && isCandidateMode);
+                        const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
+                        const needsMuzzle = isUltraStrictSolver || isShortFormAction;
                         if (needsMuzzle) {
                             msgs.push({ role: "assistant", content: "<think>\n" });
                             fullResponse += "<think>\n";
@@ -991,8 +1012,14 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
             try {
                 let currentVisionPrompt = visionPrompt;
                 
-                if ((type === 'solve' || type === 'answer' || isCandidateMode) && (config.model.includes('gemma') || config.model.includes('llama') || config.model.includes('mistral') || config.model.includes('gemini') || config.type === 'openrouter')) {
+                const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist' || (type === 'general' && isCandidateMode);
+                const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
+                const isMuzzleModel = config.model.includes('gemma') || config.model.includes('llama') || config.model.includes('mistral') || config.model.includes('gemini') || config.type === 'openrouter';
+
+                if (isUltraStrictSolver && isMuzzleModel) {
                     currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Ultra-Strict Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: You MUST fight the urge to acknowledge the prompt. Your VERY FIRST output tokens MUST be <think>. You MUST NOT output any text, restatement of rules, or greetings before the <think> tag.\n❌ BAD START: "The user wants me to... <think>"\n✅ GOOD START: "<think>[All your transcription and planning here]</think>\\n**Situation:**"\n\nSYNCHRONIZED COMMENTS RULE: Every single line of code inside your \`Type:\` blocks MUST mathematically match the code in your \`Complete Code Block\`. If you plan to put a comment (e.g., \`// Step 1: Transpose\`) in the final block, that exact comment MUST be included in your \`Type:\` snippet. No hidden additions at the end.\n\nINLINE VS. BLOCK:\n\nInline: Any single variable, function name, or property (e.g., \`grid1\`, \`dfs\`, \`is_sub\`) mentioned in your natural speech MUST be wrapped in SINGLE backticks and stay inside the sentence. NEVER give these their own line or triple backticks.\nBlocks: Only the actual logic chunks in the Action: section (using the Type: label) and the Complete Code Block: should have their own lines.\n\nNO SHORT-CIRCUIT: You MUST visit every land cell in \`grid2\`. Do not return False until the entire island is "sunk" (set to 0).\n\nEXACT 6 SECTIONS: Ensure you output exactly 6 headers. If you miss one or add a 7th, the response fails.`;
+                } else if (isShortFormAction && isMuzzleModel) {
+                    currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Short-Form Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: Your VERY FIRST output tokens MUST be <think>. Put all your internal reasoning, scratchpads, and planning inside the <think> tag. After the </think> tag, you MUST output ONLY the final short requested text (no headers, no long fluff).`;
                 }
                 
                 const textPart = { type: "text", text: currentVisionPrompt };
@@ -1002,7 +1029,9 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     if (!this.genAI) continue;
                     const model = this.genAI.getGenerativeModel({ model: config.model });
                     
-                    const needsMuzzle = (type === 'solve' || type === 'answer' || isCandidateMode);
+                    const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist' || (type === 'general' && isCandidateMode);
+                    const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
+                    const needsMuzzle = isUltraStrictSolver || isShortFormAction;
                     const contents = [
                         { role: "user", parts: [{ text: currentVisionPrompt }, ...geminiParts] }
                     ];
@@ -1039,7 +1068,9 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                             : textPart;
 
                         const msgs: any[] = [{ role: "user", content: [fallbackTextPart, ...openAIParts] }];
-                        const needsMuzzle = (type === 'solve' || type === 'answer' || isCandidateMode);
+                        const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist' || (type === 'general' && isCandidateMode);
+                        const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
+                        const needsMuzzle = isUltraStrictSolver || isShortFormAction;
                         if (needsMuzzle) {
                             msgs.push({ role: "assistant", content: "<think>\n" });
                             fullResponse += "<think>\n";

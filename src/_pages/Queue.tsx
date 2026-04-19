@@ -194,8 +194,10 @@ const AudioVisualizer = ({ audioContext, source }: { audioContext: AudioContext 
 };
 
 // --- HELPER: Message Content Renderer ---
-const MessageContent: React.FC<{ text: string }> = ({ text }) => {
-    // 1. Hide the <think> scratchpad in real-time.
+const MessageContent: React.FC<{ text: string, isStreaming?: boolean }> = ({ text, isStreaming }) => {
+    // 1. Separate <think> from the rest of the text
+    const thinkMatch = text.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
+    const thinkingContent = thinkMatch ? thinkMatch[1].trim() : "";
     let cleanedText = text.replace(/<think>[\s\S]*?(<\/think>|$)/g, '');
 
     // 2. THE BULLETPROOF REGEX TRAPDOOR:
@@ -216,10 +218,13 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
     const isRunawayYap = isYapping && cleanedText.length > 400 && !didSnap;
 
     // 4. Show the spinner if thinking OR if safely yapping without a true Situation match yet.
-    const isThinkingActive = 
+    // **FIX**: We only show the spinner if we are STILL STREAMING. 
+    // If streaming finished, we MUST NOT hang.
+    const isThinkingActive = isStreaming && (
         (!cleanedText && text.includes('<think>')) || 
         (text.includes('<think>') && !text.includes('</think>') && !didSnap) ||
-        (isYapping && !didSnap && !isRunawayYap);
+        (isYapping && !didSnap && !isRunawayYap)
+    );
 
     if (isThinkingActive) {
         return (
@@ -231,8 +236,21 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
     }
 
     return (
-        <div className="text-[14px] leading-relaxed text-gray-200 markdown-content">
-            <ReactMarkdown
+        <div className="text-[14px] leading-relaxed text-gray-200 markdown-content w-full">
+            {thinkingContent && (
+                <details className="mb-4 group border border-white/10 rounded-lg overflow-hidden bg-black/20 pb-0">
+                    <summary className="flex items-center gap-2 text-xs font-semibold text-gray-400 bg-white/5 px-3 py-2 cursor-pointer hover:bg-white/10 hover:text-white transition-colors select-none outline-none">
+                        <Sparkles size={14} className="text-blue-400" />
+                        <span>Show thinking</span>
+                        <ChevronDown size={14} className="ml-auto transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className="p-3 text-xs text-gray-400 font-mono italic whitespace-pre-wrap opacity-80 custom-scrollbar overflow-x-auto text-left border-t border-white/5">
+                        {thinkingContent}
+                    </div>
+                </details>
+            )}
+            {cleanedText && (
+                <ReactMarkdown
                 remarkPlugins={[remarkMath]}
                 rehypePlugins={[rehypeHighlight, rehypeKatex]}
                 components={{
@@ -284,8 +302,9 @@ const MessageContent: React.FC<{ text: string }> = ({ text }) => {
                     }
                 }}
             >
-                {text}
+                {cleanedText}
             </ReactMarkdown>
+            )}
         </div>
     );
 };
@@ -2465,7 +2484,7 @@ const Queue: React.FC<any> = () => {
                                                                     <span className="animate-pulse">{thinkingStep}</span>
                                                                 </div>
                                                             )}
-                                                            <MessageContent text={msg.text} />
+                                                            <MessageContent text={msg.text} isStreaming={msg.isStreaming} />
                                                             <div className="flex items-center mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                 <button
                                                                     onClick={() => handleCopyAiMessage(msg.id, msg.text)}
@@ -2535,7 +2554,7 @@ const Queue: React.FC<any> = () => {
                                                     </button>
                                                 </div>
                                             </div>
-                                            <MessageContent text={emailDraft} />
+                                            <MessageContent text={emailDraft} isStreaming={false} />
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center justify-center flex-1 text-gray-400 gap-3">
