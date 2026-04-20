@@ -36,7 +36,7 @@ async function safePdfParse(buffer: Buffer) {
 }
 
 // --- 1. THE EXPANDED WATERFALL BRAINS ---
-const CHAT_MODELS = [
+export const CHAT_MODELS = [
     // --- TIER 1: THE HEAVY LIFTERS (Advanced Reasoning & Logic) ---
     { type: 'openrouter', model: 'nousresearch/hermes-3-llama-3.1-405b:free', name: 'Hermes 3 Llama 405B' },
     { type: 'openrouter', model: 'qwen/qwen3-next-80b-a3b-instruct:free', name: 'Qwen 3 Next 80B' },
@@ -81,10 +81,10 @@ const CHAT_MODELS = [
 ];
 
 // --- 2. THE EYES (Vision Waterfall) ---
-const VISION_MODELS = [
+export const VISION_MODELS = [
     // --- TIER 1: ELITE & RELIABLE VISION (Gemma 4 Upgrade) ---
-    { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B (Vision)' }, // ADDED '-it'
     { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B (Vision)' }, // ADDED '-a4b-it'
+    { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B (Vision)' }, // ADDED '-it'
     { type: 'gemini', model: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash-Lite' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
@@ -204,7 +204,12 @@ export class LLMHelper {
     }
 
     private cleanResponse(text: string): string {
-        const noThink = text;
+        let noThink = text;
+
+        // [NEW] Rescue stranded short-form answers:
+        if (noThink.startsWith("<think>\n") && !noThink.includes("</think>")) {
+            noThink = noThink.replace(/<think>\n?/g, "");
+        }
 
         // [NEW] FIX MATH FORMATTING: Convert \[ ... \] to $$ ... $$ for proper React rendering
         const fixedMath = noThink
@@ -678,19 +683,19 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
                 taskInstruction = "CRITICAL RULE: You MUST put all your reading, reasoning, and logic inside a single <think> ... </think> tag at the top of your response. THEN, output only the final answer and a strict analogy. Do NOT output raw scratchpads outside the tag.";
                 break;
             case 'reply':
-                taskInstruction = "CRITICAL RULE: You MUST put all your logic inside a <think> ... </think> tag at the top. THEN, output exactly 2-3 conversational sentences. No fluff.";
+                taskInstruction = "CRITICAL RULE: Output exactly 1-2 conversational sentences. NO <think> tags. NO fluff. Answer directly.";
                 break;
             case 'answer':
                 taskInstruction = "CRITICAL RULE: You MUST put all your logic inside a <think> ... </think> tag at the top. THEN, provide a deep, comprehensive answer. Use the STAR method if applicable.";
                 break;
             case 'ask':
-                taskInstruction = "CRITICAL RULE: You MUST put all your logic inside a <think> ... </think> tag at the top. THEN, suggest 3-4 insightful follow-up questions. Keep each question extremely brief (max 3 lines). No elaborate paragraphs.";
+                taskInstruction = "CRITICAL RULE: Suggest 3-4 insightful follow-up questions. NO <think> tags. Keep each question extremely brief (max 2 lines). No elaborate paragraphs.";
                 break;
             case 'recap':
-                taskInstruction = "CRITICAL RULE: You MUST put all your logic inside a <think> ... </think> tag at the top. THEN, summarize the conversation in EXACTLY 3 brief bullet points.";
+                taskInstruction = "CRITICAL RULE: Summarize the conversation in EXACTLY 3 brief bullet points. NO <think> tags.";
                 break;
             default:
-                taskInstruction = "CRITICAL RULE: You MUST put all your logic inside a <think> ... </think> tag at the top. THEN, answer the user's request directly and concisely.";
+                taskInstruction = "CRITICAL RULE: Answer the user's request directly and concisely. NO <think> tags. No preamble.";
                 break;
         }
 
@@ -809,7 +814,8 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
         fileContext: string = "",
         type: string = "general",
         isCandidateMode: boolean = false,
-        onToken?: (token: string) => void
+        onToken?: (token: string) => void,
+        overrideModel?: string
     ): Promise<string> {
 
         this.isAborted = false; // Reset flag at start
@@ -845,7 +851,16 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
         const firstUserIndex = mappedHistory.findIndex(h => h.role === 'user');
         let validHistory = firstUserIndex !== -1 ? mappedHistory.slice(firstUserIndex) : [];
 
-        for (const config of CHAT_MODELS) {
+        let executionList = [...CHAT_MODELS];
+        if (overrideModel && overrideModel !== "auto") {
+            const overrideConfig = executionList.find(m => m.model === overrideModel);
+            if (overrideConfig) {
+                // Move preferred model to the front, preserving the rest of the waterfall for fallback
+                executionList = [overrideConfig, ...executionList.filter(m => m.model !== overrideModel)];
+            }
+        }
+
+        for (const config of executionList) {
             try {
                 console.log(`[LLM] 🔄 Waterfall: Trying ${config.model} (${config.type})...`);
 
@@ -864,7 +879,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                 if (isUltraStrictSolver && isMuzzleModel) {
                     finalSystemInstruction += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Ultra-Strict Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: You MUST fight the urge to acknowledge the prompt. Your VERY FIRST output tokens MUST be <think>. You MUST NOT output any text, restatement of rules, or greetings before the <think> tag.\n❌ BAD START: "The user wants me to... <think>"\n✅ GOOD START: "<think>[All your planning here]</think>\\n**Situation:**"\n\nSYNCHRONIZED COMMENTS RULE: Every single line of code inside your \`Type:\` blocks MUST mathematically match the code in your \`Complete Code Block\`. If you plan to put a comment (e.g., \`// Step 1: Transpose\`) in the final block, that exact comment MUST be included in your \`Type:\` snippet. No hidden additions at the end.\n\nINLINE VS. BLOCK:\n\nInline: Any single variable, function name, or property (e.g., \`grid1\`, \`dfs\`, \`is_sub\`) mentioned in your natural speech MUST be wrapped in SINGLE backticks and stay inside the sentence. NEVER give these their own line or triple backticks.\nBlocks: Only the actual logic chunks in the Action: section (using the Type: label) and the Complete Code Block: should have their own lines.\n\nNO SHORT-CIRCUIT: You MUST visit every land cell in \`grid2\`. Do not return False until the entire island is "sunk" (set to 0).\n\nEXACT 6 SECTIONS: Ensure you output exactly 6 headers. If you miss one or add a 7th, the response fails.`;
                 } else if (isShortFormAction && isMuzzleModel) {
-                    finalSystemInstruction += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Short-Form Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE & OVERRIDE: Your VERY FIRST output tokens MUST be <think>. Put all your internal reasoning, scratchpads, and planning inside the <think> tag. \nOVERRIDE: For this specific action, IGNORE any prior rules requiring '###' headers, long formatting, or solving problems from the chat history. \nAfter the </think> tag closes, you MUST output ABSOLUTELY NOTHING EXCEPT the exact short requested text (e.g. just the 3-4 questions, or just the title). NO headers, NO preamble, NO fluff, NO analogies. Just the raw, requested short output.`;
+                    finalSystemInstruction += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Short-Form Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL OVERRIDE: For this specific action, IGNORE any prior rules requiring '###' headers or long formatting. \nNO THINKING ALLOWED: Do NOT output any <think> tags. You must fulfill the EXACT TASK GOAL immediately. NO extra headers, NO preamble, NO fluff, NO apologies. Just provide the raw, requested short output.`;
                 }
 
                 let fullResponse = "";
@@ -879,12 +894,20 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     if (this.cachedStudentPdfPart) parts.push(this.cachedStudentPdfPart);
 
                     const result = await chat.sendMessageStream(parts);
+                    const needsMuzzle = isUltraStrictSolver;
+                    if (needsMuzzle) {
+                        fullResponse += "<think>\n";
+                        if (onToken) onToken("<think>\n");
+                    }
                     for await (const chunk of result.stream) {
                         if (this.isAborted) {
                             console.log(`[LLM] 🛑 Generation aborted by user.`);
                             break;
                         }
-                        const text = chunk.text();
+                        let text = chunk.text();
+                        if (needsMuzzle && text.includes('<think>')) {
+                            text = text.replace(/<think>\n?/g, '');
+                        }
                         fullResponse += text;
                         if (onToken) onToken(text);
                     }
@@ -907,7 +930,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                         ];
                         const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist' || (type === 'general' && isCandidateMode);
                         const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
-                        const needsMuzzle = isUltraStrictSolver || isShortFormAction;
+                        const needsMuzzle = isUltraStrictSolver;
                         if (needsMuzzle) {
                             msgs.push({ role: "assistant", content: "<think>\n" });
                             fullResponse += "<think>\n";
@@ -925,8 +948,11 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                                 console.log(`[LLM] 🛑 Generation aborted by user.`);
                                 break;
                             }
-                            const content = chunk.choices[0]?.delta?.content || "";
-                            if (content && !content.includes('<think>')) {
+                            let content = chunk.choices[0]?.delta?.content || "";
+                            if (content) {
+                                if (needsMuzzle && content.includes('<think>')) {
+                                    content = content.replace(/<think>\n?/g, '');
+                                }
                                 fullResponse += content;
                                 if (onToken) onToken(content);
                             }
@@ -943,7 +969,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
         return "⚠️ All AI providers failed. Check API Keys.";
     }
 
-    public async chatWithAttachments(message: string, attachments: { path: string, type: string }[], onToken?: (token: string) => void, type: string = "answer"): Promise<string> {
+    public async chatWithAttachments(message: string, attachments: { path: string, type: string }[], onToken?: (token: string) => void, type: string = "answer", overrideModel?: string): Promise<string> {
         this.isAborted = false; // Reset flag at start
         console.log(`[LLM] 🖼️ Attachment Waterfall: Analyzing ${attachments.length} attachments...`);
         const geminiParts: any[] = [];
@@ -1008,7 +1034,15 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
 
         if (this.sessionTranscript) visionPrompt += `\n\nContext: ${this.sessionTranscript}`;
 
-        for (const config of VISION_MODELS) {
+        let executionList = [...VISION_MODELS];
+        if (overrideModel && overrideModel !== "auto") {
+            const overrideConfig = executionList.find(m => m.model === overrideModel);
+            if (overrideConfig) {
+                executionList = [overrideConfig, ...executionList.filter(m => m.model !== overrideModel)];
+            }
+        }
+
+        for (const config of executionList) {
             try {
                 let currentVisionPrompt = visionPrompt;
                 
@@ -1019,7 +1053,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                 if (isUltraStrictSolver && isMuzzleModel) {
                     currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Ultra-Strict Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: You MUST fight the urge to acknowledge the prompt. Your VERY FIRST output tokens MUST be <think>. You MUST NOT output any text, restatement of rules, or greetings before the <think> tag.\n❌ BAD START: "The user wants me to... <think>"\n✅ GOOD START: "<think>[All your transcription and planning here]</think>\\n**Situation:**"\n\nSYNCHRONIZED COMMENTS RULE: Every single line of code inside your \`Type:\` blocks MUST mathematically match the code in your \`Complete Code Block\`. If you plan to put a comment (e.g., \`// Step 1: Transpose\`) in the final block, that exact comment MUST be included in your \`Type:\` snippet. No hidden additions at the end.\n\nINLINE VS. BLOCK:\n\nInline: Any single variable, function name, or property (e.g., \`grid1\`, \`dfs\`, \`is_sub\`) mentioned in your natural speech MUST be wrapped in SINGLE backticks and stay inside the sentence. NEVER give these their own line or triple backticks.\nBlocks: Only the actual logic chunks in the Action: section (using the Type: label) and the Complete Code Block: should have their own lines.\n\nNO SHORT-CIRCUIT: You MUST visit every land cell in \`grid2\`. Do not return False until the entire island is "sunk" (set to 0).\n\nEXACT 6 SECTIONS: Ensure you output exactly 6 headers. If you miss one or add a 7th, the response fails.`;
                 } else if (isShortFormAction && isMuzzleModel) {
-                    currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Short-Form Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE & OVERRIDE: Your VERY FIRST output tokens MUST be <think>. Put all your internal reasoning, scratchpads, and planning inside the <think> tag. \nOVERRIDE: For this specific action, IGNORE any prior rules requiring '###' headers, long formatting, or solving problems from the chat history. \nAfter the </think> tag closes, you MUST output ABSOLUTELY NOTHING EXCEPT the exact short requested text (e.g. just the 3-4 questions, or just the title). NO headers, NO preamble, NO fluff, NO analogies. Just the raw, requested short output.`;
+                    currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Short-Form Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL OVERRIDE: For this specific action, IGNORE any prior rules requiring '###' headers or long formatting. \nNO THINKING ALLOWED: Do NOT output any <think> tags. You must fulfill the EXACT TASK GOAL immediately. NO extra headers, NO preamble, NO fluff, NO apologies. Just provide the raw, requested short output.`;
                 }
                 
                 const textPart = { type: "text", text: currentVisionPrompt };
@@ -1031,23 +1065,25 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     
                     const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist' || (type === 'general' && isCandidateMode);
                     const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
-                    const needsMuzzle = isUltraStrictSolver || isShortFormAction;
                     const contents = [
                         { role: "user", parts: [{ text: currentVisionPrompt }, ...geminiParts] }
                     ];
+                    
+                    const result = await model.generateContentStream({ contents: contents });
+                    const needsMuzzle = isUltraStrictSolver;
                     if (needsMuzzle) {
-                        contents.push({ role: "model", parts: [{ text: "<think>\n" }] });
                         fullResponse += "<think>\n";
                         if (onToken) onToken("<think>\n");
                     }
-                    
-                    const result = await model.generateContentStream({ contents: contents });
                     for await (const chunk of result.stream) {
                         if (this.isAborted) {
                             console.log(`[LLM] 🛑 Generation aborted by user.`);
                             break;
                         }
-                        const text = chunk.text();
+                        let text = chunk.text();
+                        if (needsMuzzle && text.includes('<think>')) {
+                            text = text.replace(/<think>\n?/g, '');
+                        }
                         fullResponse += text;
                         if (onToken) onToken(text);
                     }
@@ -1070,7 +1106,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                         const msgs: any[] = [{ role: "user", content: [fallbackTextPart, ...openAIParts] }];
                         const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist' || (type === 'general' && isCandidateMode);
                         const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
-                        const needsMuzzle = isUltraStrictSolver || isShortFormAction;
+                        const needsMuzzle = isUltraStrictSolver;
                         if (needsMuzzle) {
                             msgs.push({ role: "assistant", content: "<think>\n" });
                             fullResponse += "<think>\n";
@@ -1088,8 +1124,14 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                                 console.log(`[LLM] 🛑 Generation aborted by user.`);
                                 break;
                             }
-                            const content = chunk.choices[0]?.delta?.content || "";
-                            if (content) { fullResponse += content; if (onToken) onToken(content); }
+                            let content = chunk.choices[0]?.delta?.content || "";
+                            if (content) {
+                                if (needsMuzzle && content.includes('<think>')) {
+                                    content = content.replace(/<think>\n?/g, '');
+                                }
+                                fullResponse += content;
+                                if (onToken) onToken(content);
+                            }
                         }
                         console.log(`[LLM] ✅ Vision Success: ${config.model}`);
                         return this.cleanResponse(fullResponse);

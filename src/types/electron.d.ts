@@ -46,7 +46,7 @@ export interface ElectronAPI {
   analyzeAudioFile: (path: string) => Promise<{ text: string; timestamp: number }>
   invoke: (channel: string, ...args: any[]) => Promise<any>
 
-  chatWithAttachments: (message: string, attachments: { path: string, type: string }[], type?: string) => Promise<string>
+  chatWithAttachments: (message: string, attachments: { path: string, type: string }[], type?: string, overrideModel?: string) => Promise<string>
 
   // Settings & Modes
   toggleStealthMode: () => Promise<boolean>
@@ -62,6 +62,7 @@ export interface ElectronAPI {
   getApiKeys: () => Promise<any>;
 
   // LLM Configuration (ALL WERE MISSING)
+  getAiModels: () => Promise<any>;
   getCurrentLlmConfig: () => Promise<any>;
   checkLLMConfig: () => Promise<boolean>;
   getAvailableOllamaModels: () => Promise<string[]>;

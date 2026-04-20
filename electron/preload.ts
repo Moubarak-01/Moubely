@@ -80,6 +80,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   analyzeImageFile: (p: string) => ipcRenderer.invoke("analyze-image-file", p),
   quitApp: () => ipcRenderer.invoke("quit-app"),
 
+  getAiModels: () => ipcRenderer.invoke("get-ai-models"),
   getCurrentLlmConfig: () => ipcRenderer.invoke("get-current-llm-config"),
   checkLLMConfig: () => ipcRenderer.invoke("check-llm-config"),
   getAvailableOllamaModels: () => ipcRenderer.invoke("get-available-ollama-models"),
@@ -91,7 +92,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setIgnoreMouseEvents: (i: boolean, o: any) => ipcRenderer.invoke("set-ignore-mouse-events", i, o),
   toggleMouseIgnore: (i: boolean) => ipcRenderer.send("toggle-mouse-ignore", i),
 
-  chatWithAttachments: (m: string, a: { path: string, type: string }[], t?: string) => ipcRenderer.invoke("chat-with-attachments", { message: m, attachments: a, type: t }),
+  chatWithAttachments: (m: string, a: { path: string, type: string }[], t?: string, overrideModel?: string) => ipcRenderer.invoke("chat-with-attachments", { message: m, attachments: a, type: t, overrideModel }),
   checkProfileExists: () => ipcRenderer.invoke("check-profile-exists"),
   saveStudentFiles: (f: any[]) => ipcRenderer.invoke("save-student-files", f),
 

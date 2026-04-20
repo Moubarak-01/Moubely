@@ -5,6 +5,7 @@ import crypto from "crypto";
 import { AppState } from "./main";
 import { LocalServerHelper } from "./LocalServerHelper";
 import { GenerationHelper } from "./GenerationHelper";
+import { CHAT_MODELS, VISION_MODELS } from "./LLMHelper";
 
 // Helper for consistent logging
 const logIPC = (channel: string, details: string = "") => {
@@ -203,6 +204,10 @@ export function initializeIpcHandlers(appState: AppState) {
     return newState;
   });
 
+  ipcMain.handle("get-ai-models", async () => {
+    return { chatModels: CHAT_MODELS, visionModels: VISION_MODELS };
+  });
+
   // --- 2. AI CHAT HANDLER ---
   ipcMain.handle("generate-media", async (event, args) => {
     try {
@@ -218,7 +223,7 @@ export function initializeIpcHandlers(appState: AppState) {
     try {
       if (!llmHelper) throw new Error("LLM Helper not initialized");
 
-      const { message, history, mode, fileContext, type, isCandidateMode } = args;
+      const { message, history, mode, fileContext, type, isCandidateMode, overrideModel } = args;
 
       logIPC("gemini-chat", `Type: ${type?.toUpperCase() || "GENERAL"} | Mode: ${mode} | Twin: ${isCandidateMode}`);
       if (message) console.log(`[IPC ⚡] >> Prompt: "${message.slice(0, 60).replace(/\n/g, ' ')}..."`);
@@ -234,7 +239,8 @@ export function initializeIpcHandlers(appState: AppState) {
           if (!event.sender.isDestroyed()) {
             event.sender.send("llm-token", token);
           }
-        }
+        },
+        overrideModel
       );
 
       console.log(`[IPC ⚡] << Response Complete (${response.length} chars)`);
@@ -254,7 +260,7 @@ export function initializeIpcHandlers(appState: AppState) {
   });
 
   // --- 3. ATTACHMENT HANDLER ---
-  ipcMain.handle("chat-with-attachments", async (event, { message, attachments, type }) => {
+  ipcMain.handle("chat-with-attachments", async (event, { message, attachments, type, overrideModel }) => {
     try {
       logIPC("chat-with-attachments", `Attachments: ${attachments?.length || 0} | Type: ${type || "answer"}`);
       if (!llmHelper) throw new Error("LLM Helper not initialized");
@@ -263,7 +269,7 @@ export function initializeIpcHandlers(appState: AppState) {
         if (!event.sender.isDestroyed()) {
           event.sender.send("llm-token", token);
         }
-      }, type);
+      }, type, overrideModel);
     } catch (error: any) {
       console.error(`[IPC ⚡] ❌ Attachment Error:`, error);
       return `Attachment Error: ${error.message}`;
