@@ -59,6 +59,9 @@ Moubely is an advanced, always-on-top AI productivity hub designed for seamless 
 - 🔐 **Hardware-Encrypted Secrets**: Industry-standard protection for API keys using Electron's `safeStorage` (OS-level encryption)
 - 📄 **OCR Space Integration**: Advanced cloud-based PDF recovery and high-accuracy text extraction from scanned documents
 - 🌉 **Unified AI Hydration**: Breakthrough synchronization bridge ensures chat and media engines share the same secure credentials instantly
+- 📏 **Horizontal Control Hardening**: All tool buttons (Vision, Smart, Persona, Mode) are now locked into a single-line, horizontally scrollable container that never wraps
+- 🎈 **Floating Menu Architecture**: Dropdown selection menus now use fixed screen positioning to prevent being clipped by scrollable parent containers
+- 👁️ **Compact Model Display**: The Vision model button now maintains a stable width with internal marquee scrolling, preventing UI expansion when long model names are selected
 
 ---
 
@@ -83,6 +86,9 @@ We have shifted from a static, premium-first architecture to a universal, open-m
 | **Data Security**       | Plaintext Environment    | **Hardware-Encrypted** (Electron `safeStorage`)              |
 | **OCR Engine**          | Local Basic              | **OCR Space Pro** (High-Accuracy PDF Recovery)               |
 | **Key Sync**            | Handled Separately       | **Unified AI Bridge** (Instant Multi-Engine Rehydration)     |
+| **Control Layout**      | Flex Wrapping (Multi-Row)| **Horizontal Scroll** (Single-Line No-Wrap Hardening)        |
+| **Menu Positioning**    | Absolute (Clipping prone)| **Fixed-Position Tracking** (Anti-Clipping Architecture)     |
+| **Model Labeling**      | Static "Vision" text     | **Internal Marquee** (Compact Stable Width Display)          |
 
 ---
 
@@ -563,6 +569,24 @@ graph TD
 **Problem:** By rendering both the loader icon and its explanatory text in bright blue, alongside highly contrasted pink inline code blocks, the AI's internal thought process felt visually heavier and more disruptive than its actual final answer.
 
 **Solution:** Executed a high-polish **UI De-escalation** in `Queue.tsx`. The vivid blue color was strictly isolated to the animated `Loader2` wheel while the "Deep reasoning in progress..." text was dimmed to a standard `text-gray-300`. Additionally, inline code tags were shifted from pink to a cooler `text-blue-300`, producing an elegant, lightweight scannability flow.
+
+</details>
+
+<details>
+<summary><strong>38. The Clipping Menu Paradox (Horizontal Scroll)</strong></summary>
+
+**Problem:** Implementing a non-wrapping horizontal scroll bar (`overflow-x-auto`) for the control buttons caused all selection menus (Vision, Mode, Chat) to be "clipped" by the parent's boundaries, making the bottom half of the model lists invisible.
+
+**Solution:** Shifted the entire menu architecture from `absolute` to `fixed` positioning. By capturing the trigger button's screen coordinates (`getBoundingClientRect`) and dynamically anchoring the menu using those coordinates, we bypassed the parent container's overflow restrictions while maintaining perfect alignment during scrolls.
+
+</details>
+
+<details>
+<summary><strong>39. The Expanding Button Problem (Layout Drift)</strong></summary>
+
+**Problem:** Displaying the active model name (e.g., "Gemini 3.1 Flash Lite Preview") inside the Vision button would cause the button to expand horizontally, pushing the "Smart" and "Persona" buttons off-screen and breaking the UI balance.
+
+**Solution:** Enforced a strict **Hard Width Limit** (50-80px) on the internal label container. By pairing this with an automatic marquee (scroll) effect, the button remains exactly the same size regardless of the model name length, preserving the layout's visual integrity.
 
 </details>
 
