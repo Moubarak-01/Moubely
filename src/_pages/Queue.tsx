@@ -7,7 +7,7 @@ import {
     Scaling, Copy, Check, CheckCheck, Trash2, Mail,
     Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
     Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw, Plus, Maximize,
-    Video, Image, Code, Maximize2, Download
+    Video, Image, Code, Maximize2, Download, GraduationCap
 } from "lucide-react"
 import moubelyIcon from "../../assets/Moubely_icon.png"
 
@@ -82,6 +82,7 @@ const truncateToWords = (text: string, limit: number) => {
 const cleanMeetingTitle = (rawTitle: string): string => {
     if (!rawTitle) return "Untitled Meeting";
     return rawTitle
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')
         .replace(/[#*`"']/g, '')
         .replace(/^Title:\s*/i, '')
         .replace(/Meeting Title:\s*/i, '')
@@ -588,6 +589,10 @@ const Queue: React.FC<any> = () => {
     const [selectedVisionModel, setSelectedVisionModel] = useState("");
     const [showChatModelMenu, setShowChatModelMenu] = useState(false);
     const [showVisionModelMenu, setShowVisionModelMenu] = useState(false);
+    const [chatMenuPos, setChatMenuPos] = useState<DOMRect | null>(null);
+    const [visionMenuPos, setVisionMenuPos] = useState<DOMRect | null>(null);
+    const [modeMenuPos, setModeMenuPos] = useState<DOMRect | null>(null);
+    const [genMenuPos, setGenMenuPos] = useState<DOMRect | null>(null);
 
     useEffect(() => {
         if (window.electronAPI && window.electronAPI.getAiModels) {
@@ -1704,10 +1709,10 @@ const Queue: React.FC<any> = () => {
                 message: `Create a very short title (max 5 words, no quotes) for this chat prompt. Output only the title. Prompt: ${userText}`,
                 mode: "general",
                 history: [],
-                type: "general",
+                type: "title",
                 isCandidateMode: false
             });
-            const cleanTitle = title.replace(/['"]/g, '').trim();
+            const cleanTitle = title.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/['"]/g, '').trim();
             setPastChats(prev => {
                 const targetChat = prev.find(c => c.id === sessionId);
                 if (!targetChat) return prev;
@@ -2935,7 +2940,8 @@ const Queue: React.FC<any> = () => {
 
                                         <div className="relative flex items-center">
                                             <button
-                                                onClick={() => {
+                                                onClick={(e) => {
+                                                    setChatMenuPos(e.currentTarget.getBoundingClientRect());
                                                     setShowChatModelMenu(!showChatModelMenu);
                                                     setShowModelMenu(false);
                                                 }}
@@ -2950,8 +2956,14 @@ const Queue: React.FC<any> = () => {
                                             >
                                                 <MessageSquare size={18} />
                                             </button>
-                                            {showChatModelMenu && (
-                                                <div className="absolute bottom-full left-0 mb-4 w-56 bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1 z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2">
+                                            {showChatModelMenu && chatMenuPos && (
+                                                <div 
+                                                    className="fixed mb-4 w-56 bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1 z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2"
+                                                    style={{ 
+                                                        bottom: window.innerHeight - chatMenuPos.top + 8,
+                                                        left: chatMenuPos.left
+                                                    }}
+                                                >
                                                     <div className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1 bg-white/5">💬 Chat Models</div>
                                                     <button onClick={() => { setSelectedChatModel(""); setShowChatModelMenu(false); }} className={`w-full text-left px-4 py-2.5 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${!selectedChatModel ? 'text-blue-400 bg-white/10' : 'text-gray-300 hover:text-white'}`}>
                                                         <span>Auto (Waterfall)</span>
@@ -2969,7 +2981,8 @@ const Queue: React.FC<any> = () => {
 
                                         <div className="relative flex items-center">
                                             <button
-                                                onClick={() => {
+                                                onClick={(e) => {
+                                                    setGenMenuPos(e.currentTarget.getBoundingClientRect());
                                                     if (isArtActive) {
                                                         setIsArtActive(false);
                                                         setShowModelMenu(false);
@@ -2985,9 +2998,14 @@ const Queue: React.FC<any> = () => {
                                             >
                                                 <Sparkles size={18} />
                                             </button>
-
-                                            {showModelMenu && (
-                                                <div className="absolute bottom-full left-0 mb-4 w-56 bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1 z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2">
+                                            {showModelMenu && genMenuPos && (
+                                                <div 
+                                                    className="fixed mb-4 w-56 bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1 z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2"
+                                                    style={{ 
+                                                        bottom: window.innerHeight - genMenuPos.top + 8,
+                                                        left: genMenuPos.left
+                                                    }}
+                                                >
                                                     <div className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1 bg-white/5">Studio Models</div>
                                                     {GENERATIVE_MODELS.map((m) => (
                                                         <button
@@ -3073,15 +3091,13 @@ const Queue: React.FC<any> = () => {
                                     </div>
                                 </div>
                                 {isInputFocused && (
-                                    <div className="flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full">
-                                        <button onClick={handleUseScreen} className="control-btn hover:bg-white/15 py-2 px-3"><Monitor size={14} className="text-blue-400" /><span>Queue Screen</span></button>
-                                        <button onClick={() => setIsSmartMode(!isSmartMode)} className={`control-btn py-2 px-3 ${isSmartMode ? 'active' : ''}`}><Zap size={14} className={isSmartMode ? 'fill-current' : ''} /><span>Smart</span></button>
-                                        <button onClick={() => window.location.hash = "#/settings"} className="control-btn py-2 px-3 text-white/60 hover:text-white/90 hover:bg-white/10 transition-all"><UserCog size={14} /><span>Persona</span></button>
-                                        <div className="relative"> <button onClick={() => setShowModeMenu(!showModeMenu)} className="control-btn hover:bg-white/15 py-2 px-3"><span>{mode}</span><ChevronDown size={12} /></button> {showModeMenu && (<div className="absolute bottom-full left-0 mb-2 w-32 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60]"> {['General', 'Student'].map((m) => (<button key={m} onClick={() => handleModeSelect(m)} className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 ${mode === m ? 'text-blue-400 bg-white/5' : 'text-gray-300'}`}> {m} </button>))} </div>)} </div>
-                                        {mode === "Student" && (<button onClick={() => setShowStudentModal(true)} className="control-btn hover:bg-white/15 py-2 px-3 text-blue-300"> <UserCog size={14} /> <span>Update Profile</span> </button>)}
-                                        <div className="relative ml-auto">
+                                    <div className="flex flex-nowrap items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full pb-2 overflow-x-auto custom-scrollbar-hide select-none">
+                                        <div className="relative shrink-0 flex items-center">
                                             <button 
-                                                onClick={() => setShowVisionModelMenu(!showVisionModelMenu)} 
+                                                onClick={(e) => {
+                                                    setVisionMenuPos(e.currentTarget.getBoundingClientRect());
+                                                    setShowVisionModelMenu(!showVisionModelMenu);
+                                                }} 
                                                 className={`control-btn py-2 px-3 transition-all ${
                                                     showVisionModelMenu 
                                                         ? 'text-emerald-400 bg-white/10' 
@@ -3090,10 +3106,21 @@ const Queue: React.FC<any> = () => {
                                                             : 'text-gray-400 hover:text-white hover:bg-white/15'
                                                 }`}
                                             >
-                                                <Eye size={14} /><span className="max-w-[100px] truncate">{visionModels.find(m => (m.model || m.id) === selectedVisionModel)?.name?.replace('Gemini ', '').trim() || 'Vision'}</span>
+                                                <Eye size={14} />
+                                                <div className="marquee-container max-w-[50px] sm:max-w-[80px]">
+                                                    <span className="marquee-content can-marquee">
+                                                        {visionModels.find(m => (m.model || m.id) === selectedVisionModel)?.name || selectedVisionModel || "Vision"}
+                                                    </span>
+                                                </div>
                                             </button>
-                                            {showVisionModelMenu && (
-                                                <div className="absolute bottom-full right-0 mb-2 w-56 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[60] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2">
+                                            {showVisionModelMenu && visionMenuPos && (
+                                                <div 
+                                                    className="fixed mb-2 w-56 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2"
+                                                    style={{ 
+                                                        bottom: window.innerHeight - visionMenuPos.top + 8,
+                                                        left: visionMenuPos.left
+                                                    }}
+                                                >
                                                     <div className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1">👁️ Vision Models</div>
                                                     <button onClick={() => { setSelectedVisionModel(""); setShowVisionModelMenu(false); }} className={`w-full text-left px-4 py-2 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${!selectedVisionModel ? 'text-emerald-400 bg-white/5' : 'text-gray-300 hover:text-white'}`}>
                                                         <span>Auto (Waterfall)</span>
@@ -3107,6 +3134,34 @@ const Queue: React.FC<any> = () => {
                                                     )})}
                                                 </div>
                                             )}
+                                        </div>
+                                        <button onClick={() => setIsSmartMode(!isSmartMode)} className={`control-btn py-2 px-3 shrink-0 ${isSmartMode ? 'active' : ''}`}><Zap size={14} className={isSmartMode ? 'fill-current' : ''} /><span>Smart</span></button>
+                                        <button onClick={() => window.location.hash = "#/settings"} className="control-btn py-2 px-3 text-white/60 hover:text-white/90 hover:bg-white/10 transition-all shrink-0"><UserCog size={14} /><span>Persona</span></button>
+                                        <div className="relative shrink-0"> 
+                                            <button 
+                                                onClick={(e) => {
+                                                    setModeMenuPos(e.currentTarget.getBoundingClientRect());
+                                                    setShowModeMenu(!showModeMenu);
+                                                }} 
+                                                className="control-btn hover:bg-white/15 py-2 px-3"
+                                            >
+                                                <span>{mode}</span>
+                                                <ChevronDown size={12} />
+                                            </button> 
+                                            {showModeMenu && modeMenuPos && (
+                                                <div 
+                                                    className="fixed mb-2 w-32 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[100] animate-in fade-in slide-in-from-bottom-2"
+                                                    style={{ 
+                                                        bottom: window.innerHeight - modeMenuPos.top + 8,
+                                                        left: modeMenuPos.left
+                                                    }}
+                                                > {['General', 'Student'].map((m) => (<button key={m} onClick={() => handleModeSelect(m)} className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 ${mode === m ? 'text-blue-400 bg-white/5' : 'text-gray-300'}`}> {m} </button>))} </div>)} </div>
+                                        {mode === "Student" && (<button onClick={() => setShowStudentModal(true)} className="p-2 rounded-xl transition-all flex items-center justify-center text-blue-300 hover:text-white hover:bg-white/5 shrink-0" title={isStealth ? undefined : "Update Profile"}> <GraduationCap size={18} /> </button>)}
+                                        <div className="ml-auto shrink-0 flex items-center">
+                                            <button onClick={handleUseScreen} className="control-btn hover:bg-white/15 py-2 px-3 shrink-0">
+                                                <Monitor size={14} className="text-blue-400" />
+                                                <span>Queue Screen</span>
+                                            </button>
                                         </div>
                                     </div>
                                 )}

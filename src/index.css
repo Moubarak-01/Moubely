@@ -234,6 +234,16 @@ body,
   border-radius: 20px;
 }
 
+.custom-scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.custom-scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+
 /* --- STRICT ARROW CURSOR MODE --- */
 /* 
    Per User Request: Force a normal arrow cursor everywhere.

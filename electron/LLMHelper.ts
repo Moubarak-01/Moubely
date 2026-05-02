@@ -37,24 +37,21 @@ async function safePdfParse(buffer: Buffer) {
 
 // --- 1. THE EXPANDED WATERFALL BRAINS ---
 export const CHAT_MODELS = [
-    // --- TIER 1: THE HEAVY LIFTERS (Advanced Reasoning & Logic) ---
-    { type: 'openrouter', model: 'nousresearch/hermes-3-llama-3.1-405b:free', name: 'Hermes 3 Llama 405B' },
-    { type: 'openrouter', model: 'qwen/qwen3-next-80b-a3b-instruct:free', name: 'Qwen 3 Next 80B' },
-
-    // --- TIER 2 : FAST & OPEN (Gemma 4 / Flash / Lite) ---
+    // --- TIER 1 : FAST & OPEN (Gemma 4 / Flash / Lite) ---
     { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B' },
     { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-2.0-flash-lite-preview-02-05', name: 'Gemini 2.0 Flash Lite' }, // ZERO RPD
     { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' }, // ZERO RPD,
 
-    // --- TIER 3: Gemini ---
+    // --- TIER 2: Gemini ---
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-    { type: 'gemini', model: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite' }, // ADDED: 500 RPD
+    { type: 'gemini', model: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite' }, // Active (500 RPD)
+    { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' }, // Active (20 RPD)
     { type: 'openrouter', model: 'nvidia/nemotron-3-nano-30b-a3b:free', name: 'Nvidia Nemotron 3 Nano' },
     { type: 'gemini', model: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' }, // ZERO RPD,
 
-    // --- TIER 4: EFFICIENCY & SPECIALIZED ---
+    // --- TIER 3: EFFICIENCY & SPECIALIZED ---
     { type: 'openrouter', model: 'stepfun/step-3.5-flash:free', name: 'Step 3.5 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-native', name: 'Gemini 2.5 Flash Native' },
     { type: 'gemini', model: 'gemini-robotics-er-1.5-preview', name: 'Gemini Robotics' },
@@ -66,7 +63,7 @@ export const CHAT_MODELS = [
     { type: 'openrouter', model: 'anthropic/claude-sonnet-4.5', name: 'Claude 4.5 Sonnet' },
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet' },
 
-    // --- TIER 5: RESEARCH & SEARCH (Perplexity, Groq and Git) ---
+    // --- TIER 4: RESEARCH & SEARCH (Perplexity, Groq and Git) ---
     { type: 'openrouter', model: 'meta-llama/llama-3.2-3b-instruct:free', name: 'Llama 3.2 3B Instruct' },
     { type: 'openrouter', model: 'arcee-ai/trinity-mini:free', name: 'Trinity Mini 1.2B' },
     { type: 'openrouter', model: 'liquid/lfm-2.5-1.2b-instruct:free', name: 'Liquid LFM 1.2B' },
@@ -85,14 +82,14 @@ export const VISION_MODELS = [
     // --- TIER 1: ELITE & RELIABLE VISION (Gemma 4 Upgrade) ---
     { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B (Vision)' }, // ADDED '-a4b-it'
     { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B (Vision)' }, // ADDED '-it'
-    { type: 'gemini', model: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash-Lite' },
+    { type: 'gemini', model: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
-    { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
+    { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
     { type: 'openrouter', model: 'anthropic/claude-opus-4.5', name: 'Claude 4.5 Opus (Vision)' },
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Reasoning Vision)' },
-    { type: 'gemini', model: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview' }, // ZERO RPD
-    { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3.0 BPro' }, // ZERO RPD
+    { type: 'gemini', model: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro' }, // Inactive (0 RPD)
+    { type: 'gemini', model: 'gemini-3-pro-preview', name: 'Gemini 3 Pro' }, // Deprecated
     { type: 'gemini', model: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' }, // ZERO RPD,
 
     // --- TIER 2: FAST & RELIABLE ---
@@ -677,7 +674,7 @@ ANY RULE VIOLATION INVALIDATES THE RESPONSE.
 
         switch (type) {
             case 'title':
-                taskInstruction = "Summarize the session into one short title. CRITICAL: NO <think> tags. NO markdown. Output ONLY plain text. Max 6 words.";
+                taskInstruction = "Summarize the session into one short title. CRITICAL: Put your reasoning in a <think> tag. Output ONLY plain text for the title. Max 6 words.";
                 break;
             case 'assist':
                 taskInstruction = "CRITICAL RULE: You MUST put all your reading, reasoning, and logic inside a single <think> ... </think> tag at the top of your response. THEN, output only the final answer and a strict analogy. Do NOT output raw scratchpads outside the tag.";
@@ -872,14 +869,16 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     finalSystemInstruction += studentAugmentation;
                 }
 
-                const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist' || (type === 'general' && isCandidateMode);
+                const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist';
                 const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
-                const isMuzzleModel = config.model.includes('gemma') || config.model.includes('llama') || config.model.includes('mistral') || config.model.includes('gemini') || config.type === 'openrouter';
+                const isMuzzleModel = true; // Apply formatting uniformly to ALL models
 
                 if (isUltraStrictSolver && isMuzzleModel) {
                     finalSystemInstruction += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Ultra-Strict Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: You MUST fight the urge to acknowledge the prompt. Your VERY FIRST output tokens MUST be <think>. You MUST NOT output any text, restatement of rules, or greetings before the <think> tag.\n❌ BAD START: "The user wants me to... <think>"\n✅ GOOD START: "<think>[All your planning here]</think>\\n**Situation:**"\n\nSYNCHRONIZED COMMENTS RULE: Every single line of code inside your \`Type:\` blocks MUST mathematically match the code in your \`Complete Code Block\`. If you plan to put a comment (e.g., \`// Step 1: Transpose\`) in the final block, that exact comment MUST be included in your \`Type:\` snippet. No hidden additions at the end.\n\nINLINE VS. BLOCK:\n\nInline: Any single variable, function name, or property (e.g., \`grid1\`, \`dfs\`, \`is_sub\`) mentioned in your natural speech MUST be wrapped in SINGLE backticks and stay inside the sentence. NEVER give these their own line or triple backticks.\nBlocks: Only the actual logic chunks in the Action: section (using the Type: label) and the Complete Code Block: should have their own lines.\n\nNO SHORT-CIRCUIT: You MUST visit every land cell in \`grid2\`. Do not return False until the entire island is "sunk" (set to 0).\n\nEXACT 6 SECTIONS: Ensure you output exactly 6 headers. If you miss one or add a 7th, the response fails.`;
                 } else if (isShortFormAction && isMuzzleModel) {
-                    finalSystemInstruction += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Short-Form Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL OVERRIDE: For this specific action, IGNORE any prior rules requiring '###' headers or long formatting. \nNO THINKING ALLOWED: Do NOT output any <think> tags. You must fulfill the EXACT TASK GOAL immediately. NO extra headers, NO preamble, NO fluff, NO apologies. Just provide the raw, requested short output.`;
+                    finalSystemInstruction += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Short-Form Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL OVERRIDE: For this specific action, IGNORE any prior rules requiring '###' headers or long formatting. \nYou MUST do all your reasoning inside a <think> tag. After the </think> tag, output ONLY the final short output. NO extra headers, NO preamble, NO fluff, NO apologies. Just provide the raw, requested short output.`;
+                } else if (type === 'general' && isMuzzleModel) {
+                    finalSystemInstruction += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" General Chat Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: Your VERY FIRST output tokens MUST be <think>. You MUST do all your reasoning, planning, and constraint checking inside a <think> ... </think> block. \n\nCRITICAL CLOSING RULE: You MUST literally output the </think> tag when you are done reasoning. If you do not close the tag, the system will break.\n\nAfter the </think> tag, output your final conversational response natively.`;
                 }
 
                 let fullResponse = "";
@@ -894,7 +893,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     if (this.cachedStudentPdfPart) parts.push(this.cachedStudentPdfPart);
 
                     const result = await chat.sendMessageStream(parts);
-                    const needsMuzzle = isUltraStrictSolver;
+                    const needsMuzzle = isUltraStrictSolver || isShortFormAction || type === 'general';
                     if (needsMuzzle) {
                         fullResponse += "<think>\n";
                         if (onToken) onToken("<think>\n");
@@ -928,9 +927,9 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                             ...history.map(h => ({ role: h.role === 'ai' ? 'assistant' : 'user', content: h.text })),
                             { role: "user", content: message }
                         ];
-                        const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist' || (type === 'general' && isCandidateMode);
+                        const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist';
                         const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
-                        const needsMuzzle = isUltraStrictSolver;
+                        const needsMuzzle = isUltraStrictSolver || isShortFormAction || type === 'general';
                         if (needsMuzzle) {
                             msgs.push({ role: "assistant", content: "<think>\n" });
                             fullResponse += "<think>\n";
@@ -1046,14 +1045,16 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
             try {
                 let currentVisionPrompt = visionPrompt;
                 
-                const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist' || (type === 'general' && isCandidateMode);
+                const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist';
                 const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
-                const isMuzzleModel = config.model.includes('gemma') || config.model.includes('llama') || config.model.includes('mistral') || config.model.includes('gemini') || config.type === 'openrouter';
+                const isMuzzleModel = true; // Apply formatting uniformly to ALL models
 
                 if (isUltraStrictSolver && isMuzzleModel) {
                     currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Ultra-Strict Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: You MUST fight the urge to acknowledge the prompt. Your VERY FIRST output tokens MUST be <think>. You MUST NOT output any text, restatement of rules, or greetings before the <think> tag.\n❌ BAD START: "The user wants me to... <think>"\n✅ GOOD START: "<think>[All your transcription and planning here]</think>\\n**Situation:**"\n\nSYNCHRONIZED COMMENTS RULE: Every single line of code inside your \`Type:\` blocks MUST mathematically match the code in your \`Complete Code Block\`. If you plan to put a comment (e.g., \`// Step 1: Transpose\`) in the final block, that exact comment MUST be included in your \`Type:\` snippet. No hidden additions at the end.\n\nINLINE VS. BLOCK:\n\nInline: Any single variable, function name, or property (e.g., \`grid1\`, \`dfs\`, \`is_sub\`) mentioned in your natural speech MUST be wrapped in SINGLE backticks and stay inside the sentence. NEVER give these their own line or triple backticks.\nBlocks: Only the actual logic chunks in the Action: section (using the Type: label) and the Complete Code Block: should have their own lines.\n\nNO SHORT-CIRCUIT: You MUST visit every land cell in \`grid2\`. Do not return False until the entire island is "sunk" (set to 0).\n\nEXACT 6 SECTIONS: Ensure you output exactly 6 headers. If you miss one or add a 7th, the response fails.`;
                 } else if (isShortFormAction && isMuzzleModel) {
-                    currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Short-Form Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL OVERRIDE: For this specific action, IGNORE any prior rules requiring '###' headers or long formatting. \nNO THINKING ALLOWED: Do NOT output any <think> tags. You must fulfill the EXACT TASK GOAL immediately. NO extra headers, NO preamble, NO fluff, NO apologies. Just provide the raw, requested short output.`;
+                    currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Short-Form Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL OVERRIDE: For this specific action, IGNORE any prior rules requiring '###' headers or long formatting. \nYou MUST do all your reasoning inside a <think> tag. After the </think> tag, output ONLY the final short output. NO extra headers, NO preamble, NO fluff, NO apologies. Just provide the raw, requested short output.`;
+                } else if (type === 'general' && isMuzzleModel) {
+                    currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" General Chat Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: Your VERY FIRST output tokens MUST be <think>. You MUST do all your reasoning, planning, and constraint checking inside a <think> ... </think> block. \n\nCRITICAL CLOSING RULE: You MUST literally output the </think> tag when you are done reasoning. If you do not close the tag, the system will break.\n\nAfter the </think> tag, output your final conversational response natively.`;
                 }
                 
                 const textPart = { type: "text", text: currentVisionPrompt };
@@ -1063,14 +1064,14 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     if (!this.genAI) continue;
                     const model = this.genAI.getGenerativeModel({ model: config.model });
                     
-                    const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist' || (type === 'general' && isCandidateMode);
+                    const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist';
                     const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
                     const contents = [
                         { role: "user", parts: [{ text: currentVisionPrompt }, ...geminiParts] }
                     ];
                     
                     const result = await model.generateContentStream({ contents: contents });
-                    const needsMuzzle = isUltraStrictSolver;
+                    const needsMuzzle = isUltraStrictSolver || isShortFormAction || type === 'general';
                     if (needsMuzzle) {
                         fullResponse += "<think>\n";
                         if (onToken) onToken("<think>\n");
@@ -1104,9 +1105,9 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                             : textPart;
 
                         const msgs: any[] = [{ role: "user", content: [fallbackTextPart, ...openAIParts] }];
-                        const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist' || (type === 'general' && isCandidateMode);
+                        const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist';
                         const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
-                        const needsMuzzle = isUltraStrictSolver;
+                        const needsMuzzle = isUltraStrictSolver || isShortFormAction || type === 'general';
                         if (needsMuzzle) {
                             msgs.push({ role: "assistant", content: "<think>\n" });
                             fullResponse += "<think>\n";
