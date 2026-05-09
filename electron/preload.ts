@@ -29,7 +29,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("private-mode-toggled", s);
   },
 
-  onGhostTypingInput: (cb: (data: { char?: string, action?: 'backspace' | 'enter' }) => void) => {
+  onGhostTypingInput: (cb: (data: { char?: string, action?: string, shortcut?: string }) => void) => {
     const s = (_: any, d: any) => cb(d);
     ipcRenderer.on("ghost-typing-input", s);
     return () => ipcRenderer.removeListener("ghost-typing-input", s);

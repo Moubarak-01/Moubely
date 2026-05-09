@@ -30,7 +30,7 @@ export interface ElectronAPI {
   onSolutionsReady: (callback: (solutions: string) => void) => () => void
   onResetView: (callback: () => void) => () => void
   onTokenReceived: (callback: (token: string) => void) => () => void
-  onGhostTypingInput: (callback: (data: { char?: string, action?: 'backspace' | 'enter' }) => void) => () => void
+  onGhostTypingInput: (callback: (data: { char?: string, action?: string, shortcut?: string }) => void) => () => void
   onGhostTypingState: (callback: (isActive: boolean) => void) => () => void
 
   // Utilities

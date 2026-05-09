@@ -675,6 +675,169 @@ const Queue: React.FC<any> = () => {
     useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
     useEffect(() => { transcriptLengthRef.current = transcriptLogs.length; }, [transcriptLogs]);
 
+    // --- GHOST INTERCEPT LISTENERS ---
+    useEffect(() => {
+        if (!window.electronAPI) return;
+
+        const unGhostInput = window.electronAPI.onGhostTypingInput((data) => {
+            const el = textareaRef.current;
+            if (!el) return;
+
+            if (data.char) {
+                const start = el.selectionStart;
+                const end = el.selectionEnd;
+                setInput(prev => prev.substring(0, start) + data.char + prev.substring(end));
+                setTimeout(() => {
+                    const newPos = start + (data.char?.length || 0);
+                    el.setSelectionRange(newPos, newPos);
+                    el.focus();
+                }, 0);
+            } else if (data.action === 'backspace') {
+                const start = el.selectionStart;
+                const end = el.selectionEnd;
+                if (start === end && start > 0) {
+                    setInput(prev => prev.substring(0, start - 1) + prev.substring(end));
+                    setTimeout(() => {
+                        el.setSelectionRange(start - 1, start - 1);
+                        el.focus();
+                    }, 0);
+                } else if (start !== end) {
+                    setInput(prev => prev.substring(0, start) + prev.substring(end));
+                    setTimeout(() => {
+                        el.setSelectionRange(start, start);
+                        el.focus();
+                    }, 0);
+                }
+            } else if (data.action === 'tab') {
+                const start = el.selectionStart;
+                const end = el.selectionEnd;
+                const tabSpace = "  "; // Insert 2 spaces for tab
+                setInput(prev => prev.substring(0, start) + tabSpace + prev.substring(end));
+                setTimeout(() => {
+                    el.setSelectionRange(start + tabSpace.length, start + tabSpace.length);
+                    el.focus();
+                }, 0);
+            } else if (data.action === 'delete') {
+                const start = el.selectionStart;
+                const end = el.selectionEnd;
+                if (start === end && start < el.value.length) {
+                    setInput(prev => prev.substring(0, start) + prev.substring(start + 1));
+                    setTimeout(() => {
+                        el.setSelectionRange(start, start);
+                        el.focus();
+                    }, 0);
+                } else if (start !== end) {
+                    setInput(prev => prev.substring(0, start) + prev.substring(end));
+                    setTimeout(() => {
+                        el.setSelectionRange(start, start);
+                        el.focus();
+                    }, 0);
+                }
+            } else if (data.action === 'left') {
+                const pos = Math.max(0, el.selectionStart - 1);
+                el.setSelectionRange(pos, pos);
+                el.focus();
+            } else if (data.action === 'right') {
+                const pos = Math.min(el.value.length, el.selectionStart + 1);
+                el.setSelectionRange(pos, pos);
+                el.focus();
+            } else if (data.action === 'up') {
+                const currentPos = el.selectionStart;
+                const textBefore = el.value.substring(0, currentPos);
+                const lastNewline = textBefore.lastIndexOf('\n');
+                if (lastNewline !== -1) {
+                    const prevNewline = textBefore.lastIndexOf('\n', lastNewline - 1);
+                    const newPos = prevNewline === -1 ? 0 : prevNewline + 1;
+                    el.setSelectionRange(newPos, newPos);
+                } else {
+                    el.setSelectionRange(0, 0);
+                }
+                el.focus();
+            } else if (data.action === 'down') {
+                const currentPos = el.selectionStart;
+                const nextNewline = el.value.indexOf('\n', currentPos);
+                if (nextNewline !== -1) {
+                    el.setSelectionRange(nextNewline + 1, nextNewline + 1);
+                } else {
+                    el.setSelectionRange(el.value.length, el.value.length);
+                }
+                el.focus();
+            } else if (data.action === 'home') {
+                el.setSelectionRange(0, 0);
+                el.focus();
+            } else if (data.action === 'end') {
+                el.setSelectionRange(el.value.length, el.value.length);
+                el.focus();
+            } else if (data.action === 'enter') {
+                setGhostTriggerSend(prev => prev + 1);
+            } else if (data.action === 'newline') {
+                const start = el.selectionStart;
+                const end = el.selectionEnd;
+                setInput(prev => prev.substring(0, start) + "\n" + prev.substring(end));
+                setTimeout(() => {
+                    el.setSelectionRange(start + 1, start + 1);
+                    el.focus();
+                }, 0);
+            } else if (data.shortcut) {
+                switch (data.shortcut) {
+                    case 'select-all':
+                        el.select();
+                        break;
+                    case 'copy':
+                        const selectedText = el.value.substring(el.selectionStart, el.selectionEnd);
+                        if (selectedText) {
+                            navigator.clipboard.writeText(selectedText);
+                        }
+                        break;
+                    case 'paste':
+                        navigator.clipboard.readText().then(text => {
+                            const start = el.selectionStart;
+                            const end = el.selectionEnd;
+                            setInput(prev => prev.substring(0, start) + text + prev.substring(end));
+                            setTimeout(() => {
+                                const newPos = start + text.length;
+                                el.setSelectionRange(newPos, newPos);
+                                el.focus();
+                            }, 0);
+                        });
+                        break;
+                    case 'cut':
+                        const cutText = el.value.substring(el.selectionStart, el.selectionEnd);
+                        if (cutText) {
+                            navigator.clipboard.writeText(cutText);
+                            const startX = el.selectionStart;
+                            const endX = el.selectionEnd;
+                            setInput(prev => prev.substring(0, startX) + prev.substring(endX));
+                            setTimeout(() => {
+                                el.setSelectionRange(startX, startX);
+                                el.focus();
+                            }, 0);
+                        }
+                        break;
+                    case 'undo':
+                        document.execCommand('undo');
+                        break;
+                }
+            }
+        });
+
+        const unGhostState = window.electronAPI.onGhostTypingState((active) => {
+            setIsGhostActive(active);
+        });
+
+        return () => {
+            unGhostInput();
+            unGhostState();
+        };
+    }, []);
+
+    // Effect to trigger handleSend when ghost input sends 'enter'
+    useEffect(() => {
+        if (ghostTriggerSend > 0) {
+            handleSend();
+        }
+    }, [ghostTriggerSend]);
+
     const MAX_QUEUE_SIZE = 12;
 
     const handleExpandToggle = () => {
@@ -884,38 +1047,6 @@ const Queue: React.FC<any> = () => {
                 })
             );
 
-            cleanupFunctions.push(
-                window.electronAPI.onStealthModeToggled((enabled) => {
-                    console.log(`[Queue] 🛡️ Stealth Toggle -> ${enabled}`);
-                    setIsStealth(enabled);
-                })
-            );
-
-            cleanupFunctions.push(
-                window.electronAPI.onPrivateModeToggled((enabled) => {
-                    console.log(`[Queue] 🕶️ Private Toggle -> ${enabled}`);
-                    setIsPrivateMode(enabled);
-                })
-            );
-
-            cleanupFunctions.push(
-                window.electronAPI.onGhostTypingInput((data) => {
-                    if (data.char) {
-                        setInput(prev => prev + data.char);
-                    } else if (data.action === 'backspace') {
-                        setInput(prev => prev.slice(0, -1));
-                    } else if (data.action === 'enter') {
-                        setGhostTriggerSend(Date.now());
-                    }
-                })
-            );
-
-            cleanupFunctions.push(
-                window.electronAPI.onGhostTypingState((active) => {
-                    console.log(`[Queue] 👻 Ghost Typing -> ${active}`);
-                    setIsGhostActive(active);
-                })
-            );
         }
 
         // --- ADDED: CTRL+H LISTENER FOR LOCAL CAPTURE & CTRL FOR SCROLL PORTAL ---

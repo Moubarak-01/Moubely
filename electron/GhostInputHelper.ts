@@ -24,6 +24,10 @@ const VK_RIGHT = 0x27;
 const VK_DOWN = 0x28;
 const VK_INSERT = 0x2D;
 const VK_DELETE = 0x2E;
+const VK_A = 0x41;
+const VK_C = 0x43;
+const VK_V = 0x56;
+const VK_X = 0x58;
 const VK_Z = 0x5A;
 const VK_LWIN = 0x5B;
 const VK_RWIN = 0x5C;
@@ -42,6 +46,7 @@ let CallNextHookEx: any;
 let GetKeyboardState: any;
 let ToUnicode: any;
 let GetAsyncKeyState: any;
+let GetKeyState: any;
 
 let isLoaded = false;
 
@@ -67,6 +72,7 @@ function initKoffi() {
         GetKeyboardState = user32.func('bool __stdcall GetKeyboardState(uint8 *lpKeyState)');
         ToUnicode = user32.func('int __stdcall ToUnicode(uint32 wVirtKey, uint32 wScanCode, const uint8 *lpKeyState, _Out_ char16_t *pwszBuff, int cchBuff, uint32 wFlags)');
         GetAsyncKeyState = user32.func('int16 __stdcall GetAsyncKeyState(int vKey)');
+        GetKeyState = user32.func('int16 __stdcall GetKeyState(int vKey)');
 
         isLoaded = true;
     } catch (e) {
@@ -129,6 +135,12 @@ export class GhostInputHelper {
                             const altDown = (GetAsyncKeyState(VK_MENU) & 0x8000) !== 0;
                             const winDown = (GetAsyncKeyState(VK_LWIN) & 0x8000) !== 0 || (GetAsyncKeyState(VK_RWIN) & 0x8000) !== 0;
 
+                            // 1.5 Bypass if Moubely is focused to prevent doubling
+                            const win = this.appState.getMainWindow();
+                            if (win && win.isFocused()) {
+                                return CallNextHookEx(this.hookHandle, nCode, wParam, lParam);
+                            }
+
                             // 2. Detect Shift+Z for Toggle (Our Rescue Key)
                             const shiftDown = (GetAsyncKeyState(VK_SHIFT) & 0x8000) !== 0;
                             if (vkCode === VK_Z && shiftDown && !ctrlDown && !altDown && !winDown) {
@@ -136,37 +148,102 @@ export class GhostInputHelper {
                                 return 1; // Block Shift+Z
                             }
 
-                            // 3. If any main modifier is held (Ctrl, Alt, Win), let the shortcut pass through
-                            if (ctrlDown || altDown || winDown) {
+                            // 3. Handle Special Shortcuts (Ctrl + Key)
+                            if (ctrlDown && !altDown && !winDown) {
+                                if (vkCode === VK_A) {
+                                    this.sendToFrontend({ shortcut: 'select-all' });
+                                    return 1;
+                                }
+                                if (vkCode === VK_C) {
+                                    this.sendToFrontend({ shortcut: 'copy' });
+                                    return 1;
+                                }
+                                if (vkCode === VK_V) {
+                                    this.sendToFrontend({ shortcut: 'paste' });
+                                    return 1;
+                                }
+                                if (vkCode === VK_X) {
+                                    this.sendToFrontend({ shortcut: 'cut' });
+                                    return 1;
+                                }
+                                if (vkCode === VK_Z) {
+                                    this.sendToFrontend({ shortcut: 'undo' });
+                                    return 1;
+                                }
+                                // Let other Ctrl shortcuts pass through (like Ctrl+Tab, etc.)
                                 return CallNextHookEx(this.hookHandle, nCode, wParam, lParam);
                             }
 
-                            // 4. Pass through system/navigation/modifier keys (so they function normally)
+                            // 4. Pass through system/modifier keys (so they function normally)
                             if (
                                 vkCode === VK_SHIFT || vkCode === VK_LSHIFT || vkCode === VK_RSHIFT ||
                                 vkCode === VK_CONTROL || vkCode === VK_LCONTROL || vkCode === VK_RCONTROL ||
                                 vkCode === VK_MENU || vkCode === VK_LMENU || vkCode === VK_RMENU ||
-                                vkCode === VK_CAPITAL || vkCode === VK_ESCAPE || vkCode === VK_TAB ||
-                                (vkCode >= 0x21 && vkCode <= 0x2E) || // PageUp to Delete
+                                vkCode === VK_CAPITAL || vkCode === VK_ESCAPE ||
                                 (vkCode >= 0x70 && vkCode <= 0x87)    // F1 to F24
                             ) {
                                 return CallNextHookEx(this.hookHandle, nCode, wParam, lParam);
                             }
 
-                            // 5. Intercept typing for Moubely
+                            // 5. Intercept typing and navigation for Moubely
                             if (vkCode === VK_BACK) {
                                 this.sendToFrontend({ action: 'backspace' });
                                 return 1; // Block
                             }
 
+                            if (vkCode === VK_DELETE) {
+                                this.sendToFrontend({ action: 'delete' });
+                                return 1; // Block
+                            }
+
+                            if (vkCode === VK_TAB) {
+                                this.sendToFrontend({ action: 'tab' });
+                                return 1; // Block
+                            }
+
+                            if (vkCode === VK_LEFT) {
+                                this.sendToFrontend({ action: 'left' });
+                                return 1; // Block
+                            }
+                            if (vkCode === VK_RIGHT) {
+                                this.sendToFrontend({ action: 'right' });
+                                return 1; // Block
+                            }
+                            if (vkCode === VK_UP) {
+                                this.sendToFrontend({ action: 'up' });
+                                return 1; // Block
+                            }
+                            if (vkCode === VK_DOWN) {
+                                this.sendToFrontend({ action: 'down' });
+                                return 1; // Block
+                            }
+                            if (vkCode === VK_HOME) {
+                                this.sendToFrontend({ action: 'home' });
+                                return 1; // Block
+                            }
+                            if (vkCode === VK_END) {
+                                this.sendToFrontend({ action: 'end' });
+                                return 1; // Block
+                            }
+
                             if (vkCode === VK_RETURN) {
-                                this.sendToFrontend({ action: 'enter' });
+                                if (shiftDown) {
+                                    this.sendToFrontend({ action: 'newline' });
+                                } else {
+                                    this.sendToFrontend({ action: 'enter' });
+                                }
                                 return 1; // Block
                             }
 
                             // 6. Character Translation
                             const keyState = Buffer.alloc(256);
-                            GetKeyboardState(keyState);
+                            // Do not use GetKeyboardState here as it might be out of sync
+                            // Manually build the state for critical keys
+                            if (shiftDown) keyState[VK_SHIFT] = 0x80;
+                            if (ctrlDown) keyState[VK_CONTROL] = 0x80;
+                            if (altDown) keyState[VK_MENU] = 0x80;
+                            if (GetKeyState(VK_CAPITAL) & 0x01) keyState[VK_CAPITAL] = 0x01;
+
                             const outBuffer = Buffer.alloc(4);
                             const res = ToUnicode(vkCode, scanCode, keyState, outBuffer, 2, 0);
                             
@@ -203,7 +280,7 @@ export class GhostInputHelper {
         }
     }
 
-    private sendToFrontend(data: { char?: string, action?: 'backspace' | 'enter' }) {
+    private sendToFrontend(data: { char?: string, action?: string, shortcut?: string }) {
         const win = this.appState.getMainWindow();
         if (win && !win.isDestroyed()) {
             win.webContents.send("ghost-typing-input", data);
