@@ -71,7 +71,7 @@ We have shifted from a static, premium-first architecture to a universal, open-m
 
 | Feature                 | Beta / MVP               | **v1.0.0 (Stable)**                                          |
 | :---------------------- | :----------------------- | :----------------------------------------------------------- |
-| **Model Roster**        | 18-Model Waterfall       | **20+ Model Waterfall** (Llama 405B, GPT-OSS 120B)           |
+| **Model Roster**        | 18-Model Waterfall       | **20+ Model Waterfall**           |
 | **History Logic**       | One record per message   | **Unified Chat Sessions** (Threaded)                         |
 | **Vision Logic**        | Manual routing           | **Global Vision Sync** (All actions see pixels)              |
 | **Privacy Engineering** | Entangled Stealth        | **Decoupled Protection** (OBS hiding vs. Click Pass-through) |
@@ -206,19 +206,25 @@ graph TD
 
 | Tier                           | Models                                                                                             |
 | :----------------------------- | :------------------------------------------------------------------------------------------------- |
-| **Tier 1: Heavy Lifters**      | **Hermes 3 Llama 405B**, Llama 3.3 70B, **GPT-OSS 120B**, **Qwen 3 Next 80B**, Cosmos Nemotron 34B |
-| **Tier 2: Fast Multi-Model**   | **Gemma 3 Family (27B - 1B)**                                                                      |
-| **Tier 3: Google Performance** | Gemini 3.0 Pro, Gemini 3 Flash, Gemini 2.5 Flash, Nemotron 3 Nano                                  |
-| **Tier 4: Specialized Tiers**  | **Step 3.5 Flash**, Solar Pro 3, Claude 4.5 Haiku, Claude 3.7 Sonnet (Thinking)                    |
-| **Tier 5: Deep Safety Net**    | Llama 3.2 3B, Trinity Mini, Liquid LFM 1.2B, Perplexity Sonar                                      |
+| **Tier 1: Speed & Open**       | **Gemma 4 (31B/26B)**, **Gemini 2.5 Flash Lite**, **Gemini 2.0 Flash (Lite)**                      |
+| **Tier 2: High Performance**   | **Gemini 3.1 Flash Lite**, **Gemini 3 Flash**, **Nvidia Nemotron 3 Nano**, **Gemini 2.5 Flash/Pro** |
+| **Tier 3: Elite Reasoning**    | **Claude 3.7 Sonnet (Thinking)**, **Claude 4.5 Opus/Sonnet/Haiku**, **Mistral 3.1**, **Step 3.5**  |
+| **Tier 4: Research & Robotics** | **Gemini Robotics**, **Solar Pro 3**, **Trinity Mini**, **Arcee Trinity Large**, **Liquid LFM**    |
+| **Tier 5: Backups & Search**    | **Groq Llama 3.3**, **Sonar Reasoning Pro**, **GPT-4o**, **Llama 3.2 3B**                          |
+
+
+
+
 
 ### The "Eyes" (Vision) 👁️
 
 | Tier                        | Models                                                                             |
 | :-------------------------- | :--------------------------------------------------------------------------------- |
-| **Tier 1: Elite Vision**    | **Gemini 3.1 Pro**, Gemini 3.0 Pro, Claude 4.5 Opus, Claude 3.7 Sonnet (Reasoning) |
-| **Tier 2: Fast & Reliable** | Gemini 3 Flash, Gemini 2.5 Flash, Claude 4.5 Haiku, Mistral Small Vision           |
-| **Tier 3: Backups**         | Mistral Large 2 (Nvidia), GPT-4o, Perplexity Vision                                |
+| **Tier 1: Elite Vision**    | **Gemma 4 (31B/26B)**, **Gemini 3.1 Pro**, **Claude 3.7 Sonnet (Reasoning)**, **Gemini 3 Flash** |
+| **Tier 2: Fast & Reliable** | **Gemini 2.5 Flash (Lite)**, **Claude 4.5 Sonnet/Haiku**, **Mistral Small Vision** |
+| **Tier 3: Backups**         | **Mistral Large 2 (Nvidia)**, **GPT-4o**, **Sonar Reasoning Pro**                  |
+
+
 
 ### The "Hands" (Creation - Art Studio) 🎨
 
@@ -234,6 +240,32 @@ graph TD
 | :-------------------------- | :------------------------------------------------------------------ |
 | **Local Whisper**           | Primary. Uses `Xenova/whisper-tiny.en` running locally on port 3000 |
 | **Groq (Whisper-Large-V3)** | Instant cloud fallback if the local queue times out or fails        |
+
+---
+
+## 📖 How to Use Moubely
+
+### 1. Installation & Setup
+- **Install**: Run the application installer.
+- **Onboarding**: Upon first launch, you'll be greeted by a setup wizard. Enter your **Name** and your **API Keys** (Gemini, OpenRouter, etc.).
+- **Ready**: Once configured, Moubely is ready to serve you from the top of your screen.
+
+### 2. Essential Shortcuts
+Moubely is designed for speed. Memorize these to master your workflow:
+- 📸 **`Ctrl + H`**: Capture a region or your entire screen.
+- 👁️ **`Ctrl + B`**: Toggle the app window (Minimize to tray / Restore to top).
+- ⚙️ **`Ctrl + Enter`**: Process your current queue or submit a text prompt.
+- 🕶️ **`Shift + A`**: Toggle **Private Mode** (Allows clicks to pass through to background apps).
+- 👻 **`Shift + Z`**: Toggle **Ghost Mode** (Global keyboard stealth — *Requires Stealth Mode to be active*).
+
+### 3. Core Modes & Buttons
+- **Smart Mode (⚡)**: Ideal for **Meetings and Live Interviews**. When active, Moubely uses a high-speed waterfall to ensure near-instant transcription and reasoning, even if your local hardware is lagging.
+- **Student Mode (🎓)**: Upload your PDFs, code files, or documents. Moubely will learn the context and "act" based on that specific data, effectively becoming an expert on your personal info.
+- **Vision Selection (👁️)**: Click the Vision button to choose which model handles your screenshots.
+- **Brain/Persona Selection**: Switch between different AI personalities and reasoning models in real-time.
+
+### 4. Dynamic Model Switching
+Moubely allows you to change the active model **mid-session**. If a fast model is struggling with a complex problem, simply click the model name and switch to a "Heavy Lifter" like **gemma-4 models** for maximum accuracy.
 
 ---
 
@@ -589,6 +621,16 @@ graph TD
 **Solution:** Enforced a strict **Hard Width Limit** (50-80px) on the internal label container. By pairing this with an automatic marquee (scroll) effect, the button remains exactly the same size regardless of the model name length, preserving the layout's visual integrity.
 
 </details>
+
+<details>
+<summary><strong>40. The Global Keyboard "Doubling" Problem</strong></summary>
+
+**Problem:** Using a low-level keyboard hook created a "double input" loop where the browser received both the native event and our injected IPC event simultaneously, resulting in `HHee lllloo` style text.
+
+**Solution:** Implemented a **Smart Focus Gate** in the native interceptor. The hook now performs a real-time check of `win.isFocused()`. If the app is active, it passes the input to the OS handler; if the app is hidden/backgrounded, it intercepts and routes via IPC, ensuring perfectly clean text entry.
+
+</details>
+
 
 ---
 
