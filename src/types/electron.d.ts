@@ -26,10 +26,15 @@ export interface ElectronAPI {
   onStealthModeToggled: (callback: (enabled: boolean) => void) => () => void
   onPrivateModeToggled: (callback: (enabled: boolean) => void) => () => void
   onScreenshotTaken: (callback: (data: { path: string; preview: string }) => void) => () => void
-  onScreenshotAction: (callback: (data: any) => void) => () => void // <--- WAS MISSING
+  onScreenshotAction: (callback: (data: any) => void) => () => void
   onSolutionsReady: (callback: (solutions: string) => void) => () => void
   onResetView: (callback: () => void) => () => void
   onTokenReceived: (callback: (token: string) => void) => () => void
+  onGhostTypingInput: (callback: (data: { char?: string, action?: 'backspace' | 'enter' }) => void) => () => void
+  onGhostTypingState: (callback: (isActive: boolean) => void) => () => void
+
+  // Utilities
+  copyToClipboard: (text: string) => Promise<void>
 
   // Debug / Processing Events (ALL WERE MISSING)
   onSolutionStart: (callback: () => void) => () => void
@@ -53,6 +58,7 @@ export interface ElectronAPI {
   getStealthMode: () => Promise<boolean>
   togglePrivateMode: () => Promise<boolean>
   getPrivateMode: () => Promise<boolean>
+  toggleGhostMode: () => Promise<boolean>
   getBackgroundCursor: () => Promise<string | null>
   checkProfileExists: () => Promise<boolean>
   saveStudentFiles: (files: { name: string, data: ArrayBuffer }[]) => Promise<boolean>

@@ -82,10 +82,10 @@ export const VISION_MODELS = [
     // --- TIER 1: ELITE & RELIABLE VISION (Gemma 4 Upgrade) ---
     { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B (Vision)' }, // ADDED '-a4b-it'
     { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B (Vision)' }, // ADDED '-it'
-    { type: 'gemini', model: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite' },
-    { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-    { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
+    { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+    { type: 'gemini', model: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite' },
+    { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'openrouter', model: 'anthropic/claude-opus-4.5', name: 'Claude 4.5 Opus (Vision)' },
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet:thinking', name: 'Claude 3.7 Sonnet (Reasoning Vision)' },
     { type: 'gemini', model: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro' }, // Inactive (0 RPD)
@@ -814,7 +814,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
         onToken?: (token: string) => void,
         overrideModel?: string
     ): Promise<string> {
-
+        console.log(`[LLM] 🚀 Request Started: "${message.substring(0, 100).replace(/\n/g, ' ')}..."`);
         this.isAborted = false; // Reset flag at start
         const studentDir = path.join(app.getPath("userData"), "student_profile");
 
@@ -856,10 +856,11 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                 executionList = [overrideConfig, ...executionList.filter(m => m.model !== overrideModel)];
             }
         }
+        console.log(`[LLM] 🏗️ Waterfall Sequence: ${executionList.map(m => m.model).join(" -> ")}`);
 
         for (const config of executionList) {
             try {
-                console.log(`[LLM] 🔄 Waterfall: Trying ${config.model} (${config.type})...`);
+                console.log(`\n[LLM] 🔄 ATTEMPTING: ${config.model} (${config.type})...`);
 
                 let finalSystemInstruction = baseSystemInstruction;
 
@@ -970,7 +971,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
 
     public async chatWithAttachments(message: string, attachments: { path: string, type: string }[], onToken?: (token: string) => void, type: string = "answer", overrideModel?: string): Promise<string> {
         this.isAborted = false; // Reset flag at start
-        console.log(`[LLM] 🖼️ Attachment Waterfall: Analyzing ${attachments.length} attachments...`);
+        console.log(`[LLM] 🖼️ Vision Request: ${attachments.length} files | Prompt: "${message.substring(0, 50).replace(/\n/g, ' ')}..."`);
         const geminiParts: any[] = [];
         const openAIParts: any[] = [];
         let attachedTextCode = "";
@@ -1041,7 +1042,10 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
             }
         }
 
+        console.log(`[LLM] 🏗️ Vision Waterfall: ${executionList.map(m => m.model).join(" -> ")}`);
+
         for (const config of executionList) {
+            console.log(`\n[LLM] 👁️ ATTEMPTING VISION: ${config.model} (${config.type})...`);
             try {
                 let currentVisionPrompt = visionPrompt;
                 

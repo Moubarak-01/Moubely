@@ -1,4 +1,4 @@
-import { ipcMain, app, desktopCapturer, shell, dialog, safeStorage } from "electron";
+import { ipcMain, app, desktopCapturer, shell, dialog, safeStorage, clipboard } from "electron";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
@@ -144,6 +144,16 @@ export function initializeIpcHandlers(appState: AppState) {
     return true;
   });
 
+  ipcMain.handle("copy-to-clipboard", (event, text: string) => {
+    try {
+      clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      console.error("[IPC ⚡] ❌ Clipboard Write Failed:", e);
+      return false;
+    }
+  });
+
   // --- MOUSE CLICK-THROUGH HANDLERS ---
   ipcMain.handle("set-ignore-mouse-events", (event, ignore: boolean, options: any) => {
     const win = appState.getMainWindow();
@@ -191,6 +201,13 @@ export function initializeIpcHandlers(appState: AppState) {
     const newState = appState.toggleStealthMode();
     logIPC("toggle-stealth-mode", `New State: ${newState ? "PROTECTED" : "VISIBLE"}`);
     return newState;
+  });
+
+  // --- GHOST MODE ---
+  ipcMain.handle("toggle-ghost-mode", () => {
+    appState.ghostInputHelper.toggle();
+    logIPC("toggle-ghost-mode", `Ghost Mode Toggled`);
+    return appState.ghostInputHelper.isActive;
   });
 
   // --- PRIVATE MODE ---

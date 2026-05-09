@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   updateContentDimensions: (d: any) => ipcRenderer.invoke("update-content-dimensions", d),
   setWindowSize: (d: any) => ipcRenderer.invoke("set-window-size", d),
   toggleExpand: (isExpanded: boolean) => ipcRenderer.invoke("toggle-expand", isExpanded),
+  copyToClipboard: (text: string) => ipcRenderer.invoke("copy-to-clipboard", text),
 
   // Expansion Toggle Listener
   onToggleExpansion: (cb: any) => {
@@ -28,6 +29,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("private-mode-toggled", s);
   },
 
+  onGhostTypingInput: (cb: (data: { char?: string, action?: 'backspace' | 'enter' }) => void) => {
+    const s = (_: any, d: any) => cb(d);
+    ipcRenderer.on("ghost-typing-input", s);
+    return () => ipcRenderer.removeListener("ghost-typing-input", s);
+  },
+
+  onGhostTypingState: (cb: (isActive: boolean) => void) => {
+    const s = (_: any, e: boolean) => cb(e);
+    ipcRenderer.on("ghost-typing-state", s);
+    return () => ipcRenderer.removeListener("ghost-typing-state", s);
+  },
+
   onScreenshotAction: (cb: any) => {
     const s = (_: any, d: any) => cb(d);
     ipcRenderer.on("screenshot-action-triggered", s);
@@ -44,6 +57,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openFilePicker: () => ipcRenderer.invoke("open-file-picker"),
   saveApiKeys: (keys: any) => ipcRenderer.invoke("save-api-keys", keys),
   getApiKeys: () => ipcRenderer.invoke("get-api-keys"),
+  toggleGhostMode: () => ipcRenderer.invoke("toggle-ghost-mode"),
 
   transcribeDictation: (base64Audio: string, mimeType: string) => ipcRenderer.invoke("transcribe-dictation", base64Audio, mimeType),
   cancelChat: () => ipcRenderer.invoke("cancel-gemini-chat"),

@@ -7,7 +7,7 @@ import {
     Scaling, Copy, Check, CheckCheck, Trash2, Mail,
     Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
     Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw, Plus, Maximize,
-    Video, Image, Code, Maximize2, Download, GraduationCap
+    Video, Image, Code, Maximize2, Download, GraduationCap, Ghost
 } from "lucide-react"
 import moubelyIcon from "../../assets/Moubely_icon.png"
 
@@ -195,7 +195,7 @@ const AudioVisualizer = ({ audioContext, source }: { audioContext: AudioContext 
 };
 
 // --- HELPER: Message Content Renderer ---
-const MessageContent: React.FC<{ text: string, isStreaming?: boolean }> = ({ text, isStreaming }) => {
+const MessageContent: React.FC<{ text: string, isStreaming?: boolean, activeModel?: string }> = ({ text, isStreaming, activeModel }) => {
     // 1. Separate <think> from the rest of the text
     const thinkMatch = text.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
     const thinkingContent = thinkMatch ? thinkMatch[1].trim() : "";
@@ -231,7 +231,7 @@ const MessageContent: React.FC<{ text: string, isStreaming?: boolean }> = ({ tex
         return (
             <div className="flex items-center gap-2 text-gray-300 opacity-90 text-sm py-1 font-medium tracking-wide">
                 <Loader2 size={15} className="animate-spin text-blue-400" />
-                <span>Deep reasoning in progress...</span>
+                <span>{activeModel?.toLowerCase().includes('gemma') ? 'Deep reasoning in progress...' : 'Solving problem in progress...'}</span>
             </div>
         );
     }
@@ -281,7 +281,11 @@ const MessageContent: React.FC<{ text: string, isStreaming?: boolean }> = ({ tex
                         const codeText = extractTextFromChildren(children).replace(/\n$/, '');
                         const [isCopied, setIsCopied] = useState(false)
                         const handleCopyCode = () => {
-                            navigator.clipboard.writeText(codeText)
+                            if (window.electronAPI?.copyToClipboard) {
+                                window.electronAPI.copyToClipboard(codeText);
+                            } else {
+                                navigator.clipboard.writeText(codeText);
+                            }
                             setIsCopied(true)
                             setTimeout(() => setIsCopied(false), 2000)
                         }
@@ -425,11 +429,12 @@ const TextFilePreview = ({ url }: { url: string }) => {
 };
 
 // --- UNIVERSAL MEDIA LIGHTBOX COMPONENT ---
-const UniversalMediaLightbox = ({ file, onClose, onDownload, savedId }: {
+const UniversalMediaLightbox = ({ file, onClose, onDownload, savedId, isStealth }: {
     file: { path: string, type: string, name?: string, localPath?: string },
     onClose: () => void,
     onDownload: (url: string, name: string, id: string) => void,
-    savedId: string | null
+    savedId: string | null,
+    isStealth: boolean
 }) => {
     const [scale, setScale] = useState(1);
     const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -472,7 +477,7 @@ const UniversalMediaLightbox = ({ file, onClose, onDownload, savedId }: {
                     <button
                         onClick={() => onDownload(file.localPath || file.path, file.name || 'exported_media', 'lightbox')}
                         className={`p-2 rounded-full backdrop-blur transition-all ${savedId === 'lightbox' ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
-                        title="Save to folder"
+                        title={isStealth ? undefined : "Save to folder"}
                     >
                         {savedId === 'lightbox' ? <Check size={20} /> : <Download size={20} />}
                     </button>
@@ -486,7 +491,7 @@ const UniversalMediaLightbox = ({ file, onClose, onDownload, savedId }: {
                 {file.type === 'video' ? (
                     <video controls autoPlay src={src} className="max-w-full max-h-full rounded-lg shadow-2xl shadow-purple-500/10" />
                 ) : file.type === 'pdf' ? (
-                    <iframe src={`${src}#toolbar=1`} className="w-full h-full bg-white rounded-lg shadow-2xl" title="PDF Preview" />
+                    <iframe src={`${src}#toolbar=1`} className="w-full h-full bg-white rounded-lg shadow-2xl" title={isStealth ? undefined : "PDF Preview"} />
                 ) : file.type === 'image' ? (
                     <img
                         src={src}
@@ -630,6 +635,8 @@ const Queue: React.FC<any> = () => {
 
     // --- MODES STATE ---
     const [isStealth, setIsStealth] = useState(false);
+    const [isGhostActive, setIsGhostActive] = useState(false);
+    const [ghostTriggerSend, setGhostTriggerSend] = useState(0);
     const [isPrivateMode, setIsPrivateMode] = useState(false);
     const [isHoveringChat, setIsHoveringChat] = useState(false);
     const [isCtrlPressed, setIsCtrlPressed] = useState(false);
@@ -890,6 +897,25 @@ const Queue: React.FC<any> = () => {
                     setIsPrivateMode(enabled);
                 })
             );
+
+            cleanupFunctions.push(
+                window.electronAPI.onGhostTypingInput((data) => {
+                    if (data.char) {
+                        setInput(prev => prev + data.char);
+                    } else if (data.action === 'backspace') {
+                        setInput(prev => prev.slice(0, -1));
+                    } else if (data.action === 'enter') {
+                        setGhostTriggerSend(Date.now());
+                    }
+                })
+            );
+
+            cleanupFunctions.push(
+                window.electronAPI.onGhostTypingState((active) => {
+                    console.log(`[Queue] 👻 Ghost Typing -> ${active}`);
+                    setIsGhostActive(active);
+                })
+            );
         }
 
         // --- ADDED: CTRL+H LISTENER FOR LOCAL CAPTURE & CTRL FOR SCROLL PORTAL ---
@@ -951,10 +977,24 @@ const Queue: React.FC<any> = () => {
     }
 
     const handleToggleStealth = async () => {
-        if (window.electronAPI) {
-            const newState = await window.electronAPI.toggleStealthMode();
-            setIsStealth(newState);
+        try {
+            const newState = await window.electronAPI.toggleStealthMode()
+            setIsStealth(newState)
+        } catch (error) {
+            console.error("Failed to toggle stealth mode:", error)
         }
+    }
+
+    const handleToggleGhostMode = async () => {
+        try {
+            const newState = await window.electronAPI.toggleGhostMode()
+            setIsGhostActive(newState)
+        } catch (error) {
+            console.error("Failed to toggle ghost mode:", error)
+        }
+    }
+
+    const handleMinimize = () => { 
     };
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -1323,7 +1363,11 @@ const Queue: React.FC<any> = () => {
 
     const handleCopyEmail = () => {
         if (!emailDraft) return;
-        navigator.clipboard.writeText(emailDraft);
+        if (window.electronAPI?.copyToClipboard) {
+            window.electronAPI.copyToClipboard(emailDraft);
+        } else {
+            navigator.clipboard.writeText(emailDraft);
+        }
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
     };
@@ -1496,13 +1540,21 @@ const Queue: React.FC<any> = () => {
 
 
     const handleCopyUserMessage = (id: string, text: string) => {
-        navigator.clipboard.writeText(text);
+        if (window.electronAPI?.copyToClipboard) {
+            window.electronAPI.copyToClipboard(text);
+        } else {
+            navigator.clipboard.writeText(text);
+        }
         setCopiedId(id);
         setTimeout(() => setCopiedId(null), 2000);
     }
 
     const handleCopyAiMessage = (id: string, text: string) => {
-        navigator.clipboard.writeText(text);
+        if (window.electronAPI?.copyToClipboard) {
+            window.electronAPI.copyToClipboard(text);
+        } else {
+            navigator.clipboard.writeText(text);
+        }
         setCopiedId(id);
         setTimeout(() => setCopiedId(null), 2000);
     }
@@ -1619,14 +1671,22 @@ const Queue: React.FC<any> = () => {
     const handleCopyHistoryTranscript = (meetingId: string, transcript: TranscriptItem[], e: React.MouseEvent) => {
         e.stopPropagation();
         const text = transcript.map(t => t.text).join(" ");
-        navigator.clipboard.writeText(text);
+        if (window.electronAPI?.copyToClipboard) {
+            window.electronAPI.copyToClipboard(text);
+        } else {
+            navigator.clipboard.writeText(text);
+        }
         setCopiedTranscriptId(meetingId);
         setTimeout(() => setCopiedTranscriptId(null), 2000);
     }
 
     const handleCopyHistoryEmail = (meetingId: string, email: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        navigator.clipboard.writeText(email);
+        if (window.electronAPI?.copyToClipboard) {
+            window.electronAPI.copyToClipboard(email);
+        } else {
+            navigator.clipboard.writeText(email);
+        }
         setCopiedEmailId(meetingId);
         setTimeout(() => setCopiedEmailId(null), 2000);
     }
@@ -2166,6 +2226,7 @@ const Queue: React.FC<any> = () => {
                     onClose={() => setFullscreenFile(null)}
                     onDownload={handleDownloadMedia}
                     savedId={savedId}
+                    isStealth={isStealth}
                 />
             )}
             {hoverImage && !fullscreenFile && (
@@ -2248,6 +2309,16 @@ const Queue: React.FC<any> = () => {
                         >
                             {isStealth ? <EyeOff size={20} /> : <Eye size={20} />}
                         </button>
+
+                        {isStealth && (
+                            <button
+                                onClick={handleToggleGhostMode}
+                                className={`icon-btn ${isGhostActive ? 'text-purple-400 hover:text-purple-300' : 'text-gray-500 hover:text-white'}`}
+                                title={isStealth || isGhostActive ? undefined : "Toggle Ghost Mode (Shift+Z)"}
+                            >
+                                <Ghost size={20} />
+                            </button>
+                        )}
 
                         <button
                             onClick={handleExpandToggle}
@@ -2447,14 +2518,26 @@ const Queue: React.FC<any> = () => {
                                                             </div>
                                                         ) : (
                                                             <div className="flex items-center gap-3 w-full justify-end">
-                                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                                                    <button
+                                                                <div className="relative flex items-center shrink-0">
+                                                                    {/* VISUAL HINT (always visible, fades out on hover) */}
+                                                                    <div className="absolute right-2 flex gap-[2px] opacity-30 group-hover:opacity-0 transition-opacity pointer-events-none">
+                                                                        <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                                                                        <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                                                                        <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
+                                                                    </div>
+                                                                    
+                                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pr-2">
+                                                                        <span className="text-[10px] text-gray-500 font-mono select-none mr-1">
+                                                                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                        </span>
+                                                                        <button
                                                                         onClick={() => handleCopyUserMessage(msg.id, msg.text)}
                                                                         className={`p-1.5 transition-colors rounded-full ${copiedId === msg.id ? 'text-green-400 bg-green-400/10' : 'text-gray-500 hover:text-white bg-black/40'}`}
                                                                     >
                                                                         {copiedId === msg.id ? <CheckCheck size={12} /> : <Copy size={12} />}
                                                                     </button>
                                                                     <button onClick={() => handleStartEdit(msg)} className="p-1.5 text-gray-400 hover:text-white bg-black/40 rounded-full"><Edit2 size={12} /></button>
+                                                                </div>
                                                                 </div>
                                                                 <div className="user-bubble text-left relative max-w-full">
                                                                     <CollapsibleUserMessage text={msg.text} />
@@ -2513,26 +2596,37 @@ const Queue: React.FC<any> = () => {
                                                                     <span className="animate-pulse">{thinkingStep}</span>
                                                                 </div>
                                                             )}
-                                                            <MessageContent text={msg.text} isStreaming={msg.isStreaming} />
-                                                            <div className="flex items-center mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button
-                                                                    onClick={() => handleCopyAiMessage(msg.id, msg.text)}
-                                                                    className={`flex items-center gap-1.5 px-2 py-1 transition-colors rounded-md text-xs font-medium ${copiedId === msg.id ? 'text-green-400 bg-green-500/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                                                                >
-                                                                    {copiedId === msg.id ? <CheckCheck size={13} /> : <Copy size={13} />}
-                                                                    <span>{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
-                                                                </button>
-                                                                {msg.queuedAttachments && msg.queuedAttachments.length > 0 && (
+                                                            <MessageContent text={msg.text} isStreaming={msg.isStreaming} activeModel={selectedChatModel} />
+                                                            <div className="relative w-full group/bottom-actions mt-1">
+                                                                {/* VISUAL HINT: subtle bottom bar that expands/disappears on hover */}
+                                                                <div className="absolute left-0 bottom-2 w-8 h-[2px] bg-white/10 rounded-full group-hover/bottom-actions:opacity-0 transition-opacity pointer-events-none" />
+                                                                
+                                                                <div className="flex items-center gap-2 opacity-0 group-hover/bottom-actions:opacity-100 transition-opacity pb-1 w-full pt-1">
                                                                     <button
-                                                                        onClick={() => handleDownloadMedia(msg.queuedAttachments![0].path, msg.text, msg.id)}
-                                                                        onContextMenu={handleResetDownloadPath}
-                                                                        className={`flex items-center gap-1.5 px-2 py-1 transition-colors rounded-md text-xs font-medium ${savedId === msg.id ? 'text-green-400 bg-green-500/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                                                                        title="Download (Right-click to reset folder)"
+                                                                        onClick={() => handleCopyAiMessage(msg.id, msg.text)}
+                                                                        className={`flex items-center gap-1.5 px-2 py-1 transition-colors rounded-md text-xs font-medium ${copiedId === msg.id ? 'text-green-400 bg-green-500/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                                                                     >
-                                                                        {savedId === msg.id ? <Check size={13} /> : <Download size={13} />}
-                                                                        <span>{savedId === msg.id ? 'Saved!' : 'Save'}</span>
+                                                                        {copiedId === msg.id ? <CheckCheck size={13} /> : <Copy size={13} />}
+                                                                        <span>{copiedId === msg.id ? 'Copied' : 'Copy'}</span>
                                                                     </button>
-                                                                )}
+                                                                    {msg.queuedAttachments && msg.queuedAttachments.length > 0 && (
+                                                                        <button
+                                                                            onClick={() => handleDownloadMedia(msg.queuedAttachments![0].path, msg.text, msg.id)}
+                                                                            onContextMenu={handleResetDownloadPath}
+                                                                            className={`flex items-center gap-1.5 px-2 py-1 transition-colors rounded-md text-xs font-medium ${savedId === msg.id ? 'text-green-400 bg-green-500/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                                                                            title={isStealth ? undefined : "Download (Right-click to reset folder)"}
+                                                                        >
+                                                                            {savedId === msg.id ? <Check size={13} /> : <Download size={13} />}
+                                                                            <span>{savedId === msg.id ? 'Saved!' : 'Save'}</span>
+                                                                        </button>
+                                                                    )}
+                                                                    <div className="flex-1"></div>
+                                                                    {!msg.isStreaming && msg.timestamp && (
+                                                                        <span className="text-[10px] text-gray-500 font-mono select-none mr-2">
+                                                                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -2899,7 +2993,7 @@ const Queue: React.FC<any> = () => {
                                                             <iframe
                                                                 src={`${hoverSrc}#toolbar=0&view=FitH`}
                                                                 className="w-full h-full border-none pointer-events-none scale-[1.0] origin-top bg-white"
-                                                                title="PDF Hover"
+                                                                title={isStealth ? undefined : "PDF Hover"}
                                                             />
                                                         );
                                                     } else if (hoverAttachment.type === 'image') {
@@ -3055,7 +3149,43 @@ const Queue: React.FC<any> = () => {
                                                 }
                                             }
                                         }}
-                                        placeholder={showPostMeeting ? "Ask about the meeting..." : "Ask about your screen..."}
+                                        onDragOver={(e) => e.preventDefault()}
+                                        onDrop={async (e) => {
+                                            e.preventDefault();
+                                            const files = e.dataTransfer.files;
+                                            if (!files || files.length === 0) return;
+                                            
+                                            for (let i = 0; i < files.length; i++) {
+                                                const file = files[i];
+                                                if (window.electronAPI && window.electronAPI.saveChatFile) {
+                                                    const arrayBuffer = await file.arrayBuffer();
+                                                    const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
+                                                    
+                                                    const isImage = ['png', 'jpg', 'jpeg', 'webp', 'heic', 'gif'].includes(ext);
+                                                    
+                                                    try {
+                                                        const protocolUrl = await window.electronAPI.saveChatFile(arrayBuffer, ext);
+                                                        if (isImage) {
+                                                            setQueuedScreenshots(prev => {
+                                                                const newQueue = [...prev, { path: protocolUrl, preview: protocolUrl }];
+                                                                if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
+                                                                return newQueue;
+                                                            });
+                                                        } else {
+                                                            let type = 'generic_file';
+                                                            if (['mp4', 'webm', 'mov', 'avi'].includes(ext)) type = 'video';
+                                                            else if (ext === 'pdf') type = 'pdf';
+                                                            else if (['txt', 'md', 'csv', 'json', 'js', 'ts', 'jsx', 'tsx', 'py', 'html', 'css', 'go', 'cs', 'java', 'cpp', 'c', 'h', 'hpp', 'sh', 'bash', 'yml', 'yaml', 'xml', 'log', 'ini', 'cfg', 'conf', 'php', 'rb', 'swift', 'kt', 'dart', 'rs', 'sql', 'env'].includes(ext)) type = 'text';
+
+                                                            setQueuedAttachments(prev => [...prev, { name: file.name, path: protocolUrl, type }]);
+                                                        }
+                                                    } catch (err) {
+                                                        console.error("Failed to save dropped file", err);
+                                                    }
+                                                }
+                                            }
+                                        }}
+                                        placeholder={isGhostActive ? "👻 Ghost Intercept Active (Shift+Z to toggle)..." : (showPostMeeting ? "Ask about the meeting..." : "Ask about your screen...")}
                                         rows={1}
                                         className="flex-1 bg-transparent py-4 px-2 text-sm text-gray-100 placeholder-gray-500 outline-none resize-none overflow-y-auto"
                                         style={{ minHeight: '52px', maxHeight: '150px' }}

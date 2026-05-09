@@ -42,6 +42,17 @@ export class ShortcutsHelper {
     })
     console.log("[Shortcuts] Requesting registration: Shift+A");
 
+    // Toggle Ghost Mode (Shift + Z)
+    globalShortcut.register("Shift+Z", () => {
+      console.log("[Shortcuts] 👻 Triggered: Shift+Z (Ghost Intercept)");
+      if (this.appState.getIsStealthMode && this.appState.getIsStealthMode()) {
+        this.appState.ghostInputHelper.toggle()
+      } else {
+        console.log("[Shortcuts] ⚠️ Ignored: Ghost Intercept requires Stealth Mode.");
+      }
+    })
+    console.log("[Shortcuts] Requesting registration: Shift+Z");
+
     app.on("will-quit", () => {
       globalShortcut.unregisterAll()
     })

@@ -2,6 +2,46 @@ import { BrowserWindow, screen, app } from "electron"
 import { AppState } from "./main"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
+import os from "os"
+
+// ── Windows Native API Stealth Focus ──────────────────────────────────
+// WS_EX_NOACTIVATE: Clicking the window NEVER steals focus from the background app.
+// WS_EX_TOOLWINDOW: Window is hidden from Alt+Tab.
+// Combined, Chrome (or any app) stays as the "active" window — full stealth.
+const GWL_EXSTYLE = -20;
+const WS_EX_NOACTIVATE  = 0x08000000;
+const WS_EX_TOOLWINDOW  = 0x00000080;
+const WS_EX_APPWINDOW   = 0x00040000; // We REMOVE this to hide from taskbar
+const SWP_FRAMECHANGED  = 0x0020;
+const SWP_NOMOVE        = 0x0002;
+const SWP_NOSIZE        = 0x0001;
+const SWP_NOZORDER      = 0x0004;
+const SWP_NOACTIVATE    = 0x0010;
+
+let stealthApiLoaded = false;
+let GetWindowLongPtrW: any = null;
+let SetWindowLongPtrW: any = null;
+let SetWindowPos: any = null;
+let GetForegroundWindow: any = null;
+let SetForegroundWindow: any = null;
+
+function loadStealthApis() {
+  if (stealthApiLoaded || os.platform() !== "win32") return;
+  stealthApiLoaded = true;
+  try {
+    const koffi = require("koffi");
+    const user32 = koffi.load("user32.dll");
+    // Use 'int64' for the pointer-width long on x64 Windows
+    GetWindowLongPtrW  = user32.func("int64 __stdcall GetWindowLongPtrW(void* hWnd, int nIndex)");
+    SetWindowLongPtrW  = user32.func("int64 __stdcall SetWindowLongPtrW(void* hWnd, int nIndex, int64 dwNewLong)");
+    SetWindowPos       = user32.func("bool __stdcall SetWindowPos(void* hWnd, void* hWndInsertAfter, int X, int Y, int cx, int cy, uint flags)");
+    GetForegroundWindow = user32.func("void* __stdcall GetForegroundWindow()");
+    SetForegroundWindow = user32.func("bool __stdcall SetForegroundWindow(void* hWnd)");
+    console.log("[WindowHelper] 🛡️ Native stealth-focus APIs loaded via koffi");
+  } catch (e) {
+    console.warn("[WindowHelper] ⚠️ Could not load stealth APIs, focus stealth unavailable:", e);
+  }
+}
 
 const isDev = !app.isPackaged || process.env.NODE_ENV === "development"
 const startUrl = isDev 
@@ -21,9 +61,12 @@ console.log(`[WindowHelper] 🖼️ Icon Path: ${iconPath}`);
 export class WindowHelper {
   private mainWindow: BrowserWindow | null = null
   private appState: AppState
+  private lastForegroundHwnd: any = null; // Track the last non-Moubely foreground window
 
   constructor(appState: AppState) {
     this.appState = appState
+    // Pre-load stealth APIs at construction
+    if (process.platform === "win32") loadStealthApis();
   }
 
   // State variables for window geometry memory
@@ -154,7 +197,7 @@ export class WindowHelper {
     })
   }
 
-  // --- STEALTH LOGIC (Content Protection) ---
+  // --- STEALTH LOGIC (Content Protection + Focus Stealth) ---
   public setStealthMode(enabled: boolean): void {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return
 
@@ -166,6 +209,62 @@ export class WindowHelper {
     if (process.platform === "darwin") {
       this.mainWindow.setHiddenInMissionControl(enabled)
     }
+
+    // ── Windows Focus Stealth Hardening ──────────────────────────────
+    // 1. Electron-level: Tell Electron this window CANNOT be focused.
+    // This is the most reliable way to prevent Chrome from losing focus on click.
+    if (typeof (this.mainWindow as any).setFocusable === "function") {
+      this.mainWindow.setFocusable(!enabled);
+    }
+
+    // 2. Windows Native-level: WS_EX_NOACTIVATE + WS_EX_TOOLWINDOW
+    if (process.platform === "win32" && GetWindowLongPtrW && SetWindowLongPtrW) {
+      try {
+        const hwnd = this.mainWindow.getNativeWindowHandle();
+        const currentStyle = Number(GetWindowLongPtrW(hwnd, GWL_EXSTYLE));
+
+        let newStyle: number;
+        if (enabled) {
+          if (GetForegroundWindow) {
+            this.lastForegroundHwnd = GetForegroundWindow();
+          }
+          // NOACTIVATE: Prevent activation on click.
+          // TOOLWINDOW: Hide from Alt+Tab and Taskbar.
+          newStyle = (currentStyle | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW;
+          console.log(`[WindowHelper] 🛡️ Focus Stealth: ARMED (Non-Focusable)`);
+        } else {
+          newStyle = (currentStyle & ~WS_EX_NOACTIVATE & ~WS_EX_TOOLWINDOW) | WS_EX_APPWINDOW;
+          console.log(`[WindowHelper] 🛡️ Focus Stealth: DISARMED`);
+        }
+
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, BigInt(newStyle));
+
+        if (SetWindowPos) {
+          SetWindowPos(
+            hwnd, null,
+            0, 0, 0, 0,
+            SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
+          );
+        }
+
+        // 3. Immediate Focus Recovery: If Chrome blinked, force it back NOW.
+        if (enabled && this.lastForegroundHwnd && SetForegroundWindow) {
+          // Double-tap focus restoration to handle Windows focus-stealing races
+          SetForegroundWindow(this.lastForegroundHwnd);
+          setTimeout(() => {
+            try { SetForegroundWindow(this.lastForegroundHwnd); } catch {}
+          }, 10);
+          setTimeout(() => {
+            try { SetForegroundWindow(this.lastForegroundHwnd); } catch {}
+          }, 100);
+        }
+      } catch (e) {
+        console.warn("[WindowHelper] ⚠️ Native focus stealth failed:", e);
+      }
+    }
+    
+    // Ensure the window always remains on top, even if focusable state change drops it.
+    this.mainWindow.setAlwaysOnTop(true, 'screen-saver');
   }
 
   // --- PRIVATE MODE LOGIC (Click Pass-through) ---
@@ -181,13 +280,34 @@ export class WindowHelper {
   public getStartUrl() { return startUrl }
   public isVisible() { return this.mainWindow?.isVisible() ?? false }
   public hideMainWindow() { this.mainWindow?.hide() }
-  public showMainWindow() { this.mainWindow?.showInactive() }
+  public showMainWindow() {
+    // In stealth mode, track what's focused before showing, then restore focus
+    if (this.appState.getIsStealthMode() && process.platform === "win32" && GetForegroundWindow) {
+      try { this.lastForegroundHwnd = GetForegroundWindow(); } catch {}
+    }
+    this.mainWindow?.showInactive()
+    this.mainWindow?.setAlwaysOnTop(true, 'screen-saver')
+    // Restore focus aggressively
+    if (this.appState.getIsStealthMode() && this.lastForegroundHwnd && SetForegroundWindow) {
+      try { SetForegroundWindow(this.lastForegroundHwnd); } catch {}
+      setTimeout(() => {
+        try { SetForegroundWindow(this.lastForegroundHwnd); } catch {}
+      }, 50);
+    }
+  }
   public toggleMainWindow() { if (this.isVisible()) this.hideMainWindow(); else this.showMainWindow(); }
 
   public centerAndShowWindow() {
     if (!this.mainWindow) return;
 
     console.log("[WindowHelper] 🔭 Centering and Showing Window...");
+
+    // In stealth mode, save foreground window before we show
+    const isStealth = this.appState.getIsStealthMode();
+    if (isStealth && process.platform === "win32" && GetForegroundWindow) {
+      try { this.lastForegroundHwnd = GetForegroundWindow(); } catch {}
+    }
+
     // Position at Top-Center
     const { width: screenWidth, x: screenX, y: screenY } = screen.getPrimaryDisplay().workArea;
     const [currentWidth] = this.mainWindow.getSize();
@@ -195,12 +315,24 @@ export class WindowHelper {
       screenX + Math.round((screenWidth - currentWidth) / 2),
       screenY
     );
-    this.mainWindow.show();
-    this.mainWindow.focus();
 
-    // --- NEW: Re-assert dominance whenever the window is shown ---
-    // This counters Windows/Mac pushing the window back when you click into Zoom.
+    if (isStealth) {
+      // Show without taking focus — background app stays active
+      this.mainWindow.showInactive();
+    } else {
+      this.mainWindow.show();
+      this.mainWindow.focus();
+    }
+
+    // Re-assert dominance (always-on-top Z-order)
     this.mainWindow.setAlwaysOnTop(true, 'screen-saver');
+
+    // In stealth, restore focus to the background app
+    if (isStealth && this.lastForegroundHwnd && SetForegroundWindow) {
+      setTimeout(() => {
+        try { SetForegroundWindow(this.lastForegroundHwnd); } catch {}
+      }, 50);
+    }
   }
 
   public moveWindowRight() { this.moveWindow(20, 0) }

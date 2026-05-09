@@ -9,6 +9,7 @@ import { ShortcutsHelper } from "./shortcuts"
 import { ProcessingHelper } from "./ProcessingHelper"
 import { CursorHelper } from "./CursorHelper"
 import { LocalServerHelper } from "./LocalServerHelper"
+import { GhostInputHelper } from "./GhostInputHelper"
 
 console.log("Main process loading...");
 
@@ -26,6 +27,7 @@ export class AppState {
   public processingHelper: ProcessingHelper
   public generationHelper: GenerationHelper
   public cursorHelper: CursorHelper
+  public ghostInputHelper: GhostInputHelper
   private tray: any = null
 
   private view: "queue" | "solutions" = "queue"
@@ -56,6 +58,7 @@ export class AppState {
     this.windowHelper = new WindowHelper(this)
     this.shortcutsHelper = new ShortcutsHelper(this)
     this.cursorHelper = new CursorHelper()
+    this.ghostInputHelper = new GhostInputHelper(this)
 
     AppState.instance = this
   }
@@ -256,6 +259,11 @@ async function initializeApp() {
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit()
   })
+
+  app.on("will-quit", () => {
+    AppState.getInstance().ghostInputHelper.disable();
+  })
+
 }
 
 initializeApp();
