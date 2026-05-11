@@ -886,19 +886,31 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
 
                 if (config.type === 'gemini') {
                     if (!this.genAI) continue;
-                    const geminiModel = this.genAI.getGenerativeModel({ model: config.model });
-                    const chat = geminiModel.startChat({ history: validHistory });
-
-                    // Use the OVERWRITTEN 'message' variable
-                    let parts: any[] = [{ text: finalSystemInstruction + "\n\n" + message }];
-                    if (this.cachedStudentPdfPart) parts.push(this.cachedStudentPdfPart);
-
-                    const result = await chat.sendMessageStream(parts);
+                    
                     const needsMuzzle = isUltraStrictSolver || isShortFormAction || type === 'general';
+                    const geminiModel = this.genAI.getGenerativeModel({ 
+                        model: config.model,
+                        systemInstruction: finalSystemInstruction 
+                    });
+
+                    // Construct Turn-Based History for generateContentStream
+                    let currentParts: any[] = [{ text: message }];
+                    if (this.cachedStudentPdfPart) currentParts.push(this.cachedStudentPdfPart);
+
+                    let contents: any[] = [
+                        ...validHistory,
+                        { role: 'user', parts: currentParts }
+                    ];
+
+                    // [NEW] FORCE PRE-FILL (MOUBELIZED START)
                     if (needsMuzzle) {
+                        contents.push({ role: 'model', parts: [{ text: "<think>\n" }] });
                         fullResponse += "<think>\n";
                         if (onToken) onToken("<think>\n");
                     }
+
+                    const result = await geminiModel.generateContentStream({ contents });
+                    
                     for await (const chunk of result.stream) {
                         if (this.isAborted) {
                             console.log(`[LLM] 🛑 Generation aborted by user.`);

@@ -62,6 +62,9 @@ Moubely is an advanced, always-on-top AI productivity hub designed for seamless 
 - 📏 **Horizontal Control Hardening**: All tool buttons (Vision, Smart, Persona, Mode) are now locked into a single-line, horizontally scrollable container that never wraps
 - 🎈 **Floating Menu Architecture**: Dropdown selection menus now use fixed screen positioning to prevent being clipped by scrollable parent containers
 - 👁️ **Compact Model Display**: The Vision model button now maintains a stable width with internal marquee scrolling, preventing UI expansion when long model names are selected
+- ⏳ **Non-Blocking Task Queue**: Seamlessly queue up to 2 pending tasks while the AI processes your current request, complete with persistent UI status indicators
+- 🛡️ **Race-Condition Hardening**: Industrial-grade state protection using synchronous `useRef` guards to prevent double-triggering of chat actions or meeting finalization
+- 🧹 **Zero-Duplicate History**: Intelligent deduplication logic that automatically discards redundant session creations during high-velocity interactions
 
 ---
 
@@ -89,6 +92,8 @@ We have shifted from a static, premium-first architecture to a universal, open-m
 | **Control Layout**      | Flex Wrapping (Multi-Row)| **Horizontal Scroll** (Single-Line No-Wrap Hardening)        |
 | **Menu Positioning**    | Absolute (Clipping prone)| **Fixed-Position Tracking** (Anti-Clipping Architecture)     |
 | **Model Labeling**      | Static "Vision" text     | **Internal Marquee** (Compact Stable Width Display)          |
+| **Queue Management**    | Single Request Only      | **Asynchronous FIFO Queue** (1 Active + 2 Pending)           |
+| **History Stability**   | Prone to Race Conditions | **Strict Deduplication & Ref-Based Protection**              |
 
 ---
 
@@ -628,6 +633,33 @@ Moubely allows you to change the active model **mid-session**. If a fast model i
 **Problem:** Using a low-level keyboard hook created a "double input" loop where the browser received both the native event and our injected IPC event simultaneously, resulting in `HHee lllloo` style text.
 
 **Solution:** Implemented a **Smart Focus Gate** in the native interceptor. The hook now performs a real-time check of `win.isFocused()`. If the app is active, it passes the input to the OS handler; if the app is hidden/backgrounded, it intercepts and routes via IPC, ensuring perfectly clean text entry.
+
+</details>
+
+<details>
+<summary><strong>41. The "Double-Click" Ghost Session (Race Condition)</strong></summary>
+
+**Problem:** Rapid user input or double-clicking "Send" caused multiple identical chat sessions to be created in history due to React's asynchronous state update lag.
+
+**Solution:** Implemented **Synchronous Reference Guards** (`isThinkingRef`). By checking a mutable ref instead of just state at the start of the handler, we block redundant triggers instantly before the next render cycle, ensuring one-click-one-action reliability.
+
+</details>
+
+<details>
+<summary><strong>42. Async Task Overlap (Non-Blocking Queue)</strong></summary>
+
+**Problem:** Users had to wait for the AI to finish a response before asking another question, creating a bottleneck in high-speed research workflows.
+
+**Solution:** Engineered an **Asynchronous FIFO Queue**. The system now supports 1 active task and up to 2 pending slots. Users can continue typing and submitting prompts; if the AI is busy, the task is captured in a pending state with its specific model and attachment snapshots, and processed automatically as soon as the system is idle.
+
+</details>
+
+<details>
+<summary><strong>43. Meeting Finalization Duplication</strong></summary>
+
+**Problem:** Switching models or rapidly stopping a meeting session sometimes triggered the `useEffect` responsible for generating titles and summaries twice, leading to duplicate entries in the meeting transcript history.
+
+**Solution:** Introduced an **Atomic Generation Guard** (`isGeneratingMeetingRef`). This ensures that the expensive finalization logic (Email generation + Summary) is strictly executed once per session ID, even if the surrounding component re-renders during the process.
 
 </details>
 

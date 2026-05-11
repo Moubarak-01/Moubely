@@ -39,6 +39,17 @@ interface Message {
     isMedia?: boolean
 }
 
+interface QueuedMessage {
+    text: string;
+    attachments: { path: string, type: string, name: string, localPath?: string }[];
+    screenshots: ScreenshotData[];
+    type: "general" | "assist" | "reply" | "answer" | "ask" | "recap" | "solve";
+    isArt?: boolean;
+    chatModel?: string;
+    visionModel?: string;
+    isSmart?: boolean;
+}
+
 interface TranscriptItem {
     id: string
     text: string
@@ -195,7 +206,7 @@ const AudioVisualizer = ({ audioContext, source }: { audioContext: AudioContext 
 };
 
 // --- HELPER: Message Content Renderer ---
-const MessageContent: React.FC<{ text: string, isStreaming?: boolean, activeModel?: string }> = ({ text, isStreaming, activeModel }) => {
+const MessageContent: React.FC<{ text: string, isStreaming?: boolean, activeModel?: string, queuedCount?: number }> = ({ text, isStreaming, activeModel, queuedCount = 0 }) => {
     // 1. Separate <think> from the rest of the text
     const thinkMatch = text.match(/<think>([\s\S]*?)(?:<\/think>|$)/);
     const thinkingContent = thinkMatch ? thinkMatch[1].trim() : "";
@@ -231,7 +242,10 @@ const MessageContent: React.FC<{ text: string, isStreaming?: boolean, activeMode
         return (
             <div className="flex items-center gap-2 text-gray-300 opacity-90 text-sm py-1 font-medium tracking-wide">
                 <Loader2 size={15} className="animate-spin text-blue-400" />
-                <span>{activeModel?.toLowerCase().includes('gemma') ? 'Deep reasoning in progress...' : 'Solving problem in progress...'}</span>
+                <span>
+                    {activeModel?.toLowerCase().includes('gemma') ? 'Deep reasoning in progress...' : 'Solving problem in progress...'}
+                    {queuedCount > 0 && <span className="ml-2 text-blue-300/60 font-normal">({queuedCount} queued)</span>}
+                </span>
             </div>
         );
     }
@@ -530,11 +544,13 @@ const Queue: React.FC<any> = () => {
     const [hoverAttachment, setHoverAttachment] = useState<{ name: string, path: string, type: string, localPath?: string } | null>(null)
     const [hoverRect, setHoverRect] = useState<DOMRect | null>(null)
     const [needsEmailGeneration, setNeedsEmailGeneration] = useState(false)
+    const isGeneratingMeetingRef = useRef(false);
 
     const [input, setInput] = useState("")
     const [messages, setMessages] = useState<Message[]>([])
     const [isThinking, setIsThinking] = useState(false)
     const [thinkingStep, setThinkingStep] = useState("")
+    const [messageQueue, setMessageQueue] = useState<QueuedMessage[]>([]);
 
     // --- DOWNLOAD FEEDBACK ---
     const [savedId, setSavedId] = useState<string | null>(null);
@@ -591,6 +607,8 @@ const Queue: React.FC<any> = () => {
     const [chatModels, setChatModels] = useState<any[]>([]);
     const [visionModels, setVisionModels] = useState<any[]>([]);
     const [selectedChatModel, setSelectedChatModel] = useState("");
+    const isThinkingRef = useRef(false);
+    const isFinalizingRef = useRef(false);
     const [selectedVisionModel, setSelectedVisionModel] = useState("");
     const [showChatModelMenu, setShowChatModelMenu] = useState(false);
     const [showVisionModelMenu, setShowVisionModelMenu] = useState(false);
@@ -1090,6 +1108,7 @@ const Queue: React.FC<any> = () => {
         };
     }, [handleCapture, isPrivateMode])
 
+
     // --- SCROLL PORTAL EFFECT ---
     useEffect(() => {
         if (!window.electronAPI || !isPrivateMode) return;
@@ -1375,6 +1394,8 @@ const Queue: React.FC<any> = () => {
     }, [isSmartMode]);
 
     const handleStopSession = () => {
+        if (isFinalizingRef.current) return;
+        isFinalizingRef.current = true;
         setIsRecording(false);
         setIsPaused(false);
         isRecordingRef.current = false;
@@ -1433,7 +1454,8 @@ const Queue: React.FC<any> = () => {
 
     useEffect(() => {
         const generateEmailAfterFinalize = async () => {
-            if (needsEmailGeneration && showPostMeeting && !emailDraft && transcriptLogs.length > 0 && window.electronAPI) {
+            if (needsEmailGeneration && showPostMeeting && !emailDraft && transcriptLogs.length > 0 && window.electronAPI && !isGeneratingMeetingRef.current) {
+                isGeneratingMeetingRef.current = true;
                 setNeedsEmailGeneration(false);
                 setIsThinking(true);
                 setThinkingStep("Drafting summary...");
@@ -1476,6 +1498,9 @@ const Queue: React.FC<any> = () => {
                 }
                 finally {
                     setIsThinking(false);
+                    isThinkingRef.current = false;
+                    isGeneratingMeetingRef.current = false;
+                    isFinalizingRef.current = false;
                 }
             } else if (needsEmailGeneration && showPostMeeting && isThinking) {
                 // FALLBACK: empty transcript
@@ -1943,6 +1968,15 @@ const Queue: React.FC<any> = () => {
         }
 
         setPastChats(prev => {
+            // Deduplication: If this is a new session, check if the previous session is identical (to prevent race condition duplicates)
+            if (!activeSessionId || !prev.find(c => c.id === activeSessionId)) {
+                const lastSession = prev[0];
+                if (lastSession && lastSession.prompt === firstUserMessage && Math.abs(Date.now() - lastSession.date) < 2000) {
+                    console.warn("[History] Duplicate session detected, skipping creation.");
+                    return prev;
+                }
+            }
+
             const existingIndex = prev.findIndex(c => c.id === activeSessionId);
             if (existingIndex >= 0) {
                 // Update existing
@@ -1983,21 +2017,63 @@ const Queue: React.FC<any> = () => {
         window.electronAPI.cancelChat();
         setIsThinking(false);
         setShowSlowLoader(false);
+        setMessageQueue([]); // Clear queue on manual stop
         if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
     };
 
     const handleSend = async (overrideText?: string) => {
         if (!window.electronAPI) return;
+        
+        const isFromQueue = overrideText !== undefined;
 
-        const textToSend = overrideText || input
+        // Use ref for immediate check to prevent double-clicks/race conditions
+        if (isThinkingRef.current && !isFromQueue) {
+             // Handle Queueing logic is below, this is just a guard
+        }
+
+        const textToSend = overrideText || input;
         const attachmentsToSend = [
             ...queuedScreenshots.map(s => ({ path: s.path, type: 'image' })),
             ...queuedAttachments
         ];
         const hasAttachments = attachmentsToSend.length > 0;
 
-        if (!textToSend.trim() && !hasAttachments) return
-        if (isThinking) return;
+        if (!textToSend.trim() && !hasAttachments) return;
+
+        // 1. Add user message to history immediately if not already there
+        if (!isFromQueue) {
+            const userMsgId = `${Date.now()}-user`;
+            setMessages(prev => [
+                ...prev,
+                {
+                    id: userMsgId,
+                    role: "user",
+                    text: textToSend || (hasAttachments ? `Analyze ${attachmentsToSend.length} attachments.` : ""),
+                    queuedScreenshots: queuedScreenshots.length > 0 ? [...queuedScreenshots] : undefined,
+                    queuedAttachments: queuedAttachments.length > 0 ? [...queuedAttachments] : undefined,
+                    timestamp: Date.now()
+                }
+            ]);
+        }
+
+        // 2. Handle Queueing
+        if (isThinking && !isFromQueue) {
+            if (messageQueue.length >= 2) return;
+            setMessageQueue(prev => [...prev, {
+                text: textToSend,
+                attachments: [...queuedAttachments],
+                screenshots: [...queuedScreenshots],
+                type: "general",
+                isArt: isArtActive,
+                chatModel: selectedChatModel,
+                visionModel: selectedVisionModel,
+                isSmart: isSmartMode
+            }]);
+            setInput("");
+            setQueuedScreenshots([]);
+            setQueuedAttachments([]);
+            return;
+        }
 
         // Eager Session Initialization
         let currentSessionId = loadedSessionId;
@@ -2007,31 +2083,12 @@ const Queue: React.FC<any> = () => {
             setLoadedSessionType("Chat");
         }
 
-        const now = Date.now();
-        const aiMsgId = `${now}-ai`;
-        const userId = `${now}-user`;
-
-        const newMessages: Message[] = [
-            ...messages,
-            {
-                id: userId,
-                role: "user",
-                text: textToSend || (hasAttachments ? `Analyze ${attachmentsToSend.length} attachments.` : ""),
-                queuedScreenshots: queuedScreenshots.length > 0 ? queuedScreenshots : undefined,
-                queuedAttachments: queuedAttachments.length > 0 ? queuedAttachments : undefined,
-                timestamp: Date.now()
-            },
-            {
-                id: aiMsgId,
-                role: "ai",
-                text: "",
-                timestamp: Date.now(),
-                isStreaming: true,
-                isMedia: isArtActive
-            }
-        ];
-
-        setMessages(newMessages)
+        isThinkingRef.current = true;
+        const aiMsgId = `${Date.now()}-ai`;
+        setMessages(prev => [
+            ...prev,
+            { id: aiMsgId, role: "ai", text: "", timestamp: Date.now(), isStreaming: true }
+        ]);
         setInput("")
 
         setIsThinking(true)
@@ -2081,21 +2138,22 @@ const Queue: React.FC<any> = () => {
                 }
             }
 
-            const finalMessages = newMessages.map(m => {
-                if (m.id === aiMsgId) {
-                    return {
-                        ...m,
-                        text: fullResponse,
-                        isStreaming: false,
-                        queuedAttachments: generatedMedia ? [{ name: "Generated " + generatedMedia.type, path: generatedMedia.localUri, type: generatedMedia.type }] : undefined
-                    };
-                }
-                return m;
+            setMessages(prev => {
+                const updated = prev.map(m => {
+                    if (m.id === aiMsgId) {
+                        return {
+                            ...m,
+                            text: fullResponse,
+                            isStreaming: false,
+                            queuedAttachments: generatedMedia ? [{ name: "Generated " + generatedMedia.type, path: generatedMedia.localUri, type: generatedMedia.type }] : undefined
+                        };
+                    }
+                    return m;
+                });
+                // Save to Local History
+                saveChatToHistory(updated, currentSessionId);
+                return updated;
             });
-            setMessages(finalMessages);
-
-            // Save to Local History
-            saveChatToHistory(finalMessages);
 
         } catch (error: any) {
             setMessages(prev => prev.map(m =>
@@ -2105,6 +2163,7 @@ const Queue: React.FC<any> = () => {
             if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
             setShowSlowLoader(false);
             setIsThinking(false);
+            isThinkingRef.current = false;
 
             if (hasAttachments) {
                 setQueuedScreenshots([]);
@@ -2114,7 +2173,7 @@ const Queue: React.FC<any> = () => {
     }
 
     // --- UPDATED: 5-BUTTON LOGIC & DIGITAL TWIN ---
-    const triggerAssistAction = async (actionType: "assist" | "reply" | "answer" | "ask" | "recap") => {
+    const triggerAssistAction = async (actionType: "assist" | "reply" | "answer" | "ask" | "recap", isFromQueue?: boolean) => {
         if (!window.electronAPI) return;
 
         // --- URGENT MODE ACTIVATION ---
@@ -2122,14 +2181,21 @@ const Queue: React.FC<any> = () => {
         // Reset back to Casual after 10s
         setTimeout(() => { isUrgentRef.current = false; }, 10000);
 
-        if (isThinking) return;
-
-        // Eager Session Initialization
-        let currentSessionId = loadedSessionId;
-        if (!currentSessionId) {
-            currentSessionId = Date.now().toString();
-            setLoadedSessionId(currentSessionId);
-            setLoadedSessionType("Chat");
+        if (isThinking && !isFromQueue) {
+            if (messageQueue.length >= 2) return;
+            setMessageQueue(prev => [...prev, {
+                text: actionType,
+                attachments: [...queuedAttachments],
+                screenshots: [...queuedScreenshots],
+                type: actionType,
+                isArt: false,
+                chatModel: selectedChatModel,
+                visionModel: selectedVisionModel,
+                isSmart: isSmartMode
+            }]);
+            setQueuedScreenshots([]);
+            setQueuedAttachments([]);
+            return;
         }
 
         // 1. Get Context
@@ -2138,7 +2204,7 @@ const Queue: React.FC<any> = () => {
             transcriptText = messages.slice(-5).map(m => `${m.role.toUpperCase()}: ${m.text}`).join("\n");
         }
 
-        if (!transcriptText.trim() && actionType !== 'answer') {
+        if (!transcriptText.trim() && actionType !== 'answer' && !isFromQueue) {
             setMessages(prev => [...prev, { id: Date.now().toString(), role: "ai", text: "I need more context or conversation history first.", timestamp: Date.now() }]);
             return;
         }
@@ -2147,6 +2213,16 @@ const Queue: React.FC<any> = () => {
         setActiveTab("Chat")
         setIsThinking(true)
         setThinkingStep("Processing...");
+        
+        // Eager Session Initialization
+        let currentSessionId = loadedSessionId;
+        if (!currentSessionId) {
+            currentSessionId = Date.now().toString();
+            setLoadedSessionId(currentSessionId);
+            setLoadedSessionType("Chat");
+        }
+
+        isThinkingRef.current = true;
 
         // UPDATED: Set the Slow Loader Timer (2s)
         setShowSlowLoader(false);
@@ -2167,26 +2243,32 @@ const Queue: React.FC<any> = () => {
 
         const hasAttachments = queuedScreenshots.length > 0 || queuedAttachments.length > 0;
         const now = Date.now();
-        const userId = `${now}-user`;
         const aiMsgId = `${now}-ai`;
 
         if (hasAttachments) {
             userDisplayMessage += " (Attachments included)";
         }
 
-        const initialMessages: Message[] = [
-            ...messages,
-            {
-                id: userId,
-                role: "user",
-                text: userDisplayMessage,
-                queuedScreenshots: queuedScreenshots.length > 0 ? [...queuedScreenshots] : undefined,
-                queuedAttachments: queuedAttachments.length > 0 ? [...queuedAttachments] : undefined,
-                timestamp: now
-            },
+        // Add User Message if not from queue
+        if (!isFromQueue) {
+            setMessages(prev => [
+                ...prev,
+                {
+                    id: `${now}-user`,
+                    role: "user",
+                    text: userDisplayMessage,
+                    queuedScreenshots: queuedScreenshots.length > 0 ? [...queuedScreenshots] : undefined,
+                    queuedAttachments: queuedAttachments.length > 0 ? [...queuedAttachments] : undefined,
+                    timestamp: now
+                }
+            ]);
+        }
+
+        // Add AI placeholder
+        setMessages(prev => [
+            ...prev,
             { id: aiMsgId, role: "ai", text: "", timestamp: now, isStreaming: true }
-        ];
-        setMessages(initialMessages);
+        ]);
 
         // 4. Call AI
         try {
@@ -2219,20 +2301,22 @@ const Queue: React.FC<any> = () => {
                 });
             }
 
-            const finalMessages = initialMessages.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m);
-            setMessages(finalMessages);
-
-            // Determine Preset Title based on Action
-            let presetTitle = "";
-            switch (actionType) {
-                case "assist": presetTitle = "Fact-Checking Assistant"; break;
-                case "reply": presetTitle = "Communication Support"; break;
-                case "answer": presetTitle = "Digital Twin Explanation"; break;
-                case "ask": presetTitle = "Interview Question Analysis"; break;
-                case "recap": presetTitle = "Discussion Recap"; break;
-            }
-
-            saveChatToHistory(finalMessages, undefined, presetTitle);
+            setMessages(prev => {
+                const updated = prev.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m);
+                
+                // Determine Preset Title based on Action
+                let presetTitle = "";
+                switch (actionType) {
+                    case "assist": presetTitle = "Fact-Checking Assistant"; break;
+                    case "reply": presetTitle = "Communication Support"; break;
+                    case "answer": presetTitle = "Digital Twin Explanation"; break;
+                    case "ask": presetTitle = "Interview Question Analysis"; break;
+                    case "recap": presetTitle = "Discussion Recap"; break;
+                }
+                
+                saveChatToHistory(updated, currentSessionId, presetTitle);
+                return updated;
+            });
         } catch (e: any) {
             console.error(e);
             setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: "Error: " + e.message, isStreaming: false } : m));
@@ -2241,18 +2325,34 @@ const Queue: React.FC<any> = () => {
             if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
             setShowSlowLoader(false);
             setIsThinking(false);
+            isThinkingRef.current = false;
         }
     }
 
     // --- NEW: TRIGGER SOLVE ACTION ---
-    const triggerSolveAction = async () => {
+    const triggerSolveAction = async (isFromQueue?: boolean) => {
         if (!window.electronAPI) return;
 
         // 1. Activate Urgent Mode (10s burst)
         isUrgentRef.current = true;
         setTimeout(() => { isUrgentRef.current = false; }, 10000);
 
-        if (isThinking) return;
+        if (isThinking && !isFromQueue) {
+            if (messageQueue.length >= 2) return;
+            setMessageQueue(prev => [...prev, {
+                text: "Solve this coding problem",
+                attachments: [...queuedAttachments],
+                screenshots: [...queuedScreenshots],
+                type: "solve",
+                isArt: false,
+                chatModel: selectedChatModel,
+                visionModel: selectedVisionModel,
+                isSmart: isSmartMode
+            }]);
+            setQueuedScreenshots([]);
+            setQueuedAttachments([]);
+            return;
+        }
 
         // Eager Session Initialization
         let currentSessionId = loadedSessionId;
@@ -2261,6 +2361,8 @@ const Queue: React.FC<any> = () => {
             setLoadedSessionId(currentSessionId);
             setLoadedSessionType("Chat");
         }
+
+        isThinkingRef.current = true;
 
         // 2. Prepare Context (Images or Transcript)
         const hasAttachments = queuedScreenshots.length > 0 || queuedAttachments.length > 0;
@@ -2282,22 +2384,28 @@ const Queue: React.FC<any> = () => {
         // 4. Add User Message
         const now = Date.now();
         const aiMsgId = `${now}-ai`;
-        const userId = `${now}-user`;
         const userDisplayMessage = hasAttachments ? "Solve this coding problem (Attachments included)." : "Solve this coding problem based on the discussion.";
 
-        const initialMessages: Message[] = [
-            ...messages,
-            {
-                id: userId,
-                role: "user",
-                text: userDisplayMessage,
-                queuedScreenshots: queuedScreenshots.length > 0 ? [...queuedScreenshots] : undefined,
-                queuedAttachments: queuedAttachments.length > 0 ? [...queuedAttachments] : undefined,
-                timestamp: now
-            },
+        // Add User Message if not from queue
+        if (!isFromQueue) {
+            setMessages(prev => [
+                ...prev,
+                {
+                    id: `${now}-user`,
+                    role: "user",
+                    text: userDisplayMessage,
+                    queuedScreenshots: queuedScreenshots.length > 0 ? [...queuedScreenshots] : undefined,
+                    queuedAttachments: queuedAttachments.length > 0 ? [...queuedAttachments] : undefined,
+                    timestamp: now
+                }
+            ]);
+        }
+
+        // Add AI placeholder
+        setMessages(prev => [
+            ...prev,
             { id: aiMsgId, role: "ai", text: "", timestamp: now, isStreaming: true }
-        ];
-        setMessages(initialMessages);
+        ]);
 
         // 5. Call API
         try {
@@ -2331,9 +2439,11 @@ const Queue: React.FC<any> = () => {
                 });
             }
 
-            const finalMessages = initialMessages.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m);
-            setMessages(finalMessages);
-            saveChatToHistory(finalMessages, undefined, "Coding Problem Solution");
+            setMessages(prev => {
+                const updated = prev.map(m => m.id === aiMsgId ? { ...m, text: response, isStreaming: false } : m);
+                saveChatToHistory(updated, currentSessionId, "Coding Problem Solution");
+                return updated;
+            });
 
         } catch (e: any) {
             setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: "Error: " + e.message, isStreaming: false } : m));
@@ -2341,8 +2451,36 @@ const Queue: React.FC<any> = () => {
             if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
             setShowSlowLoader(false);
             setIsThinking(false);
+            isThinkingRef.current = false;
         }
     }
+
+    // --- MESSAGE QUEUE PROCESSOR ---
+    useEffect(() => {
+        if (!isThinking && messageQueue.length > 0) {
+            const nextItem = messageQueue[0];
+            setMessageQueue(prev => prev.slice(1));
+            
+            console.log(`[Queue] 🚀 Triggering next queued item: ${nextItem.type}`);
+            
+            // Restore context for the queued item
+            setQueuedAttachments(nextItem.attachments);
+            setQueuedScreenshots(nextItem.screenshots);
+            setIsArtActive(!!nextItem.isArt);
+            if (nextItem.chatModel !== undefined) setSelectedChatModel(nextItem.chatModel);
+            if (nextItem.visionModel !== undefined) setSelectedVisionModel(nextItem.visionModel);
+            if (nextItem.isSmart !== undefined) setIsSmartMode(nextItem.isSmart);
+
+            // Execute based on type
+            if (nextItem.type === "general") {
+                handleSend(nextItem.text);
+            } else if (nextItem.type === "solve") {
+                triggerSolveAction(true);
+            } else {
+                triggerAssistAction(nextItem.type as any, true);
+            }
+        }
+    }, [isThinking, messageQueue, handleSend, triggerSolveAction, triggerAssistAction]);
 
     const handleInputFocus = () => {
         setIsInputFocused(true);
@@ -2524,7 +2662,7 @@ const Queue: React.FC<any> = () => {
                             </button>
 
                             <button
-                                onClick={triggerSolveAction}
+                                onClick={() => triggerSolveAction()}
                                 disabled={isThinking}
                                 className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 text-xs font-bold transition-all border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/20 ${isThinking ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
@@ -2727,7 +2865,7 @@ const Queue: React.FC<any> = () => {
                                                                     <span className="animate-pulse">{thinkingStep}</span>
                                                                 </div>
                                                             )}
-                                                            <MessageContent text={msg.text} isStreaming={msg.isStreaming} activeModel={selectedChatModel} />
+                                                            <MessageContent text={msg.text} isStreaming={msg.isStreaming} activeModel={selectedChatModel} queuedCount={messageQueue.length} />
                                                             <div className="relative w-full group/bottom-actions mt-1">
                                                                 {/* VISUAL HINT: subtle bottom bar that expands/disappears on hover */}
                                                                 <div className="absolute left-0 bottom-2 w-8 h-[2px] bg-white/10 rounded-full group-hover/bottom-actions:opacity-0 transition-opacity pointer-events-none" />
@@ -2764,6 +2902,50 @@ const Queue: React.FC<any> = () => {
                                                 )}
                                             </div>
                                         ))}
+
+                                        {/* --- PENDING QUEUE UI --- */}
+                                        {messageQueue.length > 0 && (
+                                            <div className="mt-6 mb-4 px-2 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                                                {isThinking && (
+                                                    <div className="flex items-center gap-2 mb-4 px-1">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                                                        <span className="text-[11px] font-medium text-gray-400 tracking-wide">Generating...</span>
+                                                    </div>
+                                                )}
+                                                <div className="h-[1px] bg-white/5 w-full mb-4" />
+                                                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2 px-1">
+                                                    <Clock size={12} className="text-blue-500/50" />
+                                                    Pending messages
+                                                </div>
+                                                <div className="space-y-2.5">
+                                                    {messageQueue.map((item, i) => (
+                                                        <div 
+                                                            key={i} 
+                                                            className="group relative flex items-center justify-between bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 rounded-2xl p-4 transition-all duration-500 hover:border-white/10"
+                                                        >
+                                                            <div className="flex items-center gap-4 overflow-hidden">
+                                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500/20 group-hover:bg-blue-500/40 transition-colors" />
+                                                                <span className="text-[13px] text-gray-400 group-hover:text-gray-300 transition-colors truncate max-w-[280px]">
+                                                                    {item.text || (item.type === 'solve' ? 'Solve coding problem' : item.type)}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-3 shrink-0">
+                                                                {(item.attachments.length > 0 || item.screenshots.length > 0) && (
+                                                                    <div className="flex items-center -space-x-1.5">
+                                                                        {[...item.attachments, ...item.screenshots].slice(0, 3).map((_, idx) => (
+                                                                            <div key={idx} className="w-4 h-4 rounded-md bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                                                                                <div className="w-1 h-1 rounded-full bg-blue-400/40" />
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                                <Clock size={15} className="text-gray-600 group-hover:text-blue-400/40 transition-all duration-500 group-hover:rotate-12" />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                         <div ref={chatEndRef} />
                                     </div>
                                 </div>
@@ -3254,7 +3436,7 @@ const Queue: React.FC<any> = () => {
                                     <textarea
                                         ref={textareaRef}
                                         value={input}
-                                        disabled={isThinking}
+                                        disabled={isThinking && messageQueue.length >= 2}
                                         onFocus={handleInputFocus}
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); handleSend(); } }}
@@ -3335,13 +3517,20 @@ const Queue: React.FC<any> = () => {
                                         </button>
 
                                         {isThinking ? (
-                                            <button
-                                                onClick={handleCancelGeneration}
-                                                className="p-2 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-[0_0_15px_rgba(220,38,38,0.2)]"
-                                                title={isStealth ? undefined : "Stop Generation"}
-                                            >
-                                                <div className="w-3.5 h-3.5 bg-current rounded-[2px]" />
-                                            </button>
+                                            <div className="flex items-center gap-1.5">
+                                                {(input.length > 0 || queuedScreenshots.length > 0 || queuedAttachments.length > 0) && messageQueue.length < 2 && (
+                                                    <button onClick={() => handleSend()} className="p-2 bg-blue-600/80 rounded-xl hover:bg-blue-500 transition-colors animate-in fade-in zoom-in duration-200">
+                                                        <Send size={16} className="text-white" />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={handleCancelGeneration}
+                                                    className="p-2 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-[0_0_15px_rgba(220,38,38,0.2)]"
+                                                    title={isStealth ? undefined : "Stop Generation"}
+                                                >
+                                                    <div className="w-3.5 h-3.5 bg-current rounded-[2px]" />
+                                                </button>
+                                            </div>
                                         ) : (
                                             (input.length > 0 || queuedScreenshots.length > 0 || queuedAttachments.length > 0) && (
                                                 <button onClick={() => handleSend()} className="p-2 bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors">
