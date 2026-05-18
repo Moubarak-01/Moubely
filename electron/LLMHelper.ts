@@ -38,8 +38,8 @@ async function safePdfParse(buffer: Buffer) {
 // --- 1. THE EXPANDED WATERFALL BRAINS ---
 export const CHAT_MODELS = [
     // --- TIER 1 : FAST & OPEN (Gemma 4 / Flash / Lite) ---
-    { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B' },
     { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B' },
+    { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-2.0-flash-lite-preview-02-05', name: 'Gemini 2.0 Flash Lite' }, // ZERO RPD
     { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' }, // ZERO RPD,
