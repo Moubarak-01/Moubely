@@ -19,7 +19,12 @@ export class ShortcutsHelper {
         mainWindow.webContents.send("screenshot-action-triggered", { action: "take-and-queue" });
       }
     })
-    console.log("[Shortcuts] Requesting registration: Ctrl+H");
+    
+    if (!globalShortcut.isRegistered("CommandOrControl+H")) {
+      console.error("[Shortcuts] ❌ ERROR: Failed to register Ctrl+H. Another app might be using it.");
+    } else {
+      console.log("[Shortcuts] ✅ Registered: Ctrl+H");
+    }
 
     // Process Screenshots (Ctrl+Enter)
     globalShortcut.register("CommandOrControl+Enter", async () => {

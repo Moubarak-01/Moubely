@@ -1044,6 +1044,15 @@ const Queue: React.FC<any> = () => {
             });
         }
 
+        const savedChatModel = localStorage.getItem('moubely_selected_chat_model');
+        if (savedChatModel) setSelectedChatModel(savedChatModel);
+        
+        const savedVisionModel = localStorage.getItem('moubely_selected_vision_model');
+        if (savedVisionModel) setSelectedVisionModel(savedVisionModel);
+        
+        const savedArtModel = localStorage.getItem('moubely_selected_model');
+        if (savedArtModel) setSelectedModel(savedArtModel);
+
         const cleanupFunctions: (() => void)[] = [];
 
         if (window.electronAPI) {
@@ -1067,13 +1076,8 @@ const Queue: React.FC<any> = () => {
 
         }
 
-        // --- ADDED: CTRL+H LISTENER FOR LOCAL CAPTURE & CTRL FOR SCROLL PORTAL ---
+        // --- ADDED: CTRL FOR SCROLL PORTAL ---
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'h' || e.key === 'H')) {
-                e.preventDefault();
-                console.log("[UI] ⌨️ Ctrl+H Detected -> Triggering Capture");
-                handleCapture();
-            }
             if (e.key === 'Control') {
                 setIsCtrlPressed(true);
             }
@@ -3372,13 +3376,21 @@ const Queue: React.FC<any> = () => {
                                                     }}
                                                 >
                                                     <div className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1 bg-white/5">💬 Chat Models</div>
-                                                    <button onClick={() => { setSelectedChatModel(""); setShowChatModelMenu(false); }} className={`w-full text-left px-4 py-2.5 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${!selectedChatModel ? 'text-blue-400 bg-white/10' : 'text-gray-300 hover:text-white'}`}>
+                                                    <button onClick={() => { 
+                                                        setSelectedChatModel(""); 
+                                                        localStorage.setItem('moubely_selected_chat_model', "");
+                                                        setShowChatModelMenu(false); 
+                                                    }} className={`w-full text-left px-4 py-2.5 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${!selectedChatModel ? 'text-blue-400 bg-white/10' : 'text-gray-300 hover:text-white'}`}>
                                                         <span>Auto (Waterfall)</span>
                                                     </button>
                                                     {chatModels.map((m, i) => {
                                                         const mId = m.model || m.id;
                                                         return (
-                                                        <button key={i} onClick={() => { setSelectedChatModel(mId); setShowChatModelMenu(false); }} className={`w-full text-left px-4 py-2.5 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${selectedChatModel === mId ? 'text-blue-400 bg-white/10' : 'text-gray-300 hover:text-white'}`}>
+                                                        <button key={i} onClick={() => { 
+                                                            setSelectedChatModel(mId); 
+                                                            localStorage.setItem('moubely_selected_chat_model', mId);
+                                                            setShowChatModelMenu(false); 
+                                                        }} className={`w-full text-left px-4 py-2.5 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${selectedChatModel === mId ? 'text-blue-400 bg-white/10' : 'text-gray-300 hover:text-white'}`}>
                                                             <span>{m.name || mId}</span>
                                                         </button>
                                                     )})}
@@ -3419,6 +3431,7 @@ const Queue: React.FC<any> = () => {
                                                             key={m.id}
                                                             onClick={() => {
                                                                 setSelectedModel(m.id);
+                                                                localStorage.setItem('moubely_selected_model', m.id);
                                                                 setIsArtActive(true);
                                                                 setShowModelMenu(false);
                                                             }}
@@ -3540,7 +3553,7 @@ const Queue: React.FC<any> = () => {
                                         )}
                                     </div>
                                 </div>
-                                {isInputFocused && (
+                                {(isInputFocused || isHoveringChat || isStealth) && (
                                     <div className="flex flex-nowrap items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full pb-2 overflow-x-auto custom-scrollbar-hide select-none">
                                         <div className="relative shrink-0 flex items-center">
                                             <button 
@@ -3572,13 +3585,21 @@ const Queue: React.FC<any> = () => {
                                                     }}
                                                 >
                                                     <div className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1">👁️ Vision Models</div>
-                                                    <button onClick={() => { setSelectedVisionModel(""); setShowVisionModelMenu(false); }} className={`w-full text-left px-4 py-2 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${!selectedVisionModel ? 'text-emerald-400 bg-white/5' : 'text-gray-300 hover:text-white'}`}>
+                                                    <button onClick={() => { 
+                                                        setSelectedVisionModel(""); 
+                                                        localStorage.setItem('moubely_selected_vision_model', "");
+                                                        setShowVisionModelMenu(false); 
+                                                    }} className={`w-full text-left px-4 py-2 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${!selectedVisionModel ? 'text-emerald-400 bg-white/5' : 'text-gray-300 hover:text-white'}`}>
                                                         <span>Auto (Waterfall)</span>
                                                     </button>
                                                     {visionModels.map((m, i) => {
                                                         const mId = m.model || m.id;
                                                         return (
-                                                        <button key={i} onClick={() => { setSelectedVisionModel(mId); setShowVisionModelMenu(false); }} className={`w-full text-left px-4 py-2 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${selectedVisionModel === mId ? 'text-emerald-400 bg-white/5' : 'text-gray-300 hover:text-white'}`}>
+                                                        <button key={i} onClick={() => { 
+                                                            setSelectedVisionModel(mId); 
+                                                            localStorage.setItem('moubely_selected_vision_model', mId);
+                                                            setShowVisionModelMenu(false); 
+                                                        }} className={`w-full text-left px-4 py-2 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${selectedVisionModel === mId ? 'text-emerald-400 bg-white/5' : 'text-gray-300 hover:text-white'}`}>
                                                             <span>{m.name || mId}</span>
                                                         </button>
                                                     )})}
