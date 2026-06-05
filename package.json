@@ -132,7 +132,7 @@
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.0",
     "cross-env": "^7.0.3",
-    "electron": "^40.6.1",
+    "electron": "^40.10.2",
     "electron-builder": "^25.1.8",
     "electron-is-dev": "^3.0.1",
     "postcss": "^8.4.49",
