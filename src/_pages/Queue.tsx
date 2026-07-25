@@ -2711,6 +2711,7 @@ const Queue: React.FC<any> = () => {
                                                                                         alt={`Visual Media ${index + 1}`}
                                                                                         className={`rounded-lg border border-white/10 bg-black/20 cursor-pointer hover:opacity-90 transition-opacity h-[140px] sm:h-[160px] object-cover shrink-0 ${sizeClass}`}
                                                                                         onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath, localPath: media.preview, type: 'image' }); }}
+                                                                                        onDoubleClick={() => setQueuedAttachments(prev => [...prev, { name: media.originalPath.split(/[/\\]/).pop() || 'media', path: media.originalPath, type: media.type }])}
                                                                                     />
                                                                                 );
                                                                             })}
@@ -2726,6 +2727,7 @@ const Queue: React.FC<any> = () => {
                                                                                                 onMouseEnter={(e) => { setHoverAttachment(file); setHoverRect(e.currentTarget.getBoundingClientRect()); }}
                                                                                                 onMouseLeave={() => { setHoverAttachment(null); setHoverRect(null); }}
                                                                                                 onClick={() => setFullscreenFile({ path: file.path, localPath: useLocal, type: file.type, name: file.name })}
+                                                                                                onDoubleClick={() => setQueuedAttachments(prev => [...prev, file])}
                                                                                             >
                                                                                                 <div className="flex items-center gap-2 overflow-hidden">
                                                                                                     <div className="p-1 bg-white/5 rounded-md shrink-0">
@@ -2786,7 +2788,7 @@ const Queue: React.FC<any> = () => {
                                                                     <button onClick={() => handleStartEdit(msg)} className="p-1.5 text-gray-400 hover:text-white bg-black/40 rounded-full"><Edit2 size={12} /></button>
                                                                 </div>
                                                                 </div>
-                                                                <div className="user-bubble text-left relative max-w-full">
+                                                                <div className="user-bubble text-left relative max-w-full" onDoubleClick={() => setInput(prev => prev + (prev.length > 0 ? " " : "") + msg.text)}>
                                                                     <CollapsibleUserMessage text={msg.text} />
                                                                 </div>
                                                             </div>
@@ -2818,7 +2820,7 @@ const Queue: React.FC<any> = () => {
                                                                                 {visualMedia.map((media, index) => {
                                                                                     const sizeClass = visualMedia.length === 1 && textMedia.length === 0 ? 'w-full max-w-[400px]' : 'w-[calc(50%-4px)]';
                                                                                     return media.type === 'video' ? (
-                                                                                        <div key={index} className={`relative rounded-lg overflow-hidden border border-white/10 bg-black/20 cursor-pointer hover:opacity-90 transition-opacity shrink-0 ${sizeClass}`} onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath, localPath: media.preview, type: 'video' }); }}>
+                                                                                        <div key={index} className={`relative rounded-lg overflow-hidden border border-white/10 bg-black/20 cursor-pointer hover:opacity-90 transition-opacity shrink-0 ${sizeClass}`} onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath, localPath: media.preview, type: 'video' }); }} onDoubleClick={() => setQueuedAttachments(prev => [...prev, { name: media.originalPath.split(/[/\\]/).pop() || 'media', path: media.originalPath, type: media.type }])}>
                                                                                             <video src={media.preview} className="w-full h-[140px] sm:h-[160px] object-cover pointer-events-none" />
                                                                                             <div className="absolute inset-0 flex items-center justify-center bg-black/30"><Play size={24} className="text-white opacity-80" /></div>
                                                                                         </div>
@@ -2829,6 +2831,7 @@ const Queue: React.FC<any> = () => {
                                                                                             alt={`Generated Media ${index + 1}`}
                                                                                             className={`rounded-lg border border-white/10 bg-black/20 cursor-pointer hover:opacity-90 transition-opacity h-[140px] sm:h-[160px] object-cover shrink-0 ${sizeClass}`}
                                                                                             onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath, localPath: media.preview, type: 'image' }); }}
+                                                                                            onDoubleClick={() => setQueuedAttachments(prev => [...prev, { name: media.originalPath.split(/[/\\]/).pop() || 'media', path: media.originalPath, type: media.type }])}
                                                                                         />
                                                                                     );
                                                                                 })}
@@ -2843,7 +2846,9 @@ const Queue: React.FC<any> = () => {
                                                                     <span className="animate-pulse">{thinkingStep}</span>
                                                                 </div>
                                                             )}
-                                                            <MessageContent text={msg.text} isStreaming={msg.isStreaming} activeModel={selectedChatModel} queuedCount={messageQueue.length} />
+                                                            <div className="w-full relative" onDoubleClick={() => { if (msg.text) setInput(prev => prev + (prev.length > 0 ? " " : "") + msg.text); }}>
+                                                                <MessageContent text={msg.text} isStreaming={msg.isStreaming} activeModel={selectedChatModel} queuedCount={messageQueue.length} />
+                                                            </div>
                                                             <div className="relative w-full group/bottom-actions mt-1">
                                                                 {/* VISUAL HINT: subtle bottom bar that expands/disappears on hover */}
                                                                 <div className="absolute left-0 bottom-2 w-8 h-[2px] bg-white/10 rounded-full group-hover/bottom-actions:opacity-0 transition-opacity pointer-events-none" />
