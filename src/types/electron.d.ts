@@ -27,6 +27,7 @@ export interface ElectronAPI {
   onPrivateModeToggled: (callback: (enabled: boolean) => void) => () => void
   onScreenshotTaken: (callback: (data: { path: string; preview: string }) => void) => () => void
   onScreenshotAction: (callback: (data: any) => void) => () => void
+  onScrollAction: (callback: (dir: 'up' | 'down') => void) => () => void
   onSolutionsReady: (callback: (solutions: string) => void) => () => void
   onResetView: (callback: () => void) => () => void
   onTokenReceived: (callback: (token: string) => void) => () => void

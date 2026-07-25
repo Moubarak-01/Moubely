@@ -47,6 +47,19 @@ export class ShortcutsHelper {
     })
     console.log("[Shortcuts] Requesting registration: Shift+A");
 
+    // Scroll Actions (Ctrl+PageUp/Down, Ctrl+Up/Down)
+    const scrollHandler = (dir: 'up' | 'down') => {
+      const mainWindow = this.appState.getMainWindow()
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("scroll-action", dir);
+      }
+    };
+    globalShortcut.register("CommandOrControl+PageUp", () => scrollHandler('up'));
+    globalShortcut.register("CommandOrControl+PageDown", () => scrollHandler('down'));
+    globalShortcut.register("CommandOrControl+Up", () => scrollHandler('up'));
+    globalShortcut.register("CommandOrControl+Down", () => scrollHandler('down'));
+    console.log("[Shortcuts] Requesting registration: Scroll Shortcuts");
+
     // Toggle Ghost Mode (Shift + Z)
     globalShortcut.register("Shift+Z", () => {
       console.log("[Shortcuts] 👻 Triggered: Shift+Z (Ghost Intercept)");

@@ -47,6 +47,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("screenshot-action-triggered", s);
   },
 
+  onScrollAction: (cb: (dir: 'up' | 'down') => void) => {
+    const s = (_: any, dir: 'up' | 'down') => cb(dir);
+    ipcRenderer.on("scroll-action", s);
+    return () => ipcRenderer.removeListener("scroll-action", s);
+  },
+
   takeScreenshot: () => ipcRenderer.invoke("take-screenshot"),
   saveUserProfile: (p: any) => ipcRenderer.invoke("save-user-profile", p),
   getUserProfile: () => ipcRenderer.invoke("get-user-profile"),

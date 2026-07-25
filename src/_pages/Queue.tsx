@@ -657,7 +657,6 @@ const Queue: React.FC<any> = () => {
     const [ghostTriggerSend, setGhostTriggerSend] = useState(0);
     const [isPrivateMode, setIsPrivateMode] = useState(false);
     const [isHoveringChat, setIsHoveringChat] = useState(false);
-    const [isCtrlPressed, setIsCtrlPressed] = useState(false);
     // --- AUDIO REFS ---
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const audioContextRef = useRef<AudioContext | null>(null)
@@ -1076,56 +1075,31 @@ const Queue: React.FC<any> = () => {
 
         }
 
-        // --- ADDED: CTRL FOR SCROLL PORTAL ---
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Control') {
-                setIsCtrlPressed(true);
-            }
-        };
-        const handleKeyUp = (e: KeyboardEvent) => {
-            if (e.key === 'Control') {
-                setIsCtrlPressed(false);
-            }
-        };
-
-        // RELIABLE CTRL DETECTION: Use mouse events to sync Ctrl state 
-        // because mouse events are forwarded even when window is not focused!
-        const handleMouseUpdate = (e: MouseEvent | WheelEvent) => {
-            if (isPrivateMode) {
-                setIsCtrlPressed(e.ctrlKey);
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keyup', handleKeyUp);
-        window.addEventListener('mousemove', handleMouseUpdate);
-        window.addEventListener('wheel', handleMouseUpdate);
-
         return () => {
             cleanupFunctions.forEach(fn => fn());
             cleanupStream();
             if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
-            window.removeEventListener('keydown', handleKeyDown);
-            window.removeEventListener('keyup', handleKeyUp);
-            window.removeEventListener('mousemove', handleMouseUpdate);
-            window.removeEventListener('wheel', handleMouseUpdate);
         };
     }, [handleCapture, isPrivateMode])
 
-
-    // --- SCROLL PORTAL EFFECT ---
+    // --- GLOBAL SCROLL SHORTCUT EFFECT ---
     useEffect(() => {
-        if (!window.electronAPI || !isPrivateMode) return;
+        if (!window.electronAPI) return;
+        
+        const unsubscribe = window.electronAPI.onScrollAction((dir: 'up' | 'down') => {
+            if (chatContainerRef.current) {
+                const scrollAmount = 200; // Scroll distance in pixels
+                chatContainerRef.current.scrollBy({
+                    top: dir === 'up' ? -scrollAmount : scrollAmount,
+                    behavior: 'smooth'
+                });
+            }
+        });
 
-        // If (Hovering Chat) AND (Ctrl Pressed) -> Temporary interactive mode
-        if (isHoveringChat && isCtrlPressed) {
-            console.log("[ScrollPortal] 🌀 Portal OPEN: Window Interactive (Hovering + Ctrl)");
-            window.electronAPI.toggleMouseIgnore(false);
-        } else {
-            // Otherwise, go back to ignoring events as per Private Mode rules
-            window.electronAPI.toggleMouseIgnore(true);
-        }
-    }, [isHoveringChat, isCtrlPressed, isPrivateMode]);
+        return () => {
+            unsubscribe();
+        };
+    }, []);
     const resetChat = () => {
         setMessages([{ id: "init", role: "ai", text: "Hi there. I'm Moubely. I'm ready to listen.", timestamp: Date.now() }]);
     }
