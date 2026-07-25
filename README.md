@@ -17,7 +17,7 @@
 <p align="center">
 <p align="center">
   <img src="https://img.shields.io/badge/Version-1.0.0-green?style=for-the-badge" alt="Version" />
-  <img src="https://img.shields.io/badge/Electron-33-47848F?style=for-the-badge&logo=electron" alt="Electron" />
+  <img src="https://img.shields.io/badge/Electron-40-47848F?style=for-the-badge&logo=electron" alt="Electron" />
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react" alt="React" />
   <img src="https://img.shields.io/badge/TypeScript-5.6-3178C6?style=for-the-badge&logo=typescript" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Vite-7.2-646CFF?style=for-the-badge&logo=vite" alt="Vite" />
@@ -211,11 +211,11 @@ graph TD
 
 | Tier                           | Models                                                                                             |
 | :----------------------------- | :------------------------------------------------------------------------------------------------- |
-| **Tier 1: Speed & Open**       | **Gemma 4 (31B/26B)**, **Gemini 2.5 Flash Lite**, **Gemini 2.0 Flash (Lite)**                      |
-| **Tier 2: High Performance**   | **Gemini 3.1 Flash Lite**, **Gemini 3 Flash**, **Nvidia Nemotron 3 Nano**, **Gemini 2.5 Flash/Pro** |
-| **Tier 3: Elite Reasoning**    | **Claude 3.7 Sonnet (Thinking)**, **Claude 4.5 Opus/Sonnet/Haiku**, **Mistral 3.1**, **Step 3.5**  |
+| **Tier 1: Speed & Open**       | **Gemma 4 (31B/26B)**, **Gemini 3.5/3.6 Flash (Lite)**, **Gemini 2.5 Flash Lite**, **Gemini 2.0 Flash (Lite)** |
+| **Tier 2: High Performance**   | **Gemini 3.1 Flash Lite**, **Gemini 3 Flash**, **Nvidia Nemotron 3 Nano**, **Gemini 2.5 Flash/Pro/Native** |
+| **Tier 3: Elite Reasoning**    | **Claude 3.7 Sonnet (w/ Thinking)**, **Claude 4.5 Opus/Sonnet/Haiku**, **Mistral 3.1**, **Step 3.5**  |
 | **Tier 4: Research & Robotics** | **Gemini Robotics**, **Solar Pro 3**, **Trinity Mini**, **Arcee Trinity Large**, **Liquid LFM**    |
-| **Tier 5: Backups & Search**    | **Groq Llama 3.3**, **Sonar Reasoning Pro**, **GPT-4o**, **Llama 3.2 3B**                          |
+| **Tier 5: Backups & Search**    | **Mistral Large 2**, **Groq Llama 3.3**, **Sonar (Reasoning Pro)**, **GPT-4o**, **Llama 3.2 3B**                          |
 
 
 
@@ -225,8 +225,8 @@ graph TD
 
 | Tier                        | Models                                                                             |
 | :-------------------------- | :--------------------------------------------------------------------------------- |
-| **Tier 1: Elite Vision**    | **Gemma 4 (31B/26B)**, **Gemini 3.1 Pro**, **Claude 3.7 Sonnet (Reasoning)**, **Gemini 3 Flash** |
-| **Tier 2: Fast & Reliable** | **Gemini 2.5 Flash (Lite)**, **Claude 4.5 Sonnet/Haiku**, **Mistral Small Vision** |
+| **Tier 1: Elite Vision**    | **Gemma 4 (31B/26B)**, **Gemini 3.1/3/2.5 Pro**, **Gemini 3.5/3.6 Flash (Lite)**, **Gemini 3 Flash**, **Claude 3.7 Sonnet (Reasoning)**, **Claude 4.5 Opus** |
+| **Tier 2: Fast & Reliable** | **Gemini 3.1 Flash Lite**, **Gemini 2.5 Flash (Lite)**, **Claude 4.5 Sonnet/Haiku**, **Mistral Small Vision** |
 | **Tier 3: Backups**         | **Mistral Large 2 (Nvidia)**, **GPT-4o**, **Sonar Reasoning Pro**                  |
 
 
