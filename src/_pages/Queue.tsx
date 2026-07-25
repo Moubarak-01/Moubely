@@ -7,7 +7,7 @@ import {
     Scaling, Copy, Check, CheckCheck, Trash2, Mail,
     Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
     Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw, Plus, Maximize,
-    Video, Image, Code, Maximize2, Download, GraduationCap, Ghost
+    Video, Image, Code, Maximize2, Minimize2, Download, GraduationCap, Ghost
 } from "lucide-react"
 import moubelyIcon from "../../assets/Moubely_icon.png"
 
@@ -539,6 +539,9 @@ const Queue: React.FC<any> = () => {
     const [isExpanded, setIsExpanded] = useState(false)
     const [activeTab, setActiveTab] = useState<"Chat" | "Transcript" | "Email" | "History">("Chat")
     const [isInputFocused, setIsInputFocused] = useState(false)
+    const [isInputFullscreen, setIsInputFullscreen] = useState(false)
+    const [isActionBarVisible, setIsActionBarVisible] = useState(true)
+    const actionBarTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const [fullscreenFile, setFullscreenFile] = useState<{ path: string, type: string, name?: string, localPath?: string } | null>(null)
     const [hoverImage, setHoverImage] = useState<string | null>(null)
     const [hoverAttachment, setHoverAttachment] = useState<{ name: string, path: string, type: string, localPath?: string } | null>(null)
@@ -1157,11 +1160,11 @@ const Queue: React.FC<any> = () => {
 
     useEffect(() => {
         if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            const newHeight = Math.min(textareaRef.current.scrollHeight, 150);
+            textareaRef.current.style.height = '0px';
+            const newHeight = Math.min(textareaRef.current.scrollHeight, isInputFullscreen ? 800 : 200);
             textareaRef.current.style.height = `${newHeight}px`;
         }
-    }, [input]);
+    }, [input, isInputFullscreen, messages, loadedSessionId]);
 
     const startRecordingLoop = () => {
         if (!isRecordingRef.current || !destinationRef.current || !window.electronAPI) return;
@@ -2460,9 +2463,30 @@ const Queue: React.FC<any> = () => {
         }
     }, [isThinking, messageQueue, handleSend, triggerSolveAction, triggerAssistAction]);
 
+    const handleInputInteract = () => {
+        setIsActionBarVisible(true);
+        if (actionBarTimeoutRef.current) {
+            clearTimeout(actionBarTimeoutRef.current);
+            actionBarTimeoutRef.current = null;
+        }
+    }
+
+    const handleInputLeave = () => {
+        if (actionBarTimeoutRef.current) clearTimeout(actionBarTimeoutRef.current);
+        actionBarTimeoutRef.current = setTimeout(() => {
+            setIsActionBarVisible(false);
+        }, 3000);
+    }
+
     const handleInputFocus = () => {
         setIsInputFocused(true);
+        handleInputInteract();
         if (!isExpanded) handleExpandToggle();
+    }
+
+    const handleInputBlur = () => {
+        setIsInputFocused(false);
+        handleInputLeave();
     }
 
     return (
@@ -3163,10 +3187,10 @@ const Queue: React.FC<any> = () => {
                         )}
                     </div>
                     {activeTab === "Chat" && (
-                        <div className="p-5 bg-gradient-to-t from-black via-black/90 to-transparent shrink-0 flex flex-col items-center">
-                            <div className="max-w-3xl w-full mx-auto relative">
+                        <div className="p-2 bg-gradient-to-t from-black via-black/90 to-transparent shrink-0 flex flex-col items-center">
+                            <div className="max-w-3xl w-full mx-auto relative" onMouseEnter={handleInputInteract} onMouseLeave={handleInputLeave}>
                                 {queuedScreenshots.length > 0 && (
-                                    <div className="mb-3 flex items-center gap-3 p-2 bg-white/5 border border-white/10 rounded-xl overflow-x-auto w-full">
+                                    <div className="mb-1 flex items-center gap-3 p-2 bg-white/5 border border-white/10 rounded-xl overflow-x-auto w-full custom-scrollbar-hide">
                                         <span className="text-xs text-gray-400 font-medium whitespace-nowrap">{queuedScreenshots.length}/{MAX_QUEUE_SIZE} screens ready:</span>
                                         {queuedScreenshots.map((img, index) => (
                                             <div key={img.path} className="relative group shrink-0">
@@ -3196,7 +3220,7 @@ const Queue: React.FC<any> = () => {
                                 )}
 
                                 {queuedAttachments.length > 0 && (
-                                    <div className="mb-3 flex items-center gap-3 p-2 bg-white/5 border border-white/10 rounded-xl overflow-x-auto w-full">
+                                    <div className="mb-1 flex items-center gap-3 p-2 bg-white/5 border border-white/10 rounded-xl overflow-x-auto w-full">
                                         <span className="text-xs text-gray-400 font-medium whitespace-nowrap">{queuedAttachments.length} attached:</span>
                                         {queuedAttachments.map((file) => {
                                             const isVideo = file.type === 'video';
@@ -3322,114 +3346,16 @@ const Queue: React.FC<any> = () => {
                                     </div>
                                 )}
 
-                                <div className="mb-3 w-full bg-white/5 hover:bg-white/10 focus-within:bg-white/10 border border-white/10 focus-within:border-white/20 rounded-2xl transition-all shadow-lg flex items-center px-1">
-                                    <div className="flex items-center gap-1 px-1 shrink-0">
-                                        <button onClick={handleAttachFile} className="p-2 text-gray-400 hover:text-blue-400 cursor-pointer transition-colors" title={isStealth ? undefined : "Attach File"}>
-                                            <Plus size={18} />
-                                        </button>
-
-                                        <div className="relative flex items-center">
-                                            <button
-                                                onClick={(e) => {
-                                                    setChatMenuPos(e.currentTarget.getBoundingClientRect());
-                                                    setShowChatModelMenu(!showChatModelMenu);
-                                                    setShowModelMenu(false);
-                                                }}
-                                                className={`p-2 rounded-xl transition-all ${
-                                                    showChatModelMenu 
-                                                        ? 'text-blue-400 bg-white/10' 
-                                                        : selectedChatModel !== "" 
-                                                            ? 'text-blue-400 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.3)]' 
-                                                            : 'text-gray-500 hover:text-white hover:bg-white/5'
-                                                }`}
-                                                title={isStealth ? undefined : "Select Chat Model"}
-                                            >
-                                                <MessageSquare size={18} />
-                                            </button>
-                                            {showChatModelMenu && chatMenuPos && (
-                                                <div 
-                                                    className="fixed mb-4 w-56 bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1 z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2"
-                                                    style={{ 
-                                                        bottom: window.innerHeight - chatMenuPos.top + 8,
-                                                        left: chatMenuPos.left
-                                                    }}
-                                                >
-                                                    <div className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1 bg-white/5">💬 Chat Models</div>
-                                                    <button onClick={() => { 
-                                                        setSelectedChatModel(""); 
-                                                        localStorage.setItem('moubely_selected_chat_model', "");
-                                                        setShowChatModelMenu(false); 
-                                                    }} className={`w-full text-left px-4 py-2.5 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${!selectedChatModel ? 'text-blue-400 bg-white/10' : 'text-gray-300 hover:text-white'}`}>
-                                                        <span>Auto (Waterfall)</span>
-                                                    </button>
-                                                    {chatModels.map((m, i) => {
-                                                        const mId = m.model || m.id;
-                                                        return (
-                                                        <button key={i} onClick={() => { 
-                                                            setSelectedChatModel(mId); 
-                                                            localStorage.setItem('moubely_selected_chat_model', mId);
-                                                            setShowChatModelMenu(false); 
-                                                        }} className={`w-full text-left px-4 py-2.5 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${selectedChatModel === mId ? 'text-blue-400 bg-white/10' : 'text-gray-300 hover:text-white'}`}>
-                                                            <span>{m.name || mId}</span>
-                                                        </button>
-                                                    )})}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="relative flex items-center">
-                                            <button
-                                                onClick={(e) => {
-                                                    setGenMenuPos(e.currentTarget.getBoundingClientRect());
-                                                    if (isArtActive) {
-                                                        setIsArtActive(false);
-                                                        setShowModelMenu(false);
-                                                    } else {
-                                                        setShowModelMenu(!showModelMenu);
-                                                    }
-                                                }}
-                                                className={`p-2 rounded-xl transition-all ${isArtActive
-                                                    ? 'text-yellow-400 bg-yellow-400/10 shadow-[0_0_15px_rgba(250,204,21,0.2)] active-art-pulse'
-                                                    : 'text-gray-500 hover:text-white hover:bg-white/5'
-                                                    }`}
-                                                title={isStealth ? undefined : (isArtActive ? "Reset to Text Mode" : "Generate Art & Video")}
-                                            >
-                                                <Sparkles size={18} />
-                                            </button>
-                                            {showModelMenu && genMenuPos && (
-                                                <div 
-                                                    className="fixed mb-4 w-56 bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1 z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2"
-                                                    style={{ 
-                                                        bottom: window.innerHeight - genMenuPos.top + 8,
-                                                        left: genMenuPos.left
-                                                    }}
-                                                >
-                                                    <div className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1 bg-white/5">Studio Models</div>
-                                                    {GENERATIVE_MODELS.map((m) => (
-                                                        <button
-                                                            key={m.id}
-                                                            onClick={() => {
-                                                                setSelectedModel(m.id);
-                                                                localStorage.setItem('moubely_selected_model', m.id);
-                                                                setIsArtActive(true);
-                                                                setShowModelMenu(false);
-                                                            }}
-                                                            className={`w-full text-left px-4 py-2.5 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${selectedModel === m.id && isArtActive ? 'text-blue-400 bg-white/10' : 'text-gray-300 hover:text-white'}`}
-                                                        >
-                                                            <span>{m.name}</span>
-                                                            <span className="text-[9px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">{m.type}</span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
+                                <div className={`mb-1 w-full bg-[#1a1a1a]/80 backdrop-blur-md hover:bg-[#202020] focus-within:bg-[#202020] border border-white/10 focus-within:border-white/20 transition-all shadow-lg flex flex-col p-1.5 relative ${isInputFullscreen ? 'fixed bottom-4 left-0 right-0 z-[200] max-w-4xl mx-auto rounded-3xl shadow-2xl p-3' : 'rounded-2xl'}`}>
+                                    <div className="absolute top-2 right-2 text-gray-500 hover:text-white cursor-pointer z-10 p-1 bg-white/5 hover:bg-white/10 rounded-lg transition-colors" onClick={() => setIsInputFullscreen(!isInputFullscreen)} title={isStealth ? undefined : (isInputFullscreen ? "Minimize" : "Fullscreen")}>
+                                        {isInputFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                                     </div>
-
                                     <textarea
                                         ref={textareaRef}
                                         value={input}
                                         disabled={isThinking && messageQueue.length >= 2}
                                         onFocus={handleInputFocus}
+                                        onBlur={handleInputBlur}
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.altKey) { e.preventDefault(); handleSend(); } }}
                                         onPaste={async (e) => {
@@ -3457,6 +3383,44 @@ const Queue: React.FC<any> = () => {
                                         onDragOver={(e) => e.preventDefault()}
                                         onDrop={async (e) => {
                                             e.preventDefault();
+
+                                            // Check for dragged internal/external elements (like images from chat)
+                                            const html = e.dataTransfer.getData('text/html');
+                                            const plain = e.dataTransfer.getData('text/plain');
+                                            let imageUrl = '';
+                                            
+                                            if (html) {
+                                                const imgMatch = html.match(/src=["'](.*?)["']/);
+                                                if (imgMatch) imageUrl = imgMatch[1];
+                                            } else if (plain && (plain.startsWith('http') || plain.startsWith('moubely://') || plain.startsWith('file://'))) {
+                                                imageUrl = plain;
+                                            }
+
+                                            if (imageUrl) {
+                                                if (imageUrl.startsWith('moubely://')) {
+                                                    setQueuedScreenshots(prev => {
+                                                        const newQueue = [...prev, { path: imageUrl, preview: imageUrl }];
+                                                        if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
+                                                        return newQueue;
+                                                    });
+                                                    return;
+                                                }
+                                                // Handle http/https images via backend proxy to avoid CORS
+                                                if (imageUrl.startsWith('http') && window.electronAPI && window.electronAPI.fetchExternalImage) {
+                                                    try {
+                                                        const protocolUrl = await window.electronAPI.fetchExternalImage(imageUrl);
+                                                        setQueuedScreenshots(prev => {
+                                                            const newQueue = [...prev, { path: protocolUrl, preview: protocolUrl }];
+                                                            if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
+                                                            return newQueue;
+                                                        });
+                                                    } catch (err) {
+                                                        console.error("Failed to fetch dropped web image", err);
+                                                    }
+                                                    return;
+                                                }
+                                            }
+
                                             const files = e.dataTransfer.files;
                                             if (!files || files.length === 0) return;
                                             
@@ -3492,47 +3456,150 @@ const Queue: React.FC<any> = () => {
                                         }}
                                         placeholder={isGhostActive ? "👻 Ghost Intercept Active (Shift+Z to toggle)..." : (showPostMeeting ? "Ask about the meeting..." : "Ask about your screen...")}
                                         rows={1}
-                                        className="flex-1 bg-transparent py-4 px-2 text-sm text-gray-100 placeholder-gray-500 outline-none resize-none overflow-y-auto"
-                                        style={{ minHeight: '52px', maxHeight: '150px' }}
+                                        className="bg-transparent py-1 px-2 text-sm text-gray-100 placeholder-gray-500 outline-none resize-none overflow-y-auto w-full pr-8"
+                                        style={{ minHeight: isInputFullscreen ? '40vh' : '28px', maxHeight: isInputFullscreen ? '60vh' : '200px' }}
                                     />
+                                    
+                                    <div className="flex justify-between items-end px-1 mt-0">
+                                        <div className="flex items-center gap-1">
+                                            <button onClick={handleAttachFile} className="p-2.5 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-full transition-colors cursor-pointer" title={isStealth ? undefined : "Attach File"}>
+                                                <Plus size={18} />
+                                            </button>
+                                        </div>
 
-                                    <div className="flex items-center gap-1.5 px-3 shrink-0">
-                                        <button
-                                            onClick={toggleDictation}
-                                            className={`p-2 rounded-full transition-colors flex items-center justify-center ${isDictating
-                                                ? 'text-[#60a5fa] bg-[#60a5fa]/10 gemini-mic-active'
-                                                : 'hover:bg-white/10 text-gray-400 hover:text-white'
-                                                }`}
-                                            title={isStealth ? undefined : (isDictating ? "Stop Dictation" : "Start Dictation")}
-                                        >
-                                            <Mic size={16} />
-                                        </button>
+                                        <div className="flex items-center gap-1.5 p-1 bg-white/5 rounded-[20px]">
+                                            <div className="relative flex items-center shrink-0">
+                                                <button
+                                                    onClick={(e) => {
+                                                        setChatMenuPos(e.currentTarget.getBoundingClientRect());
+                                                        setShowChatModelMenu(!showChatModelMenu);
+                                                    }}
+                                                    className={`p-2 rounded-xl flex items-center gap-1 transition-all ${
+                                                        showChatModelMenu 
+                                                            ? 'text-blue-400 bg-white/10' 
+                                                            : selectedChatModel !== "" 
+                                                                ? 'text-blue-400 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.3)]' 
+                                                                : 'text-gray-500 hover:text-white hover:bg-white/10'
+                                                    }`}
+                                                    title={isStealth ? undefined : "Select Chat Model"}
+                                                >
+                                                    <MessageCircle size={16} />
+                                                </button>
+                                                {showChatModelMenu && chatMenuPos && (
+                                                    <div 
+                                                        className="fixed mb-4 w-64 bg-[#1e1e1e] border border-white/10 rounded-xl shadow-2xl py-1 z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2"
+                                                        style={{ 
+                                                            bottom: window.innerHeight - chatMenuPos.top + 8,
+                                                            left: Math.min(chatMenuPos.left, window.innerWidth - 256)
+                                                        }}
+                                                    >
+                                                        <div className="px-3 py-1.5 text-xs font-medium text-gray-400 border-b border-white/5 mb-1">Model</div>
+                                                        <button onClick={() => { 
+                                                            setSelectedChatModel(""); 
+                                                            localStorage.setItem('moubely_selected_chat_model', "");
+                                                            setShowChatModelMenu(false); 
+                                                        }} className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors ${!selectedChatModel ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}>
+                                                            <span>Auto (Waterfall)</span>
+                                                        </button>
+                                                        {chatModels.map((m, i) => {
+                                                            const mId = m.model || m.id;
+                                                            return (
+                                                            <button key={i} onClick={() => { 
+                                                                setSelectedChatModel(mId); 
+                                                                localStorage.setItem('moubely_selected_chat_model', mId);
+                                                                setShowChatModelMenu(false); 
+                                                            }} className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors ${selectedChatModel === mId ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}>
+                                                                <span>{m.name || mId}</span>
+                                                            </button>
+                                                        )})}
+                                                    </div>
+                                                )}
+                                            </div>
 
-                                        {isThinking ? (
-                                            <div className="flex items-center gap-1.5">
-                                                {(input.length > 0 || queuedScreenshots.length > 0 || queuedAttachments.length > 0) && messageQueue.length < 2 && (
-                                                    <button onClick={() => handleSend()} className="p-2 bg-blue-600/80 rounded-xl hover:bg-blue-500 transition-colors animate-in fade-in zoom-in duration-200">
+                                            <div className="relative flex items-center shrink-0">
+                                                <button
+                                                    onClick={(e) => {
+                                                        setGenMenuPos(e.currentTarget.getBoundingClientRect());
+                                                        if (isArtActive) {
+                                                            setIsArtActive(false);
+                                                            setShowModelMenu(false);
+                                                        } else {
+                                                            setShowModelMenu(!showModelMenu);
+                                                        }
+                                                    }}
+                                                    className={`p-2 rounded-xl transition-all ${isArtActive
+                                                        ? 'text-yellow-400 bg-yellow-400/10 shadow-[0_0_15px_rgba(250,204,21,0.2)] active-art-pulse'
+                                                        : 'text-gray-500 hover:text-white hover:bg-white/10'
+                                                        }`}
+                                                    title={isStealth ? undefined : (isArtActive ? "Reset to Text Mode" : "Generate Art & Video")}
+                                                >
+                                                    <Sparkles size={16} />
+                                                </button>
+                                                {showModelMenu && genMenuPos && (
+                                                    <div 
+                                                        className="fixed mb-4 w-64 bg-[#1e1e1e] border border-white/10 rounded-xl shadow-2xl py-1 z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2"
+                                                        style={{ 
+                                                            bottom: window.innerHeight - genMenuPos.top + 8,
+                                                            left: Math.min(genMenuPos.left, window.innerWidth - 256)
+                                                        }}
+                                                    >
+                                                        <div className="px-3 py-1.5 text-xs font-medium text-gray-400 border-b border-white/5 mb-1">Model</div>
+                                                        {GENERATIVE_MODELS.map((m) => (
+                                                            <button
+                                                                key={m.id}
+                                                                onClick={() => {
+                                                                    setSelectedModel(m.id);
+                                                                    localStorage.setItem('moubely_selected_model', m.id);
+                                                                    setIsArtActive(true);
+                                                                    setShowModelMenu(false);
+                                                                }}
+                                                                className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors ${selectedModel === m.id && isArtActive ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+                                                            >
+                                                                <span>{m.name}</span>
+                                                                <span className="text-[10px] text-gray-500">{m.type}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <button
+                                                onClick={toggleDictation}
+                                                className={`p-2 rounded-xl transition-colors flex items-center justify-center shrink-0 ${isDictating
+                                                    ? 'text-[#60a5fa] bg-[#60a5fa]/10 gemini-mic-active'
+                                                    : 'hover:bg-white/10 text-gray-400 hover:text-white'
+                                                    }`}
+                                                title={isStealth ? undefined : (isDictating ? "Stop Dictation" : "Start Dictation")}
+                                            >
+                                                <Mic size={16} />
+                                            </button>
+
+                                            {isThinking ? (
+                                                <div className="flex items-center">
+                                                    {(input.length > 0 || queuedScreenshots.length > 0 || queuedAttachments.length > 0) && messageQueue.length < 2 && (
+                                                        <button onClick={() => handleSend()} className="p-2.5 bg-blue-600/80 rounded-full hover:bg-blue-500 transition-colors animate-in fade-in zoom-in duration-200 ml-1">
+                                                            <Send size={16} className="text-white" />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={handleCancelGeneration}
+                                                        className="p-2.5 bg-red-600/20 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all shadow-[0_0_15px_rgba(220,38,38,0.2)] ml-1"
+                                                        title={isStealth ? undefined : "Stop Generation"}
+                                                    >
+                                                        <div className="w-3 h-3 bg-current rounded-[2px]" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                (input.length > 0 || queuedScreenshots.length > 0 || queuedAttachments.length > 0) && (
+                                                    <button onClick={() => handleSend()} className="p-2.5 bg-blue-600 rounded-full hover:bg-blue-500 transition-colors ml-1">
                                                         <Send size={16} className="text-white" />
                                                     </button>
-                                                )}
-                                                <button
-                                                    onClick={handleCancelGeneration}
-                                                    className="p-2 bg-red-600/20 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-[0_0_15px_rgba(220,38,38,0.2)]"
-                                                    title={isStealth ? undefined : "Stop Generation"}
-                                                >
-                                                    <div className="w-3.5 h-3.5 bg-current rounded-[2px]" />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            (input.length > 0 || queuedScreenshots.length > 0 || queuedAttachments.length > 0) && (
-                                                <button onClick={() => handleSend()} className="p-2 bg-blue-600 rounded-xl hover:bg-blue-500 transition-colors">
-                                                    <Send size={16} className="text-white" />
-                                                </button>
-                                            )
-                                        )}
+                                                )
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                                {(isInputFocused || isHoveringChat || isStealth) && (
+                                {(isActionBarVisible || isStealth) && (
                                     <div className="flex flex-nowrap items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full pb-2 overflow-x-auto custom-scrollbar-hide select-none">
                                         <div className="relative shrink-0 flex items-center">
                                             <button 
@@ -3545,30 +3612,28 @@ const Queue: React.FC<any> = () => {
                                                         ? 'text-emerald-400 bg-white/10' 
                                                         : selectedVisionModel !== "" 
                                                             ? 'text-emerald-400 bg-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
-                                                            : 'text-gray-400 hover:text-white hover:bg-white/15'
+                                                            : 'text-gray-400'
                                                 }`}
                                             >
                                                 <Eye size={14} />
-                                                <div className="marquee-container max-w-[50px] sm:max-w-[80px]">
-                                                    <span className="marquee-content can-marquee">
-                                                        {visionModels.find(m => (m.model || m.id) === selectedVisionModel)?.name || selectedVisionModel || "Vision"}
-                                                    </span>
-                                                </div>
+                                                <span className="text-xs font-semibold max-w-[50px] sm:max-w-[80px] truncate">
+                                                    {visionModels.find(m => (m.model || m.id) === selectedVisionModel)?.name || selectedVisionModel || "Vision"}
+                                                </span>
                                             </button>
                                             {showVisionModelMenu && visionMenuPos && (
                                                 <div 
-                                                    className="fixed mb-2 w-56 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-hidden py-1 z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2"
+                                                    className="fixed mb-2 w-64 bg-[#1e1e1e] border border-white/10 rounded-xl shadow-2xl py-1 z-[100] max-h-80 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-bottom-2"
                                                     style={{ 
                                                         bottom: window.innerHeight - visionMenuPos.top + 8,
-                                                        left: visionMenuPos.left
+                                                        left: Math.min(visionMenuPos.left, window.innerWidth - 256)
                                                     }}
                                                 >
-                                                    <div className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest border-b border-white/5 mb-1">👁️ Vision Models</div>
+                                                    <div className="px-3 py-1.5 text-xs font-medium text-gray-400 border-b border-white/5 mb-1">Model</div>
                                                     <button onClick={() => { 
                                                         setSelectedVisionModel(""); 
                                                         localStorage.setItem('moubely_selected_vision_model', "");
                                                         setShowVisionModelMenu(false); 
-                                                    }} className={`w-full text-left px-4 py-2 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${!selectedVisionModel ? 'text-emerald-400 bg-white/5' : 'text-gray-300 hover:text-white'}`}>
+                                                    }} className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors ${!selectedVisionModel ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}>
                                                         <span>Auto (Waterfall)</span>
                                                     </button>
                                                     {visionModels.map((m, i) => {
@@ -3578,7 +3643,7 @@ const Queue: React.FC<any> = () => {
                                                             setSelectedVisionModel(mId); 
                                                             localStorage.setItem('moubely_selected_vision_model', mId);
                                                             setShowVisionModelMenu(false); 
-                                                        }} className={`w-full text-left px-4 py-2 text-xs flex items-center justify-between hover:bg-white/10 transition-colors ${selectedVisionModel === mId ? 'text-emerald-400 bg-white/5' : 'text-gray-300 hover:text-white'}`}>
+                                                        }} className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors ${selectedVisionModel === mId ? 'bg-white/10 text-white' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}>
                                                             <span>{m.name || mId}</span>
                                                         </button>
                                                     )})}

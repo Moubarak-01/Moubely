@@ -449,10 +449,46 @@ export function initializeIpcHandlers(appState: AppState) {
       const filePath = path.join(attachmentsDir, filename);
       fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
 
-      console.log(`[IPC ⚡] ✅ Chat File Saved to: ${filePath}`);
+      console.log(`[IPC ⚡] 💾 Chat File Saved to: ${filePath}`);
       return `moubely://moubely_attachments/${filename}`;
     } catch (error) {
       console.error(`[IPC ⚡] ❌ Chat File Save Failed:`, error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('fetch-external-image', async (event, url: string) => {
+    try {
+      console.log(`[IPC ⚡] 🌐 Backend requested to fetch: ${url}`);
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          throw new Error(`Invalid or unsupported scheme for backend fetch: ${url}`);
+      }
+      
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+      const arrayBuffer = await response.arrayBuffer();
+      
+      let ext = 'png';
+      const contentType = response.headers.get('content-type');
+      if (contentType) {
+          ext = contentType.split('/')[1] || 'png';
+      } else {
+          const urlExt = url.split('.').pop()?.split('?')[0].toLowerCase();
+          if (urlExt && ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(urlExt)) ext = urlExt;
+      }
+      
+      const userDataPath = app.getPath('userData');
+      const attachmentsDir = path.join(userDataPath, 'moubely_attachments');
+      if (!fs.existsSync(attachmentsDir)) fs.mkdirSync(attachmentsDir, { recursive: true });
+
+      const filename = `${crypto.randomUUID()}.${ext.replace('.', '')}`;
+      const filePath = path.join(attachmentsDir, filename);
+      fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
+
+      console.log(`[IPC ⚡] 🌐 Fetched External Image Saved to: ${filePath}`);
+      return `moubely://moubely_attachments/${filename}`;
+    } catch (error) {
+      console.error(`[IPC ⚡] ❌ Failed to fetch external image:`, error);
       throw error;
     }
   });

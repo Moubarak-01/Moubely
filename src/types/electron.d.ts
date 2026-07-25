@@ -16,6 +16,7 @@ export interface ElectronAPI {
   getScreenshots: () => Promise<Array<{ path: string; preview: string }>>
   deleteScreenshot: (path: string) => Promise<{ success: boolean; error?: string }>
   saveChatFile: (arrayBuffer: ArrayBuffer, extension: string, name?: string) => Promise<string>
+  fetchExternalImage: (url: string) => Promise<string>
   deleteChatFiles: (urls: string[]) => Promise<{ success: boolean; error?: string }>
   openFilePicker: () => Promise<{ name: string, path: string, type: string }[]>
   transcribeDictation: (base64Audio: string, mimeType: string) => Promise<string>

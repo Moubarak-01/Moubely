@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getScreenshots: () => ipcRenderer.invoke("get-screenshots"),
   deleteScreenshot: (p: string) => ipcRenderer.invoke("delete-screenshot", p),
   saveChatFile: (ab: ArrayBuffer, ext: string, name?: string) => ipcRenderer.invoke("save-chat-file", ab, ext, name),
+  fetchExternalImage: (url: string) => ipcRenderer.invoke("fetch-external-image", url),
   deleteChatFiles: (urls: string[]) => ipcRenderer.invoke("delete-chat-files", urls),
   openFilePicker: () => ipcRenderer.invoke("open-file-picker"),
   saveApiKeys: (keys: any) => ipcRenderer.invoke("save-api-keys", keys),
