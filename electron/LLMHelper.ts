@@ -37,21 +37,22 @@ async function safePdfParse(buffer: Buffer) {
 
 // --- 1. THE EXPANDED WATERFALL BRAINS ---
 export const CHAT_MODELS = [
-    // --- TIER 1 : FAST & OPEN (Gemma 4 / Flash / Lite) ---
+    // --- TIER 1 : Gemini (Gemma 4 / Flash / Lite) ---
     { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B' },
     { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B' },
+    { type: 'gemini', model: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
+    { type: 'gemini', model: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
+    { type: 'gemini', model: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-2.0-flash-lite-preview-02-05', name: 'Gemini 2.0 Flash Lite' }, // ZERO RPD
     { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' }, // ZERO RPD,
-
-    // --- TIER 2: Gemini ---
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'gemini', model: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite' }, // Active (500 RPD)
     { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' }, // Active (20 RPD)
     { type: 'openrouter', model: 'nvidia/nemotron-3-nano-30b-a3b:free', name: 'Nvidia Nemotron 3 Nano' },
     { type: 'gemini', model: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' }, // ZERO RPD,
 
-    // --- TIER 3: EFFICIENCY & SPECIALIZED ---
+    // --- TIER 2: EFFICIENCY & SPECIALIZED ---
     { type: 'openrouter', model: 'stepfun/step-3.5-flash:free', name: 'Step 3.5 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-native', name: 'Gemini 2.5 Flash Native' },
     { type: 'gemini', model: 'gemini-robotics-er-1.5-preview', name: 'Gemini Robotics' },
@@ -63,7 +64,7 @@ export const CHAT_MODELS = [
     { type: 'openrouter', model: 'anthropic/claude-sonnet-4.5', name: 'Claude 4.5 Sonnet' },
     { type: 'openrouter', model: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet' },
 
-    // --- TIER 4: RESEARCH & SEARCH (Perplexity, Groq and Git) ---
+    // --- TIER 3: RESEARCH & SEARCH (Perplexity, Groq and Git) ---
     { type: 'openrouter', model: 'meta-llama/llama-3.2-3b-instruct:free', name: 'Llama 3.2 3B Instruct' },
     { type: 'openrouter', model: 'arcee-ai/trinity-mini:free', name: 'Trinity Mini 1.2B' },
     { type: 'openrouter', model: 'liquid/lfm-2.5-1.2b-instruct:free', name: 'Liquid LFM 1.2B' },
@@ -82,6 +83,9 @@ export const VISION_MODELS = [
     // --- TIER 1: ELITE & RELIABLE VISION (Gemma 4 Upgrade) ---
     { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B (Vision)' }, // ADDED '-a4b-it'
     { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B (Vision)' }, // ADDED '-it'
+    { type: 'gemini', model: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
+    { type: 'gemini', model: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
+    { type: 'gemini', model: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash' },
     { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'gemini', model: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite' },
@@ -154,12 +158,12 @@ export class LLMHelper {
 
     public isConfigured(): boolean {
         return !!(
-            this.genAI || 
-            this.openRouterClient || 
-            this.nvidiaClient || 
-            this.openaiClient || 
-            this.groqClient || 
-            this.perplexityClient || 
+            this.genAI ||
+            this.openRouterClient ||
+            this.nvidiaClient ||
+            this.openaiClient ||
+            this.groqClient ||
+            this.perplexityClient ||
             this.githubClient
         );
     }
@@ -886,11 +890,11 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
 
                 if (config.type === 'gemini') {
                     if (!this.genAI) continue;
-                    
+
                     const needsMuzzle = isUltraStrictSolver || isShortFormAction || type === 'general';
-                    const geminiModel = this.genAI.getGenerativeModel({ 
+                    const geminiModel = this.genAI.getGenerativeModel({
                         model: config.model,
-                        systemInstruction: finalSystemInstruction 
+                        systemInstruction: finalSystemInstruction
                     });
 
                     // Construct Turn-Based History for generateContentStream
@@ -910,7 +914,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     }
 
                     const result = await geminiModel.generateContentStream({ contents });
-                    
+
                     for await (const chunk of result.stream) {
                         if (this.isAborted) {
                             console.log(`[LLM] 🛑 Generation aborted by user.`);
@@ -1060,7 +1064,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
             console.log(`\n[LLM] 👁️ ATTEMPTING VISION: ${config.model} (${config.type})...`);
             try {
                 let currentVisionPrompt = visionPrompt;
-                
+
                 const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist';
                 const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
                 const isMuzzleModel = true; // Apply formatting uniformly to ALL models
@@ -1072,20 +1076,20 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                 } else if (type === 'general' && isMuzzleModel) {
                     currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" General Chat Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: Your VERY FIRST output tokens MUST be <think>. You MUST do all your reasoning, planning, and constraint checking inside a <think> ... </think> block. \n\nCRITICAL CLOSING RULE: You MUST literally output the </think> tag when you are done reasoning. If you do not close the tag, the system will break.\n\nAfter the </think> tag, output your final conversational response natively.`;
                 }
-                
+
                 const textPart = { type: "text", text: currentVisionPrompt };
 
                 let fullResponse = "";
                 if (config.type === 'gemini') {
                     if (!this.genAI) continue;
                     const model = this.genAI.getGenerativeModel({ model: config.model });
-                    
+
                     const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist';
                     const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
                     const contents = [
                         { role: "user", parts: [{ text: currentVisionPrompt }, ...geminiParts] }
                     ];
-                    
+
                     const result = await model.generateContentStream({ contents: contents });
                     const needsMuzzle = isUltraStrictSolver || isShortFormAction || type === 'general';
                     if (needsMuzzle) {
@@ -1165,9 +1169,9 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
         if (!isUrgent) {
             try {
                 console.log(`[LLM] 🎙️ Attempting Native Local Whisper (${speedLabel})...`);
-                
+
                 const text = await WhisperHelper.transcribe(audioPath);
-                
+
                 if (text) {
                     console.log(`[LLM] ✅ Local Whisper Success: "${text.slice(0, 30)}..."`);
                     this.sessionTranscript += `\n[${new Date().toLocaleTimeString()}] ${text}`;
@@ -1295,7 +1299,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
 
     public updateApiKeys(keys: { [key: string]: string }) {
         console.log("[LLM] 🔐 Updating API Clients with User Keys...");
-        
+
         if (keys.gemini) {
             this.genAI = new GoogleGenerativeAI(keys.gemini);
             this.fileManager = new GoogleAIFileManager(keys.gemini);
@@ -1325,7 +1329,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
             });
         }
         if (keys.notion) this.notionClient = new NotionClient({ auth: keys.notion });
-        
+
         console.log("[LLM] ✅ API Clients Updated Successfully");
     }
 }
