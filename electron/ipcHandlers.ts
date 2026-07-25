@@ -6,6 +6,7 @@ import { AppState } from "./main";
 import { LocalServerHelper } from "./LocalServerHelper";
 import { GenerationHelper } from "./GenerationHelper";
 import { CHAT_MODELS, VISION_MODELS } from "./LLMHelper";
+import { marked } from "marked";
 
 // Helper for consistent logging
 const logIPC = (channel: string, details: string = "") => {
@@ -146,7 +147,22 @@ export function initializeIpcHandlers(appState: AppState) {
 
   ipcMain.handle("copy-to-clipboard", (event, text: string) => {
     try {
-      clipboard.writeText(text);
+      // Generate rich HTML for rich-text editors (like email, Notion)
+      const htmlText = marked.parse(text, { async: false }) as string;
+      
+      // Clean up markdown formatting for plain-text editors
+      let plainText = text;
+      plainText = plainText.replace(/\*\*(.*?)\*\*/g, '$1'); // bold
+      plainText = plainText.replace(/\*(.*?)\*/g, '$1'); // italic
+      plainText = plainText.replace(/^### (.*$)/gim, '$1'); // h3
+      plainText = plainText.replace(/^## (.*$)/gim, '$1'); // h2
+      plainText = plainText.replace(/^# (.*$)/gim, '$1'); // h1
+      plainText = plainText.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // links
+
+      clipboard.write({
+        text: plainText,
+        html: htmlText
+      });
       return true;
     } catch (e) {
       console.error("[IPC ⚡] ❌ Clipboard Write Failed:", e);

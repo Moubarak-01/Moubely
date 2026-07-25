@@ -166,6 +166,7 @@
     "katex": "^0.16.27",
     "koffi": "^2.15.1",
     "lucide-react": "^0.460.0",
+    "marked": "^18.0.7",
     "multer": "^1.4.5-lts.1",
     "openai": "^6.10.0",
     "pdf-parse-fork": "^1.2.0",
