@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   updateContentDimensions: (d: any) => ipcRenderer.invoke("update-content-dimensions", d),
   setWindowSize: (d: any) => ipcRenderer.invoke("set-window-size", d),
   toggleExpand: (isExpanded: boolean) => ipcRenderer.invoke("toggle-expand", isExpanded),
+  startDrag: (filePath: string) => ipcRenderer.send("start-drag", filePath),
   copyToClipboard: (text: string) => ipcRenderer.invoke("copy-to-clipboard", text),
 
   // Expansion Toggle Listener

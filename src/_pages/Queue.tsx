@@ -7,7 +7,7 @@ import {
     Scaling, Copy, Check, CheckCheck, Trash2, Mail,
     Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
     Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw, Plus, Maximize,
-    Video, Image, Code, Maximize2, Minimize2, Download, GraduationCap, Ghost, Music
+    Video, Image, Code, Maximize2, Minimize2, Download, GraduationCap, Ghost, Music, Paperclip
 } from "lucide-react"
 import moubelyIcon from "../../assets/Moubely_icon.png"
 
@@ -553,6 +553,9 @@ const Queue: React.FC<any> = () => {
     const [activeTab, setActiveTab] = useState<"Chat" | "Transcript" | "Email" | "History">("Chat")
     const [isInputFocused, setIsInputFocused] = useState(false)
     const [isInputFullscreen, setIsInputFullscreen] = useState(false)
+    const [isGlobalDragging, setIsGlobalDragging] = useState(false)
+    const globalDragCounter = useRef(0)
+    const internalDragPathRef = useRef<string | null>(null)
     const [isActionBarVisible, setIsActionBarVisible] = useState(true)
     const actionBarTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const [fullscreenFile, setFullscreenFile] = useState<{ path: string, type: string, name?: string, localPath?: string } | null>(null)
@@ -1005,6 +1008,125 @@ const Queue: React.FC<any> = () => {
 
     const handleClearQueue = async () => {
         setQueuedScreenshots([]);
+    };
+
+    
+    const handleGlobalDragEnter = (e: React.DragEvent) => {
+        if (!e.dataTransfer.types.includes('Files') && !e.dataTransfer.types.includes('text/html')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        globalDragCounter.current += 1;
+        if (globalDragCounter.current === 1) setIsGlobalDragging(true);
+    };
+
+    const handleGlobalDragLeave = (e: React.DragEvent) => {
+        if (!e.dataTransfer.types.includes('Files') && !e.dataTransfer.types.includes('text/html')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        globalDragCounter.current -= 1;
+        if (globalDragCounter.current === 0) setIsGlobalDragging(false);
+    };
+
+    const handleGlobalDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        globalDragCounter.current = 0;
+        setIsGlobalDragging(false);
+
+        // Check for dragged internal/external elements (like images from chat)
+        let imageUrl = internalDragPathRef.current || '';
+        const html = e.dataTransfer.getData('text/html');
+        const plain = e.dataTransfer.getData('text/plain');
+        
+        if (!imageUrl) {
+            if (html) {
+                const imgMatch = html.match(/src=["'](.*?)["']/);
+                if (imgMatch) imageUrl = imgMatch[1];
+            } else if (plain && (plain.startsWith('http') || plain.startsWith('moubely://') || plain.startsWith('moubely-local://') || plain.startsWith('file://') || plain.match(/^[a-zA-Z]:[\\/]/) || plain.startsWith('/'))) {
+                imageUrl = plain;
+                if (!plain.startsWith('http') && !plain.startsWith('moubely://') && !plain.startsWith('moubely-local://') && !plain.startsWith('file://')) {
+                    imageUrl = `moubely-local://${encodeURIComponent(plain)}`;
+                }
+            }
+        } else {
+            internalDragPathRef.current = null;
+            if (!imageUrl.startsWith('http') && !imageUrl.startsWith('moubely://') && !imageUrl.startsWith('moubely-local://') && !imageUrl.startsWith('file://')) {
+                imageUrl = `moubely-local://${encodeURIComponent(imageUrl)}`;
+            }
+        }
+
+        if (imageUrl) {
+            if (imageUrl.startsWith('moubely://') || imageUrl.startsWith('moubely-local://')) {
+                const ext = imageUrl.split('.').pop()?.toLowerCase().split('?')[0] || '';
+                const isImage = ['png', 'jpg', 'jpeg', 'webp', 'heic', 'gif'].includes(ext);
+                
+                if (isImage) {
+                    setQueuedScreenshots(prev => {
+                        const newQueue = [...prev, { path: imageUrl, preview: imageUrl }];
+                        if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
+                        return newQueue;
+                    });
+                } else {
+                    let type = 'generic_file';
+                    if (['mp4', 'webm', 'mov', 'avi'].includes(ext)) type = 'video';
+                    else if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'wma'].includes(ext)) type = 'audio';
+                    else if (ext === 'pdf') type = 'pdf';
+                    else if (['txt', 'md', 'csv', 'json', 'js', 'ts', 'jsx', 'tsx', 'py', 'html', 'css', 'go', 'cs', 'java', 'cpp', 'c', 'h', 'hpp', 'sh', 'bash', 'yml', 'yaml', 'xml', 'log', 'ini', 'cfg', 'conf', 'php', 'rb', 'swift', 'kt', 'dart', 'rs', 'sql', 'env'].includes(ext)) type = 'text';
+                    
+                    const name = imageUrl.split('/').pop()?.split('\\').pop() || `attached_file.${ext}`;
+                    setQueuedAttachments(prev => [...prev, { name, path: imageUrl, type }]);
+                }
+                return;
+            }
+            // Handle http/https images via backend proxy to avoid CORS
+            if (imageUrl.startsWith('http') && window.electronAPI && window.electronAPI.fetchExternalImage) {
+                try {
+                    const protocolUrl = await window.electronAPI.fetchExternalImage(imageUrl);
+                    setQueuedScreenshots(prev => {
+                        const newQueue = [...prev, { path: protocolUrl, preview: protocolUrl }];
+                        if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
+                        return newQueue;
+                    });
+                } catch (err) {
+                    console.error("Failed to fetch dropped web image", err);
+                }
+                return;
+            }
+        }
+
+        const files = e.dataTransfer.files;
+        if (!files || files.length === 0) return;
+        
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            if (window.electronAPI && window.electronAPI.saveChatFile) {
+                const arrayBuffer = await file.arrayBuffer();
+                const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
+                
+                const isImage = ['png', 'jpg', 'jpeg', 'webp', 'heic', 'gif'].includes(ext);
+                
+                try {
+                    const protocolUrl = await window.electronAPI.saveChatFile(arrayBuffer, ext);
+                    if (isImage) {
+                        setQueuedScreenshots(prev => {
+                            const newQueue = [...prev, { path: protocolUrl, preview: protocolUrl }];
+                            if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
+                            return newQueue;
+                        });
+                    } else {
+                        let type = 'generic_file';
+                        if (['mp4', 'webm', 'mov', 'avi'].includes(ext)) type = 'video';
+                        else if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'wma'].includes(ext)) type = 'audio';
+                        else if (ext === 'pdf') type = 'pdf';
+                        else if (['txt', 'md', 'csv', 'json', 'js', 'ts', 'jsx', 'tsx', 'py', 'html', 'css', 'go', 'cs', 'java', 'cpp', 'c', 'h', 'hpp', 'sh', 'bash', 'yml', 'yaml', 'xml', 'log', 'ini', 'cfg', 'conf', 'php', 'rb', 'swift', 'kt', 'dart', 'rs', 'sql', 'env'].includes(ext)) type = 'text';
+
+                        setQueuedAttachments(prev => [...prev, { name: file.name, path: protocolUrl, type }]);
+                    }
+                } catch (err) {
+                    console.error("Failed to save dropped file", err);
+                }
+            }
+        }
     };
 
     const handleClearAttachments = async () => {
@@ -2510,7 +2632,14 @@ const Queue: React.FC<any> = () => {
     }
 
     return (
-        <div className={`moubely-window ${isExpanded ? 'expanded' : ''} flex flex-col h-full relative overflow-hidden`}>
+        <div 
+            className={`moubely-window ${isExpanded ? 'expanded' : ''} flex flex-col h-full relative overflow-hidden`}
+            onDragEnter={handleGlobalDragEnter}
+            onDragLeave={handleGlobalDragLeave}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleGlobalDrop}
+        >
+
             {fullscreenFile && (
                 <UniversalMediaLightbox
                     file={fullscreenFile}
@@ -2756,9 +2885,17 @@ const Queue: React.FC<any> = () => {
                                                                                         onDoubleClick={() => setQueuedAttachments(prev => [...prev, { name: fileName, path: media.originalPath || media.preview, type: media.type }])}
                                                                                         draggable={true}
                                                                                         onDragStart={(e) => {
-                                                                                            e.dataTransfer.setData('text/plain', dragUrl);
-                                                                                            e.dataTransfer.setData('text/uri-list', dragUrl);
+                                                                                            e.preventDefault();
+                                                                                            let localPath = dragUrl;
+                                                                                            if (localPath.startsWith('moubely-local://')) {
+                                                                                                localPath = decodeURIComponent(localPath.replace('moubely-local://', ''));
+                                                                                            }
+                                                                                            if (window.electronAPI && window.electronAPI.startDrag) {
+                                                                                                internalDragPathRef.current = localPath;
+                                                                                                window.electronAPI.startDrag(localPath);
+                                                                                            }
                                                                                         }}
+                                                                                        onDragEnd={() => { internalDragPathRef.current = null; }}
                                                                                         onMouseEnter={(e) => { if (!isVisual) { setHoverAttachment({ path: media.originalPath || media.preview, type: media.type, name: fileName }); setHoverRect(e.currentTarget.getBoundingClientRect()); } }}
                                                                                         onMouseLeave={() => { if (!isVisual) { setHoverAttachment(null); setHoverRect(null); } }}
                                                                                     >
@@ -2875,9 +3012,17 @@ const Queue: React.FC<any> = () => {
                                                                                             onDoubleClick={() => setQueuedAttachments(prev => [...prev, { name: fileName, path: media.originalPath || media.preview, type: media.type }])}
                                                                                             draggable={true}
                                                                                             onDragStart={(e) => {
-                                                                                                e.dataTransfer.setData('text/plain', dragUrl);
-                                                                                                e.dataTransfer.setData('text/uri-list', dragUrl);
+                                                                                                e.preventDefault();
+                                                                                                let localPath = dragUrl;
+                                                                                                if (localPath.startsWith('moubely-local://')) {
+                                                                                                    localPath = decodeURIComponent(localPath.replace('moubely-local://', ''));
+                                                                                                }
+                                                                                                if (window.electronAPI && window.electronAPI.startDrag) {
+                                                                                                    internalDragPathRef.current = localPath;
+                                                                                                    window.electronAPI.startDrag(localPath);
+                                                                                                }
                                                                                             }}
+                                                                                            onDragEnd={() => { internalDragPathRef.current = null; }}
                                                                                             onMouseEnter={(e) => { if (!isVisual) { setHoverAttachment({ path: media.originalPath || media.preview, type: media.type, name: fileName }); setHoverRect(e.currentTarget.getBoundingClientRect()); } }}
                                                                                             onMouseLeave={() => { if (!isVisual) { setHoverAttachment(null); setHoverRect(null); } }}
                                                                                         >
@@ -3393,6 +3538,12 @@ const Queue: React.FC<any> = () => {
                                 )}
 
                                 <div className={`mb-1 w-full bg-[#1a1a1a]/80 backdrop-blur-md hover:bg-[#202020] focus-within:bg-[#202020] border border-white/10 focus-within:border-white/20 transition-all shadow-lg flex flex-col p-1.5 relative ${isInputFullscreen ? 'fixed bottom-4 left-0 right-0 z-[200] max-w-4xl mx-auto rounded-3xl shadow-2xl p-3' : 'rounded-2xl'}`}>
+                                    {isGlobalDragging && (
+                                        <div className="absolute -inset-x-2 -inset-y-6 z-[1000] bg-[#1a2333]/95 backdrop-blur-md border-2 border-dashed border-blue-500/80 rounded-3xl flex flex-col items-center justify-center text-blue-400 pointer-events-none transition-all shadow-2xl">
+                                            <Paperclip size={28} className="mb-2 animate-bounce" />
+                                            <span className="text-[15px] font-medium tracking-wide">Drop files here</span>
+                                        </div>
+                                    )}
                                     {(isInputFullscreen || input.length > 250 || input.split('\n').length > 4) && (
                                         <div className="absolute top-2 right-2 text-gray-500 hover:text-white cursor-pointer z-10 p-1 bg-white/5 hover:bg-white/10 rounded-lg transition-colors" onClick={() => setIsInputFullscreen(!isInputFullscreen)} title={isStealth ? undefined : (isInputFullscreen ? "Minimize" : "Fullscreen")}>
                                             {isInputFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
@@ -3429,97 +3580,7 @@ const Queue: React.FC<any> = () => {
                                             }
                                         }}
                                         onDragOver={(e) => e.preventDefault()}
-                                        onDrop={async (e) => {
-                                            e.preventDefault();
-
-                                            // Check for dragged internal/external elements (like images from chat)
-                                            const html = e.dataTransfer.getData('text/html');
-                                            const plain = e.dataTransfer.getData('text/plain');
-                                            let imageUrl = '';
-                                            
-                                            if (html) {
-                                                const imgMatch = html.match(/src=["'](.*?)["']/);
-                                                if (imgMatch) imageUrl = imgMatch[1];
-                                            } else if (plain && (plain.startsWith('http') || plain.startsWith('moubely://') || plain.startsWith('moubely-local://') || plain.startsWith('file://') || plain.match(/^[a-zA-Z]:[\\/]/) || plain.startsWith('/'))) {
-                                                imageUrl = plain;
-                                                if (!plain.startsWith('http') && !plain.startsWith('moubely://') && !plain.startsWith('moubely-local://') && !plain.startsWith('file://')) {
-                                                    imageUrl = `moubely-local://${encodeURIComponent(plain)}`;
-                                                }
-                                            }
-
-                                            if (imageUrl) {
-                                                if (imageUrl.startsWith('moubely://') || imageUrl.startsWith('moubely-local://')) {
-                                                    const ext = imageUrl.split('.').pop()?.toLowerCase().split('?')[0] || '';
-                                                    const isImage = ['png', 'jpg', 'jpeg', 'webp', 'heic', 'gif'].includes(ext);
-                                                    
-                                                    if (isImage) {
-                                                        setQueuedScreenshots(prev => {
-                                                            const newQueue = [...prev, { path: imageUrl, preview: imageUrl }];
-                                                            if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
-                                                            return newQueue;
-                                                        });
-                                                    } else {
-                                                        let type = 'generic_file';
-                                                        if (['mp4', 'webm', 'mov', 'avi'].includes(ext)) type = 'video';
-                                                        else if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'wma'].includes(ext)) type = 'audio';
-                                                        else if (ext === 'pdf') type = 'pdf';
-                                                        else if (['txt', 'md', 'csv', 'json', 'js', 'ts', 'jsx', 'tsx', 'py', 'html', 'css', 'go', 'cs', 'java', 'cpp', 'c', 'h', 'hpp', 'sh', 'bash', 'yml', 'yaml', 'xml', 'log', 'ini', 'cfg', 'conf', 'php', 'rb', 'swift', 'kt', 'dart', 'rs', 'sql', 'env'].includes(ext)) type = 'text';
-                                                        
-                                                        const name = imageUrl.split('/').pop()?.split('\\').pop() || `attached_file.${ext}`;
-                                                        setQueuedAttachments(prev => [...prev, { name, path: imageUrl, type }]);
-                                                    }
-                                                    return;
-                                                }
-                                                // Handle http/https images via backend proxy to avoid CORS
-                                                if (imageUrl.startsWith('http') && window.electronAPI && window.electronAPI.fetchExternalImage) {
-                                                    try {
-                                                        const protocolUrl = await window.electronAPI.fetchExternalImage(imageUrl);
-                                                        setQueuedScreenshots(prev => {
-                                                            const newQueue = [...prev, { path: protocolUrl, preview: protocolUrl }];
-                                                            if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
-                                                            return newQueue;
-                                                        });
-                                                    } catch (err) {
-                                                        console.error("Failed to fetch dropped web image", err);
-                                                    }
-                                                    return;
-                                                }
-                                            }
-
-                                            const files = e.dataTransfer.files;
-                                            if (!files || files.length === 0) return;
-                                            
-                                            for (let i = 0; i < files.length; i++) {
-                                                const file = files[i];
-                                                if (window.electronAPI && window.electronAPI.saveChatFile) {
-                                                    const arrayBuffer = await file.arrayBuffer();
-                                                    const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
-                                                    
-                                                    const isImage = ['png', 'jpg', 'jpeg', 'webp', 'heic', 'gif'].includes(ext);
-                                                    
-                                                    try {
-                                                        const protocolUrl = await window.electronAPI.saveChatFile(arrayBuffer, ext);
-                                                        if (isImage) {
-                                                            setQueuedScreenshots(prev => {
-                                                                const newQueue = [...prev, { path: protocolUrl, preview: protocolUrl }];
-                                                                if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
-                                                                return newQueue;
-                                                            });
-                                                        } else {
-                                                            let type = 'generic_file';
-                                                            if (['mp4', 'webm', 'mov', 'avi'].includes(ext)) type = 'video';
-                                                            else if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'wma'].includes(ext)) type = 'audio';
-                                                            else if (ext === 'pdf') type = 'pdf';
-                                                            else if (['txt', 'md', 'csv', 'json', 'js', 'ts', 'jsx', 'tsx', 'py', 'html', 'css', 'go', 'cs', 'java', 'cpp', 'c', 'h', 'hpp', 'sh', 'bash', 'yml', 'yaml', 'xml', 'log', 'ini', 'cfg', 'conf', 'php', 'rb', 'swift', 'kt', 'dart', 'rs', 'sql', 'env'].includes(ext)) type = 'text';
-
-                                                            setQueuedAttachments(prev => [...prev, { name: file.name, path: protocolUrl, type }]);
-                                                        }
-                                                    } catch (err) {
-                                                        console.error("Failed to save dropped file", err);
-                                                    }
-                                                }
-                                            }
-                                        }}
+                                        onDrop={handleGlobalDrop}
                                         placeholder={isGhostActive ? "👻 Ghost Intercept Active (Shift+Z to toggle)..." : (showPostMeeting ? "Ask about the meeting..." : "Ask about your screen...")}
                                         rows={1}
                                         className="bg-transparent py-1 px-2 text-sm text-gray-100 placeholder-gray-500 outline-none resize-none overflow-y-auto w-full pr-8"

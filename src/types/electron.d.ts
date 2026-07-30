@@ -3,6 +3,7 @@ export interface ElectronAPI {
   updateContentDimensions: (dimensions: { width: number; height: number }) => Promise<void>
   setWindowSize: (dimensions: { width: number, height: number }) => Promise<void>
   toggleExpand: (isExpanded: boolean) => Promise<void>
+  startDrag: (filePath: string) => void
   moveWindowLeft: () => Promise<void>
   moveWindowRight: () => Promise<void>
   moveWindowUp: () => Promise<void>

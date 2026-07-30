@@ -1,4 +1,4 @@
-import { ipcMain, app, desktopCapturer, shell, dialog, safeStorage, clipboard } from "electron";
+import { ipcMain, app, desktopCapturer, shell, dialog, safeStorage, clipboard, nativeImage } from "electron";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
@@ -183,6 +183,13 @@ export function initializeIpcHandlers(appState: AppState) {
     if (win) {
       win.setIgnoreMouseEvents(ignore, { forward: true });
     }
+  });
+
+  ipcMain.on("start-drag", (event, filePath: string) => {
+    event.sender.startDrag({
+      file: filePath,
+      icon: nativeImage.createFromPath(path.join(__dirname, '../assets/Moubely_icon.png')).resize({ width: 32, height: 32 })
+    });
   });
 
   ipcMain.handle("move-window-right", () => {
