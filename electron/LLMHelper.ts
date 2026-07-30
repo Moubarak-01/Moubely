@@ -996,7 +996,10 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
         for (const attachment of attachments) {
             try {
                 let actualPath = attachment.path;
-                if (attachment.path.startsWith('moubely://')) {
+                if (attachment.path.startsWith('moubely-local://')) {
+                    const urlPath = attachment.path.slice('moubely-local://'.length);
+                    actualPath = decodeURIComponent(urlPath);
+                } else if (attachment.path.startsWith('moubely://')) {
                     const urlPath = attachment.path.slice('moubely://'.length);
                     actualPath = path.join(app.getPath('userData'), urlPath);
                 }
@@ -1011,13 +1014,14 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                     const b64 = buffer.toString("base64");
                     geminiParts.push({ inlineData: { data: b64, mimeType } });
                     openAIParts.push({ type: "image_url", image_url: { url: `data:${mimeType};base64,${b64}` } });
-                } else if (attachment.type === 'pdf' || attachment.type === 'video' || attachment.type === 'generic_file') {
+                } else if (attachment.type === 'pdf' || attachment.type === 'video' || attachment.type === 'generic_file' || attachment.type === 'audio') {
                     if (this.fileManager) {
                         console.log(`[LLM] 📤 Uploading heavy file to Google: ${actualPath}`);
 
                         let mimeType = 'application/octet-stream';
                         if (attachment.type === 'pdf') mimeType = 'application/pdf';
                         else if (attachment.type === 'video') mimeType = actualPath.endsWith('.webm') ? 'video/webm' : (actualPath.endsWith('.mov') ? 'video/quicktime' : 'video/mp4');
+                        else if (attachment.type === 'audio') mimeType = actualPath.endsWith('.mp3') ? 'audio/mp3' : (actualPath.endsWith('.wav') ? 'audio/wav' : (actualPath.endsWith('.ogg') ? 'audio/ogg' : 'audio/mpeg'));
                         // Else we let Gemini infer from extension (or pass generic application/octet-stream)
                         const uploadResponse = await this.fileManager.uploadFile(actualPath, { mimeType, displayName: path.basename(actualPath) });
 
