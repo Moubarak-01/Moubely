@@ -80,6 +80,7 @@ interface ChatContext {
     uploadedFilesContent: string;
     meetingTranscript: string;
     userImage?: string;
+    bypassPersona?: boolean;
 }
 
 // --- HELPERS ---
@@ -101,6 +102,10 @@ const cleanMeetingTitle = (rawTitle: string): string => {
 };
 
 const preparePayload = (userMessage: string, context: ChatContext) => {
+    if (context.bypassPersona) {
+        return userMessage;
+    }
+
     let systemInstruction = "";
     let dataToSend = "";
 
@@ -595,6 +600,7 @@ const Queue: React.FC<any> = () => {
     const [mode, setMode] = useState(() => sessionStorage.getItem("moubely_mode") || "General")
     const [showModeMenu, setShowModeMenu] = useState(false)
     const [isSmartMode, setIsSmartMode] = useState(false)
+    const [bypassPersona, setBypassPersona] = useState(false)
 
     // --- BRAIN/GENERATION MODELS ---
     const [selectedModel, setSelectedModel] = useState("imagen-4-generate");
@@ -1579,6 +1585,10 @@ const Queue: React.FC<any> = () => {
         const msgIndex = messages.findIndex(m => m.id === msgId);
         if (msgIndex === -1) return;
 
+        const msgToEdit = messages[msgIndex];
+        const attachmentsToSend = msgToEdit.queuedAttachments || [];
+        const hasAttachments = attachmentsToSend.length > 0;
+
         // Strip everything after the edited message
         const initialMessages: Message[] = messages.slice(0, msgIndex + 1).map(m =>
             m.id === msgId ? { ...m, text: editText } : m
@@ -1603,7 +1613,8 @@ const Queue: React.FC<any> = () => {
             isInMeeting: isRecording || showPostMeeting,
             meetingTranscript: transcriptLogs.map(t => t.text).join("\n"),
             uploadedFilesContent: "",
-            userImage: undefined
+            userImage: undefined,
+            bypassPersona: bypassPersona
         };
         const finalPrompt = preparePayload(editText, contextData);
 
@@ -1614,13 +1625,15 @@ const Queue: React.FC<any> = () => {
             if (isArtActive) {
                 const result = await window.electronAPI.generateMedia({ prompt: editText, model: selectedModel });
                 generatedMedia = result;
+            } else if (hasAttachments) {
+                fullResponse = await window.electronAPI.chatWithAttachments(finalPrompt, attachmentsToSend, bypassPersona ? "bypass" : "answer", selectedVisionModel);
             } else {
                 fullResponse = await window.electronAPI.invoke("gemini-chat", {
                     message: finalPrompt,
                     mode: mode,
-                    history: initialMessages.slice(0, -1).map(m => ({ role: m.role, text: m.text })),
-                    type: "general",
-                    isCandidateMode: mode === 'Student'
+                    history: bypassPersona ? [] : initialMessages.slice(0, -1).map(m => ({ role: m.role, text: m.text })),
+                    type: bypassPersona ? "bypass" : "general",
+                    isCandidateMode: bypassPersona ? false : (mode === 'Student')
                 });
             }
 
@@ -2092,7 +2105,8 @@ const Queue: React.FC<any> = () => {
             isInMeeting: isRecording || showPostMeeting,
             meetingTranscript: transcriptLogs.map(t => t.text).join("\n"),
             uploadedFilesContent: "",
-            userImage: queuedScreenshots.length > 0 ? queuedScreenshots[0].preview : undefined
+            userImage: queuedScreenshots.length > 0 ? queuedScreenshots[0].preview : undefined,
+            bypassPersona: bypassPersona
         };
 
         const finalPrompt = preparePayload(textToSend, contextData);
@@ -2112,14 +2126,14 @@ const Queue: React.FC<any> = () => {
                 const args = {
                     message: finalPrompt,
                     mode: mode,
-                    history: messages.map(m => ({ role: m.role, text: m.text })),
-                    type: "general",
-                    isCandidateMode: mode === 'Student',
+                    history: bypassPersona ? [] : messages.map(m => ({ role: m.role, text: m.text })),
+                    type: bypassPersona ? "bypass" : "general",
+                    isCandidateMode: bypassPersona ? false : (mode === 'Student'),
                     overrideModel: selectedChatModel
                 };
 
                 if (hasAttachments) {
-                    fullResponse = await window.electronAPI.chatWithAttachments(finalPrompt, attachmentsToSend, "answer", selectedVisionModel)
+                    fullResponse = await window.electronAPI.chatWithAttachments(finalPrompt, attachmentsToSend, bypassPersona ? "bypass" : "answer", selectedVisionModel)
                 } else {
                     fullResponse = await window.electronAPI.invoke("gemini-chat", args)
                 }
@@ -3720,9 +3734,9 @@ const Queue: React.FC<any> = () => {
                                                 > {['General', 'Student'].map((m) => (<button key={m} onClick={() => handleModeSelect(m)} className={`w-full text-left px-4 py-2 text-xs hover:bg-white/10 ${mode === m ? 'text-blue-400 bg-white/5' : 'text-gray-300'}`}> {m} </button>))} </div>)} </div>
                                         {mode === "Student" && (<button onClick={() => setShowStudentModal(true)} className="p-2 rounded-xl transition-all flex items-center justify-center text-blue-300 hover:text-white hover:bg-white/5 shrink-0" title={isStealth ? undefined : "Update Profile"}> <GraduationCap size={18} /> </button>)}
                                         <div className="ml-auto shrink-0 flex items-center">
-                                            <button onClick={handleUseScreen} className="control-btn hover:bg-white/15 py-2 px-3 shrink-0">
-                                                <Monitor size={14} className="text-blue-400" />
-                                                <span>Queue Screen</span>
+                                            <button onClick={() => setBypassPersona(!bypassPersona)} className={`control-btn hover:bg-white/15 py-2 px-3 shrink-0 ${bypassPersona ? 'active' : ''}`}>
+                                                <Ghost size={14} className={bypassPersona ? "text-purple-400" : "text-gray-400"} />
+                                                <span>Bypass Persona</span>
                                             </button>
                                         </div>
                                     </div>

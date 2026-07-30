@@ -277,6 +277,7 @@ export class LLMHelper {
     }
 
     private getSystemInstruction(type: string, isCandidateMode: boolean, mode?: string): string {
+        if (type === "bypass") return "";
         let userProfile = {
             targetPersona: "High School Graduate",
             communicationStyle: "Analogy-Heavy",
@@ -845,8 +846,8 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
         let notionContext = await this.getNotionContext();
         let baseSystemInstruction = this.getSystemInstruction(type, isCandidateMode, mode);
 
-        if (this.sessionTranscript) baseSystemInstruction += `\n\n=== LIVE MEMORY ===\n${this.sessionTranscript}\n`;
-        if (notionContext) baseSystemInstruction += `\n\n${notionContext}`;
+        if (this.sessionTranscript && type !== 'bypass') baseSystemInstruction += `\n\n=== LIVE MEMORY ===\n${this.sessionTranscript}\n`;
+        if (notionContext && type !== 'bypass') baseSystemInstruction += `\n\n${notionContext}`;
 
         let mappedHistory = history.map(h => ({ role: h.role === 'ai' ? 'model' : 'user', parts: [{ text: h.text }] }));
         const firstUserIndex = mappedHistory.findIndex(h => h.role === 'user');
@@ -869,14 +870,14 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
                 let finalSystemInstruction = baseSystemInstruction;
 
                 // [NEW] UNIFIED PERSONA & STORY INJECTION
-                if (isCandidateMode || mode === "Student") {
+                if (type !== 'bypass' && (isCandidateMode || mode === "Student")) {
                     const studentAugmentation = await this.getStudentAugmentation(message, config.type, type);
                     finalSystemInstruction += studentAugmentation;
                 }
 
                 const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist';
                 const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
-                const isMuzzleModel = true; // Apply formatting uniformly to ALL models
+                const isMuzzleModel = type !== 'bypass'; // Apply formatting uniformly to ALL models unless bypassed
 
                 if (isUltraStrictSolver && isMuzzleModel) {
                     finalSystemInstruction += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Ultra-Strict Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: You MUST fight the urge to acknowledge the prompt. Your VERY FIRST output tokens MUST be <think>. You MUST NOT output any text, restatement of rules, or greetings before the <think> tag.\n❌ BAD START: "The user wants me to... <think>"\n✅ GOOD START: "<think>[All your planning here]</think>\\n**Situation:**"\n\nSYNCHRONIZED COMMENTS RULE: Every single line of code inside your \`Type:\` blocks MUST mathematically match the code in your \`Complete Code Block\`. If you plan to put a comment (e.g., \`// Step 1: Transpose\`) in the final block, that exact comment MUST be included in your \`Type:\` snippet. No hidden additions at the end.\n\nINLINE VS. BLOCK:\n\nInline: Any single variable, function name, or property (e.g., \`grid1\`, \`dfs\`, \`is_sub\`) mentioned in your natural speech MUST be wrapped in SINGLE backticks and stay inside the sentence. NEVER give these their own line or triple backticks.\nBlocks: Only the actual logic chunks in the Action: section (using the Type: label) and the Complete Code Block: should have their own lines.\n\nNO SHORT-CIRCUIT: You MUST visit every land cell in \`grid2\`. Do not return False until the entire island is "sunk" (set to 0).\n\nEXACT 6 SECTIONS: Ensure you output exactly 6 headers. If you miss one or add a 7th, the response fails.`;
@@ -1039,16 +1040,16 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
 
         const isCandidateMode = type === 'answer' || type === 'reply' || type === 'solve';
         const systemRules = this.getSystemInstruction(type, isCandidateMode);
-        let visionPrompt = `${systemRules}\n\nUSER REQUEST: ${message || "Analyze these attachments."}`;
+        let visionPrompt = type === 'bypass' ? message : `${systemRules}\n\nUSER REQUEST: ${message || "Analyze these attachments."}`;
 
         if (attachedTextCode) visionPrompt += attachedTextCode;
 
-        if (isCandidateMode) {
+        if (type !== 'bypass' && isCandidateMode) {
             const studentAugmentation = await this.getStudentAugmentation(message, "gemini", type);
             visionPrompt += studentAugmentation;
         }
 
-        if (this.sessionTranscript) visionPrompt += `\n\nContext: ${this.sessionTranscript}`;
+        if (this.sessionTranscript && type !== 'bypass') visionPrompt += `\n\nContext: ${this.sessionTranscript}`;
 
         let executionList = [...VISION_MODELS];
         if (overrideModel && overrideModel !== "auto") {
@@ -1067,7 +1068,7 @@ Your goal is to get hired. You speak in first-person ("I", "my", "me").
 
                 const isUltraStrictSolver = type === 'solve' || type === 'answer' || type === 'assist';
                 const isShortFormAction = type === 'reply' || type === 'ask' || type === 'recap' || type === 'title';
-                const isMuzzleModel = true; // Apply formatting uniformly to ALL models
+                const isMuzzleModel = type !== 'bypass'; // Apply formatting uniformly to ALL models unless bypassed
 
                 if (isUltraStrictSolver && isMuzzleModel) {
                     currentVisionPrompt += `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚨 "Moubely" Ultra-Strict Guardrail\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL START RULE: You MUST fight the urge to acknowledge the prompt. Your VERY FIRST output tokens MUST be <think>. You MUST NOT output any text, restatement of rules, or greetings before the <think> tag.\n❌ BAD START: "The user wants me to... <think>"\n✅ GOOD START: "<think>[All your transcription and planning here]</think>\\n**Situation:**"\n\nSYNCHRONIZED COMMENTS RULE: Every single line of code inside your \`Type:\` blocks MUST mathematically match the code in your \`Complete Code Block\`. If you plan to put a comment (e.g., \`// Step 1: Transpose\`) in the final block, that exact comment MUST be included in your \`Type:\` snippet. No hidden additions at the end.\n\nINLINE VS. BLOCK:\n\nInline: Any single variable, function name, or property (e.g., \`grid1\`, \`dfs\`, \`is_sub\`) mentioned in your natural speech MUST be wrapped in SINGLE backticks and stay inside the sentence. NEVER give these their own line or triple backticks.\nBlocks: Only the actual logic chunks in the Action: section (using the Type: label) and the Complete Code Block: should have their own lines.\n\nNO SHORT-CIRCUIT: You MUST visit every land cell in \`grid2\`. Do not return False until the entire island is "sunk" (set to 0).\n\nEXACT 6 SECTIONS: Ensure you output exactly 6 headers. If you miss one or add a 7th, the response fails.`;
