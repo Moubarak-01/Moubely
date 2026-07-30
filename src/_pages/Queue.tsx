@@ -7,7 +7,7 @@ import {
     Scaling, Copy, Check, CheckCheck, Trash2, Mail,
     Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
     Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw, Plus, Maximize,
-    Video, Image, Code, Maximize2, Minimize2, Download, GraduationCap, Ghost
+    Video, Image, Code, Maximize2, Minimize2, Download, GraduationCap, Ghost, Music
 } from "lucide-react"
 import moubelyIcon from "../../assets/Moubely_icon.png"
 
@@ -504,6 +504,8 @@ const UniversalMediaLightbox = ({ file, onClose, onDownload, savedId, isStealth 
             <div className="w-full h-full flex items-center justify-center overflow-hidden">
                 {file.type === 'video' ? (
                     <video controls autoPlay src={src} className="max-w-full max-h-full rounded-lg shadow-2xl shadow-purple-500/10" />
+                ) : file.type === 'audio' ? (
+                    <audio controls autoPlay src={src} className="max-w-full rounded-lg shadow-2xl shadow-blue-500/10" />
                 ) : file.type === 'pdf' ? (
                     <iframe src={`${src}#toolbar=1`} className="w-full h-full bg-white rounded-lg shadow-2xl" title={isStealth ? undefined : "PDF Preview"} />
                 ) : file.type === 'image' ? (
@@ -2755,7 +2757,7 @@ const Queue: React.FC<any> = () => {
                                                                                             >
                                                                                                 <div className="flex items-center gap-2 overflow-hidden">
                                                                                                     <div className="p-1 bg-white/5 rounded-md shrink-0">
-                                                                                                        {file.type === 'pdf' ? <FileText size={14} className="text-red-400" /> : <Code size={14} className="text-blue-400" />}
+                                                                                                        {file.type === 'pdf' ? <FileText size={14} className="text-red-400" /> : file.type === 'audio' ? <Music size={14} className="text-yellow-400" /> : <Code size={14} className="text-blue-400" />}
                                                                                                     </div>
                                                                                                     <span className="text-[11px] text-gray-200 truncate font-medium leading-none">{file.name}</span>
                                                                                                 </div>
@@ -3226,6 +3228,7 @@ const Queue: React.FC<any> = () => {
                                             const isVideo = file.type === 'video';
                                             const isPDF = file.type === 'pdf';
                                             const isImage = file.type === 'image';
+                                            const isAudio = file.type === 'audio';
                                             const isCode = file.type === 'text' && (file.name.endsWith('.js') || file.name.endsWith('.ts') || file.name.endsWith('.py') || file.name.endsWith('.cs'));
 
                                             return (
@@ -3242,8 +3245,9 @@ const Queue: React.FC<any> = () => {
                                                         {isVideo ? <Video size={14} className="text-purple-400 drop-shadow-sm" /> :
                                                             isPDF ? <FileText size={14} className="text-red-400 drop-shadow-sm" /> :
                                                                 isImage ? <Image size={14} className="text-emerald-400 drop-shadow-sm" /> :
-                                                                    isCode ? <Code size={14} className="text-blue-400 drop-shadow-sm" /> :
-                                                                        <FileText size={14} className="text-gray-400" />}
+                                                                    isAudio ? <Music size={14} className="text-yellow-400 drop-shadow-sm" /> :
+                                                                        isCode ? <Code size={14} className="text-blue-400 drop-shadow-sm" /> :
+                                                                            <FileText size={14} className="text-gray-400" />}
                                                         <span className="text-[10px] text-gray-200 max-w-[80px] truncate">{file.name}</span>
                                                     </div>
                                                     <button

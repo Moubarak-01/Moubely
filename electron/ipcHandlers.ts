@@ -420,6 +420,7 @@ export function initializeIpcHandlers(appState: AppState) {
         let type = 'generic_file';
         if (['png', 'jpg', 'jpeg', 'webp', 'heic'].includes(ext)) type = 'image';
         else if (['mp4', 'webm', 'mov', 'avi'].includes(ext)) type = 'video';
+        else if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'wma'].includes(ext)) type = 'audio';
         else if (ext === 'pdf') type = 'pdf';
         else if (textExtensions.includes(ext)) type = 'text';
 
