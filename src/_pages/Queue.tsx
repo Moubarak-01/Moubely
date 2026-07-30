@@ -443,10 +443,11 @@ const TextFilePreview = ({ url }: { url: string }) => {
 };
 
 // --- UNIVERSAL MEDIA LIGHTBOX COMPONENT ---
-const UniversalMediaLightbox = ({ file, onClose, onDownload, savedId, isStealth }: {
+const UniversalMediaLightbox = ({ file, onClose, onDownload, onAddToQueue, savedId, isStealth }: {
     file: { path: string, type: string, name?: string, localPath?: string },
     onClose: () => void,
     onDownload: (url: string, name: string, id: string) => void,
+    onAddToQueue: (file: any) => void,
     savedId: string | null,
     isStealth: boolean
 }) => {
@@ -487,15 +488,20 @@ const UniversalMediaLightbox = ({ file, onClose, onDownload, savedId, isStealth 
                         <Maximize size={20} />
                     </button>
                 )}
-                {(file.type === 'image' || file.type === 'video') && (
-                    <button
-                        onClick={() => onDownload(file.localPath || file.path, file.name || 'exported_media', 'lightbox')}
-                        className={`p-2 rounded-full backdrop-blur transition-all ${savedId === 'lightbox' ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
-                        title={isStealth ? undefined : "Save to folder"}
-                    >
-                        {savedId === 'lightbox' ? <Check size={20} /> : <Download size={20} />}
-                    </button>
-                )}
+                <button
+                    onClick={() => onAddToQueue(file)}
+                    className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur transition-all"
+                    title={isStealth ? undefined : "Add to Chat"}
+                >
+                    <Plus size={20} />
+                </button>
+                <button
+                    onClick={() => onDownload(file.localPath || file.path, file.name || 'exported_media', 'lightbox')}
+                    className={`p-2 rounded-full backdrop-blur transition-all ${savedId === 'lightbox' ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                    title={isStealth ? undefined : "Save to folder"}
+                >
+                    {savedId === 'lightbox' ? <Check size={20} /> : <Download size={20} />}
+                </button>
                 <button onClick={onClose} className="p-2 bg-white/10 hover:bg-red-500/80 rounded-full text-white backdrop-blur transition-colors">
                     <X size={20} />
                 </button>
@@ -579,9 +585,6 @@ const Queue: React.FC<any> = () => {
 
     const handleRemoveAttachedFile = (pathToRemove: string) => {
         setQueuedAttachments(prev => prev.filter(f => f.path !== pathToRemove));
-        if (window.electronAPI && window.electronAPI.deleteChatFiles) {
-            window.electronAPI.deleteChatFiles([pathToRemove]);
-        }
     };
 
     // --- Slow Loader State & Timer Ref ---
@@ -991,22 +994,15 @@ const Queue: React.FC<any> = () => {
     const handleUseScreen = () => { handleCapture(); }
 
     const handleRemoveQueuedScreenshot = async (pathToRemove: string) => {
-        if (!window.electronAPI) return;
-        await window.electronAPI.deleteScreenshot(pathToRemove);
         setQueuedScreenshots(prev => prev.filter(img => img.path !== pathToRemove));
     };
 
     const handleClearQueue = async () => {
-        if (!window.electronAPI) return;
-        await Promise.all(queuedScreenshots.map(img => window.electronAPI.deleteScreenshot(img.path)));
         setQueuedScreenshots([]);
     };
 
     const handleClearAttachments = async () => {
-        if (!window.electronAPI) return;
         if (queuedAttachments.length > 0) {
-            const paths = queuedAttachments.map(a => a.path);
-            await window.electronAPI.deleteChatFiles(paths);
             setQueuedAttachments([]);
         }
     };
@@ -1714,14 +1710,22 @@ const Queue: React.FC<any> = () => {
         e.stopPropagation();
         const chatToDelete = pastChats.find(c => c.id === id);
         if (chatToDelete && window.electronAPI && window.electronAPI.deleteChatFiles) {
-            const allImagePaths: string[] = [];
+            const allMediaPaths: string[] = [];
             chatToDelete.messages?.forEach(m => {
                 if (m.queuedScreenshots) {
-                    m.queuedScreenshots.forEach(img => allImagePaths.push(img.preview));
+                    m.queuedScreenshots.forEach(img => {
+                        if (img.path) allMediaPaths.push(img.path);
+                        if (img.preview && img.preview !== img.path) allMediaPaths.push(img.preview);
+                    });
+                }
+                if (m.queuedAttachments) {
+                    m.queuedAttachments.forEach(att => {
+                        if (att.path) allMediaPaths.push(att.path);
+                    });
                 }
             });
-            if (allImagePaths.length > 0) {
-                window.electronAPI.deleteChatFiles(allImagePaths);
+            if (allMediaPaths.length > 0) {
+                window.electronAPI.deleteChatFiles(allMediaPaths);
             }
         }
 
@@ -2498,6 +2502,7 @@ const Queue: React.FC<any> = () => {
                     file={fullscreenFile}
                     onClose={() => setFullscreenFile(null)}
                     onDownload={handleDownloadMedia}
+                    onAddToQueue={(f) => setQueuedAttachments(prev => [...prev, f])}
                     savedId={savedId}
                     isStealth={isStealth}
                 />
@@ -2713,59 +2718,58 @@ const Queue: React.FC<any> = () => {
                                                 {msg.role === "user" && (
                                                     <div className={`group relative w-full max-w-[85%] sm:max-w-[80%] flex flex-col items-end`}>
                                                         {(() => {
-                                                            const visualMedia = [
-                                                                ...(msg.queuedScreenshots || []).map(s => ({ preview: s.preview, originalPath: s.path, type: 'image' })),
-                                                                ...(msg.queuedAttachments || []).filter(a => a.type === 'image' || a.type === 'video').map(a => ({ preview: getResolvedMediaUrl(a), originalPath: a.path, type: a.type }))
+                                                            const allMedia = [
+                                                                ...(msg.queuedScreenshots || []).map(s => ({ preview: s.preview, originalPath: s.path, type: 'image', name: s.path?.split(/[/\\]/).pop() || 'image' })),
+                                                                ...(msg.queuedAttachments || []).map(a => ({ preview: getResolvedMediaUrl(a), originalPath: a.path, type: a.type, name: a.name || a.path?.split(/[/\\]/).pop() || 'media' }))
                                                             ];
-                                                            const textMedia = (msg.queuedAttachments || []).filter(a => a.type !== 'image' && a.type !== 'video');
 
                                                             return (
                                                                 <>
-                                                                    {(visualMedia.length > 0 || textMedia.length > 0) && (
+                                                                    {allMedia.length > 0 && (
                                                                         <div className="mb-3 flex flex-wrap gap-2 w-full justify-end items-start">
-                                                                            {visualMedia.map((media, index) => {
-                                                                                const sizeClass = visualMedia.length === 1 && textMedia.length === 0 ? 'w-full max-w-[400px]' : 'w-[calc(50%-4px)]';
-                                                                                return media.type === 'video' ? (
-                                                                                    <div key={index} className={`relative rounded-lg overflow-hidden border border-white/10 bg-black/20 cursor-pointer hover:opacity-90 transition-opacity shrink-0 ${sizeClass}`} onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath, localPath: media.preview, type: 'video' }); }}>
-                                                                                        <video src={media.preview} className="w-full h-[140px] sm:h-[160px] object-cover pointer-events-none" />
-                                                                                        <div className="absolute inset-0 flex items-center justify-center bg-black/30"><Play size={24} className="text-white opacity-80" /></div>
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <img
+                                                                            {allMedia.map((media, index) => {
+                                                                                const isVisual = media.type === 'image' || media.type === 'video';
+                                                                                const isSingleVisual = allMedia.length === 1 && isVisual;
+                                                                                const sizeClass = isSingleVisual ? 'w-full max-w-[400px] max-h-[300px] aspect-auto' : 'w-24 sm:w-28 aspect-square';
+                                                                                const dragUrl = media.originalPath || media.preview || '';
+                                                                                const fileName = media.name || dragUrl.split(/[/\\]/).pop() || 'media';
+                                                                                
+                                                                                return (
+                                                                                    <div 
                                                                                         key={index}
-                                                                                        src={media.preview}
-                                                                                        alt={`Visual Media ${index + 1}`}
-                                                                                        className={`rounded-lg border border-white/10 bg-black/20 cursor-pointer hover:opacity-90 transition-opacity h-[140px] sm:h-[160px] object-cover shrink-0 ${sizeClass}`}
-                                                                                        onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath, localPath: media.preview, type: 'image' }); }}
-                                                                                        onDoubleClick={() => setQueuedAttachments(prev => [...prev, { name: media.originalPath.split(/[/\\]/).pop() || 'media', path: media.originalPath, type: media.type }])}
-                                                                                    />
+                                                                                        className={`relative rounded-2xl overflow-hidden border border-white/5 bg-[#1e1e1e] cursor-pointer hover:bg-[#2a2a2a] hover:opacity-90 transition-all shrink-0 flex flex-col ${sizeClass}`}
+                                                                                        onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath || media.preview, localPath: media.preview, type: media.type, name: fileName }); }}
+                                                                                        onDoubleClick={() => setQueuedAttachments(prev => [...prev, { name: fileName, path: media.originalPath || media.preview, type: media.type }])}
+                                                                                        draggable={true}
+                                                                                        onDragStart={(e) => {
+                                                                                            e.dataTransfer.setData('text/plain', dragUrl);
+                                                                                            e.dataTransfer.setData('text/uri-list', dragUrl);
+                                                                                        }}
+                                                                                        onMouseEnter={(e) => { if (!isVisual) { setHoverAttachment({ path: media.originalPath || media.preview, type: media.type, name: fileName }); setHoverRect(e.currentTarget.getBoundingClientRect()); } }}
+                                                                                        onMouseLeave={() => { if (!isVisual) { setHoverAttachment(null); setHoverRect(null); } }}
+                                                                                    >
+                                                                                        {isVisual ? (
+                                                                                            <>
+                                                                                                {media.type === 'video' ? (
+                                                                                                    <>
+                                                                                                        <video src={media.preview} className="w-full h-full object-cover pointer-events-none" />
+                                                                                                        <div className="absolute bottom-2 left-2 flex items-center justify-center bg-white/20 backdrop-blur-md px-2 py-1 rounded-full"><Play size={12} className="text-white fill-white mr-1" /><span className="text-[10px] text-white font-medium leading-none">Video</span></div>
+                                                                                                    </>
+                                                                                                ) : (
+                                                                                                    <img src={media.preview} alt={`Media ${index + 1}`} className="w-full h-full object-cover" />
+                                                                                                )}
+                                                                                            </>
+                                                                                        ) : (
+                                                                                            <div className="flex flex-col h-full w-full p-3 justify-between">
+                                                                                                <div className="flex items-center gap-1.5">
+                                                                                                    <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{media.type}</span>
+                                                                                                </div>
+                                                                                                <span className="text-[12px] text-gray-200 font-medium leading-tight line-clamp-3 break-all">{fileName}</span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
                                                                                 );
                                                                             })}
-
-                                                                            {textMedia.length > 0 && (
-                                                                                <div className={`flex flex-col gap-2 ${visualMedia.length === 0 ? 'w-full justify-end items-end' : 'w-[calc(50%-4px)]'} min-h-[40px] justify-start`}>
-                                                                                    {textMedia.map((file, idx) => {
-                                                                                        const useLocal = getResolvedMediaUrl(file);
-                                                                                        return (
-                                                                                            <div
-                                                                                                key={idx}
-                                                                                                className="flex shrink-0 items-center justify-between gap-2 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 shadow-sm transition-all cursor-pointer h-fit w-full"
-                                                                                                onMouseEnter={(e) => { setHoverAttachment(file); setHoverRect(e.currentTarget.getBoundingClientRect()); }}
-                                                                                                onMouseLeave={() => { setHoverAttachment(null); setHoverRect(null); }}
-                                                                                                onClick={() => setFullscreenFile({ path: file.path, localPath: useLocal, type: file.type, name: file.name })}
-                                                                                                onDoubleClick={() => setQueuedAttachments(prev => [...prev, file])}
-                                                                                            >
-                                                                                                <div className="flex items-center gap-2 overflow-hidden">
-                                                                                                    <div className="p-1 bg-white/5 rounded-md shrink-0">
-                                                                                                        {file.type === 'pdf' ? <FileText size={14} className="text-red-400" /> : file.type === 'audio' ? <Music size={14} className="text-yellow-400" /> : <Code size={14} className="text-blue-400" />}
-                                                                                                    </div>
-                                                                                                    <span className="text-[11px] text-gray-200 truncate font-medium leading-none">{file.name}</span>
-                                                                                                </div>
-                                                                                            </div>
-                                                                                        );
-                                                                                    })}
-                                                                                </div>
-                                                                            )}
                                                                         </div>
                                                                     )}
                                                                 </>
@@ -2828,11 +2832,10 @@ const Queue: React.FC<any> = () => {
                                                         </div>
                                                         <div className="ai-message w-full group flex flex-col items-start space-y-1">
                                                             {(() => {
-                                                                const visualMedia = [
-                                                                    ...(msg.queuedScreenshots || []).map(s => ({ preview: s.preview, originalPath: s.path, type: 'image' })),
-                                                                    ...(msg.queuedAttachments || []).filter(a => a.type === 'image' || a.type === 'video').map(a => ({ preview: getResolvedMediaUrl(a), originalPath: a.path, type: a.type }))
+                                                                const allMedia = [
+                                                                    ...(msg.queuedScreenshots || []).map(s => ({ preview: s.preview, originalPath: s.path, type: 'image', name: s.path?.split(/[/\\]/).pop() || 'image' })),
+                                                                    ...(msg.queuedAttachments || []).map(a => ({ preview: getResolvedMediaUrl(a), originalPath: a.path, type: a.type, name: a.name || a.path?.split(/[/\\]/).pop() || 'media' }))
                                                                 ];
-                                                                const textMedia = (msg.queuedAttachments || []).filter(a => a.type !== 'image' && a.type !== 'video');
 
                                                                 return (
                                                                     <>
@@ -2841,24 +2844,49 @@ const Queue: React.FC<any> = () => {
                                                                                 <SkeletonMedia type={GENERATIVE_MODELS.find(m => m.id === selectedModel)?.type as any || 'image'} />
                                                                             </div>
                                                                         )}
-                                                                        {(visualMedia.length > 0 || textMedia.length > 0) && (
+                                                                        {allMedia.length > 0 && (
                                                                             <div className="mb-3 flex flex-wrap gap-2 w-full justify-start items-start">
-                                                                                {visualMedia.map((media, index) => {
-                                                                                    const sizeClass = visualMedia.length === 1 && textMedia.length === 0 ? 'w-full max-w-[400px]' : 'w-[calc(50%-4px)]';
-                                                                                    return media.type === 'video' ? (
-                                                                                        <div key={index} className={`relative rounded-lg overflow-hidden border border-white/10 bg-black/20 cursor-pointer hover:opacity-90 transition-opacity shrink-0 ${sizeClass}`} onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath, localPath: media.preview, type: 'video' }); }} onDoubleClick={() => setQueuedAttachments(prev => [...prev, { name: media.originalPath.split(/[/\\]/).pop() || 'media', path: media.originalPath, type: media.type }])}>
-                                                                                            <video src={media.preview} className="w-full h-[140px] sm:h-[160px] object-cover pointer-events-none" />
-                                                                                            <div className="absolute inset-0 flex items-center justify-center bg-black/30"><Play size={24} className="text-white opacity-80" /></div>
-                                                                                        </div>
-                                                                                    ) : (
-                                                                                        <img
+                                                                                {allMedia.map((media, index) => {
+                                                                                    const isVisual = media.type === 'image' || media.type === 'video';
+                                                                                    const isSingleVisual = allMedia.length === 1 && isVisual;
+                                                                                    const sizeClass = isSingleVisual ? 'w-full max-w-[400px] max-h-[300px] aspect-auto' : 'w-24 sm:w-28 aspect-square';
+                                                                                    const dragUrl = media.originalPath || media.preview || '';
+                                                                                    const fileName = media.name || dragUrl.split(/[/\\]/).pop() || 'media';
+                                                                                    
+                                                                                    return (
+                                                                                        <div 
                                                                                             key={index}
-                                                                                            src={media.preview}
-                                                                                            alt={`Generated Media ${index + 1}`}
-                                                                                            className={`rounded-lg border border-white/10 bg-black/20 cursor-pointer hover:opacity-90 transition-opacity h-[140px] sm:h-[160px] object-cover shrink-0 ${sizeClass}`}
-                                                                                            onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath, localPath: media.preview, type: 'image' }); }}
-                                                                                            onDoubleClick={() => setQueuedAttachments(prev => [...prev, { name: media.originalPath.split(/[/\\]/).pop() || 'media', path: media.originalPath, type: media.type }])}
-                                                                                        />
+                                                                                            className={`relative rounded-2xl overflow-hidden border border-white/5 bg-[#1e1e1e] cursor-pointer hover:bg-[#2a2a2a] hover:opacity-90 transition-all shrink-0 flex flex-col ${sizeClass}`}
+                                                                                            onClick={(e) => { e.stopPropagation(); setFullscreenFile({ path: media.originalPath || media.preview, localPath: media.preview, type: media.type, name: fileName }); }}
+                                                                                            onDoubleClick={() => setQueuedAttachments(prev => [...prev, { name: fileName, path: media.originalPath || media.preview, type: media.type }])}
+                                                                                            draggable={true}
+                                                                                            onDragStart={(e) => {
+                                                                                                e.dataTransfer.setData('text/plain', dragUrl);
+                                                                                                e.dataTransfer.setData('text/uri-list', dragUrl);
+                                                                                            }}
+                                                                                            onMouseEnter={(e) => { if (!isVisual) { setHoverAttachment({ path: media.originalPath || media.preview, type: media.type, name: fileName }); setHoverRect(e.currentTarget.getBoundingClientRect()); } }}
+                                                                                            onMouseLeave={() => { if (!isVisual) { setHoverAttachment(null); setHoverRect(null); } }}
+                                                                                        >
+                                                                                            {isVisual ? (
+                                                                                                <>
+                                                                                                    {media.type === 'video' ? (
+                                                                                                        <>
+                                                                                                            <video src={media.preview} className="w-full h-full object-cover pointer-events-none" />
+                                                                                                            <div className="absolute bottom-2 left-2 flex items-center justify-center bg-white/20 backdrop-blur-md px-2 py-1 rounded-full"><Play size={12} className="text-white fill-white mr-1" /><span className="text-[10px] text-white font-medium leading-none">Video</span></div>
+                                                                                                        </>
+                                                                                                    ) : (
+                                                                                                        <img src={media.preview} alt={`Media ${index + 1}`} className="w-full h-full object-cover" />
+                                                                                                    )}
+                                                                                                </>
+                                                                                            ) : (
+                                                                                                <div className="flex flex-col h-full w-full p-3 justify-between">
+                                                                                                    <div className="flex items-center gap-1.5">
+                                                                                                        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{media.type}</span>
+                                                                                                    </div>
+                                                                                                    <span className="text-[12px] text-gray-200 font-medium leading-tight line-clamp-3 break-all">{fileName}</span>
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </div>
                                                                                     );
                                                                                 })}
                                                                             </div>
@@ -3351,9 +3379,11 @@ const Queue: React.FC<any> = () => {
                                 )}
 
                                 <div className={`mb-1 w-full bg-[#1a1a1a]/80 backdrop-blur-md hover:bg-[#202020] focus-within:bg-[#202020] border border-white/10 focus-within:border-white/20 transition-all shadow-lg flex flex-col p-1.5 relative ${isInputFullscreen ? 'fixed bottom-4 left-0 right-0 z-[200] max-w-4xl mx-auto rounded-3xl shadow-2xl p-3' : 'rounded-2xl'}`}>
-                                    <div className="absolute top-2 right-2 text-gray-500 hover:text-white cursor-pointer z-10 p-1 bg-white/5 hover:bg-white/10 rounded-lg transition-colors" onClick={() => setIsInputFullscreen(!isInputFullscreen)} title={isStealth ? undefined : (isInputFullscreen ? "Minimize" : "Fullscreen")}>
-                                        {isInputFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                                    </div>
+                                    {(isInputFullscreen || input.length > 250 || input.split('\n').length > 4) && (
+                                        <div className="absolute top-2 right-2 text-gray-500 hover:text-white cursor-pointer z-10 p-1 bg-white/5 hover:bg-white/10 rounded-lg transition-colors" onClick={() => setIsInputFullscreen(!isInputFullscreen)} title={isStealth ? undefined : (isInputFullscreen ? "Minimize" : "Fullscreen")}>
+                                            {isInputFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                                        </div>
+                                    )}
                                     <textarea
                                         ref={textareaRef}
                                         value={input}
@@ -3396,17 +3426,34 @@ const Queue: React.FC<any> = () => {
                                             if (html) {
                                                 const imgMatch = html.match(/src=["'](.*?)["']/);
                                                 if (imgMatch) imageUrl = imgMatch[1];
-                                            } else if (plain && (plain.startsWith('http') || plain.startsWith('moubely://') || plain.startsWith('file://'))) {
+                                            } else if (plain && (plain.startsWith('http') || plain.startsWith('moubely://') || plain.startsWith('moubely-local://') || plain.startsWith('file://') || plain.match(/^[a-zA-Z]:[\\/]/) || plain.startsWith('/'))) {
                                                 imageUrl = plain;
+                                                if (!plain.startsWith('http') && !plain.startsWith('moubely://') && !plain.startsWith('moubely-local://') && !plain.startsWith('file://')) {
+                                                    imageUrl = `moubely-local://${encodeURIComponent(plain)}`;
+                                                }
                                             }
 
                                             if (imageUrl) {
-                                                if (imageUrl.startsWith('moubely://')) {
-                                                    setQueuedScreenshots(prev => {
-                                                        const newQueue = [...prev, { path: imageUrl, preview: imageUrl }];
-                                                        if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
-                                                        return newQueue;
-                                                    });
+                                                if (imageUrl.startsWith('moubely://') || imageUrl.startsWith('moubely-local://')) {
+                                                    const ext = imageUrl.split('.').pop()?.toLowerCase().split('?')[0] || '';
+                                                    const isImage = ['png', 'jpg', 'jpeg', 'webp', 'heic', 'gif'].includes(ext);
+                                                    
+                                                    if (isImage) {
+                                                        setQueuedScreenshots(prev => {
+                                                            const newQueue = [...prev, { path: imageUrl, preview: imageUrl }];
+                                                            if (newQueue.length > MAX_QUEUE_SIZE) newQueue.shift();
+                                                            return newQueue;
+                                                        });
+                                                    } else {
+                                                        let type = 'generic_file';
+                                                        if (['mp4', 'webm', 'mov', 'avi'].includes(ext)) type = 'video';
+                                                        else if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'wma'].includes(ext)) type = 'audio';
+                                                        else if (ext === 'pdf') type = 'pdf';
+                                                        else if (['txt', 'md', 'csv', 'json', 'js', 'ts', 'jsx', 'tsx', 'py', 'html', 'css', 'go', 'cs', 'java', 'cpp', 'c', 'h', 'hpp', 'sh', 'bash', 'yml', 'yaml', 'xml', 'log', 'ini', 'cfg', 'conf', 'php', 'rb', 'swift', 'kt', 'dart', 'rs', 'sql', 'env'].includes(ext)) type = 'text';
+                                                        
+                                                        const name = imageUrl.split('/').pop()?.split('\\').pop() || `attached_file.${ext}`;
+                                                        setQueuedAttachments(prev => [...prev, { name, path: imageUrl, type }]);
+                                                    }
                                                     return;
                                                 }
                                                 // Handle http/https images via backend proxy to avoid CORS
@@ -3447,6 +3494,7 @@ const Queue: React.FC<any> = () => {
                                                         } else {
                                                             let type = 'generic_file';
                                                             if (['mp4', 'webm', 'mov', 'avi'].includes(ext)) type = 'video';
+                                                            else if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'wma'].includes(ext)) type = 'audio';
                                                             else if (ext === 'pdf') type = 'pdf';
                                                             else if (['txt', 'md', 'csv', 'json', 'js', 'ts', 'jsx', 'tsx', 'py', 'html', 'css', 'go', 'cs', 'java', 'cpp', 'c', 'h', 'hpp', 'sh', 'bash', 'yml', 'yaml', 'xml', 'log', 'ini', 'cfg', 'conf', 'php', 'rb', 'swift', 'kt', 'dart', 'rs', 'sql', 'env'].includes(ext)) type = 'text';
 
@@ -3580,11 +3628,6 @@ const Queue: React.FC<any> = () => {
 
                                             {isThinking ? (
                                                 <div className="flex items-center">
-                                                    {(input.length > 0 || queuedScreenshots.length > 0 || queuedAttachments.length > 0) && messageQueue.length < 2 && (
-                                                        <button onClick={() => handleSend()} className="p-2.5 bg-blue-600/80 rounded-full hover:bg-blue-500 transition-colors animate-in fade-in zoom-in duration-200 ml-1">
-                                                            <Send size={16} className="text-white" />
-                                                        </button>
-                                                    )}
                                                     <button
                                                         onClick={handleCancelGeneration}
                                                         className="p-2.5 bg-red-600/20 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all shadow-[0_0_15px_rgba(220,38,38,0.2)] ml-1"
