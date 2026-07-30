@@ -65,6 +65,8 @@ Moubely is an advanced, always-on-top AI productivity hub designed for seamless 
 - ⏳ **Non-Blocking Task Queue**: Seamlessly queue up to 2 pending tasks while the AI processes your current request, complete with persistent UI status indicators
 - 🛡️ **Race-Condition Hardening**: Industrial-grade state protection using synchronous `useRef` guards to prevent double-triggering of chat actions or meeting finalization
 - 🧹 **Zero-Duplicate History**: Intelligent deduplication logic that automatically discards redundant session creations during high-velocity interactions
+- 🎭 **Bypass Persona Mode**: A specialized "raw mode" toggle that suspends Moubely's core system injections for direct, unfiltered LLM responses
+- 🧲 **Native OS Drag & Drop**: Advanced drop-zone engineering allowing users to drag media in and out of Moubely directly into other OS applications via native file-system handlers
 
 ---
 
@@ -663,7 +665,23 @@ Moubely allows you to change the active model **mid-session**. If a fast model i
 
 </details>
 
+<details>
+<summary><strong>44. The "Few-Shot Poisoning" Persona Bypass</strong></summary>
 
+**Problem:** Users wanted a "raw" output mode for simple requests, but the LLM would continue to adopt the previously established digital twin persona due to historical context ("few-shot poisoning"), even when core system instructions were disabled.
+
+**Solution:** Implemented **Strict History Sanitization**. When "Bypass Persona" is toggled, the application dynamically strips previous persona-laced interactions from the sent history payload while preserving the visual chat flow, guaranteeing a 100% unfiltered, zero-shot response from the selected model.
+
+</details>
+
+<details>
+<summary><strong>45. OS-Native Media Dragging from Electron</strong></summary>
+
+**Problem:** Dragging media out of the Electron window typically passed internal application URIs (`moubely-local://`) that external applications (like Discord or Explorer) could not resolve, breaking the user experience.
+
+**Solution:** Engineered a **Hybrid Drop-Zone Controller**. We integrated Electron's `webContents.startDrag()` to initiate true OS-level file transfers when dragging media out. Simultaneously, we implemented a custom `useRef` tracking system to instantly intercept drops back into the application, bypassing heavy OS file reading and ensuring instantaneous internal file attachment.
+
+</details>
 ---
 
 ### 📦 Installation & Setup
