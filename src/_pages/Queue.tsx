@@ -2872,8 +2872,7 @@ const Queue: React.FC<any> = () => {
                                                                         <div className="mb-3 flex flex-wrap gap-2 w-full justify-end items-start">
                                                                             {allMedia.map((media, index) => {
                                                                                 const isVisual = media.type === 'image' || media.type === 'video';
-                                                                                const isSingleVisual = allMedia.length === 1 && isVisual;
-                                                                                const sizeClass = isSingleVisual ? 'w-full max-w-[400px] max-h-[300px] aspect-auto' : 'w-24 sm:w-28 aspect-square';
+const sizeClass = 'w-24 sm:w-28 aspect-square';
                                                                                 const dragUrl = media.originalPath || media.preview || '';
                                                                                 const fileName = media.name || dragUrl.split(/[/\\]/).pop() || 'media';
                                                                                 
@@ -2885,17 +2884,19 @@ const Queue: React.FC<any> = () => {
                                                                                         onDoubleClick={() => setQueuedAttachments(prev => [...prev, { name: fileName, path: media.originalPath || media.preview, type: media.type }])}
                                                                                         draggable={true}
                                                                                         onDragStart={(e) => {
-                                                                                            e.preventDefault();
-                                                                                            let localPath = dragUrl;
-                                                                                            if (localPath.startsWith('moubely-local://')) {
-                                                                                                localPath = decodeURIComponent(localPath.replace('moubely-local://', ''));
-                                                                                            }
-                                                                                            if (window.electronAPI && window.electronAPI.startDrag) {
-                                                                                                internalDragPathRef.current = localPath;
-                                                                                                window.electronAPI.startDrag(localPath);
-                                                                                            }
-                                                                                        }}
-                                                                                        onDragEnd={() => { internalDragPathRef.current = null; }}
+    let localPath = dragUrl;
+    if (localPath.startsWith('moubely-local://')) {
+        localPath = decodeURIComponent(localPath.replace('moubely-local://', ''));
+    }
+    internalDragPathRef.current = localPath;
+    const fileUrl = localPath.startsWith('http') ? localPath : 'file:///' + localPath.replace(/\\/g, '/');
+    e.dataTransfer.setData('DownloadURL', 'application/octet-stream:' + fileName + ':' + fileUrl);
+    e.dataTransfer.setData('text/plain', localPath);
+    if (media.type === 'image') {
+        e.dataTransfer.setData('text/html', '<img src="' + media.preview + '" />');
+    }
+}}
+                                                                                            onDragEnd={() => { internalDragPathRef.current = null; }}
                                                                                         onMouseEnter={(e) => { if (!isVisual) { setHoverAttachment({ path: media.originalPath || media.preview, type: media.type, name: fileName }); setHoverRect(e.currentTarget.getBoundingClientRect()); } }}
                                                                                         onMouseLeave={() => { if (!isVisual) { setHoverAttachment(null); setHoverRect(null); } }}
                                                                                     >
@@ -2999,8 +3000,7 @@ const Queue: React.FC<any> = () => {
                                                                             <div className="mb-3 flex flex-wrap gap-2 w-full justify-start items-start">
                                                                                 {allMedia.map((media, index) => {
                                                                                     const isVisual = media.type === 'image' || media.type === 'video';
-                                                                                    const isSingleVisual = allMedia.length === 1 && isVisual;
-                                                                                    const sizeClass = isSingleVisual ? 'w-full max-w-[400px] max-h-[300px] aspect-auto' : 'w-24 sm:w-28 aspect-square';
+const sizeClass = 'w-24 sm:w-28 aspect-square';
                                                                                     const dragUrl = media.originalPath || media.preview || '';
                                                                                     const fileName = media.name || dragUrl.split(/[/\\]/).pop() || 'media';
                                                                                     
@@ -3012,16 +3012,18 @@ const Queue: React.FC<any> = () => {
                                                                                             onDoubleClick={() => setQueuedAttachments(prev => [...prev, { name: fileName, path: media.originalPath || media.preview, type: media.type }])}
                                                                                             draggable={true}
                                                                                             onDragStart={(e) => {
-                                                                                                e.preventDefault();
-                                                                                                let localPath = dragUrl;
-                                                                                                if (localPath.startsWith('moubely-local://')) {
-                                                                                                    localPath = decodeURIComponent(localPath.replace('moubely-local://', ''));
-                                                                                                }
-                                                                                                if (window.electronAPI && window.electronAPI.startDrag) {
-                                                                                                    internalDragPathRef.current = localPath;
-                                                                                                    window.electronAPI.startDrag(localPath);
-                                                                                                }
-                                                                                            }}
+    let localPath = dragUrl;
+    if (localPath.startsWith('moubely-local://')) {
+        localPath = decodeURIComponent(localPath.replace('moubely-local://', ''));
+    }
+    internalDragPathRef.current = localPath;
+    const fileUrl = localPath.startsWith('http') ? localPath : 'file:///' + localPath.replace(/\\/g, '/');
+    e.dataTransfer.setData('DownloadURL', 'application/octet-stream:' + fileName + ':' + fileUrl);
+    e.dataTransfer.setData('text/plain', localPath);
+    if (media.type === 'image') {
+        e.dataTransfer.setData('text/html', '<img src="' + media.preview + '" />');
+    }
+}}
                                                                                             onDragEnd={() => { internalDragPathRef.current = null; }}
                                                                                             onMouseEnter={(e) => { if (!isVisual) { setHoverAttachment({ path: media.originalPath || media.preview, type: media.type, name: fileName }); setHoverRect(e.currentTarget.getBoundingClientRect()); } }}
                                                                                             onMouseLeave={() => { if (!isVisual) { setHoverAttachment(null); setHoverRect(null); } }}

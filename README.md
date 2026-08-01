@@ -682,6 +682,15 @@ Moubely allows you to change the active model **mid-session**. If a fast model i
 **Solution:** Engineered a **Hybrid Drop-Zone Controller**. We integrated Electron's `webContents.startDrag()` to initiate true OS-level file transfers when dragging media out. Simultaneously, we implemented a custom `useRef` tracking system to instantly intercept drops back into the application, bypassing heavy OS file reading and ensuring instantaneous internal file attachment.
 
 </details>
+
+<details>
+<summary><strong>46. Internal Drag-and-Drop Conflict (ERR_FILE_NOT_FOUND)</strong></summary>
+
+**Problem:** Using Electron's `webContents.startDrag()` for external dragging required `e.preventDefault()`, which completely disabled native internal HTML5 drag-and-drop. Furthermore, creating transparent drag "ghosts" using raw OS file paths threw `ERR_FILE_NOT_FOUND` in the Chromium engine.
+
+**Solution:** Shifted to a native **Chromium DownloadURL Implementation**. By appending a specialized `DownloadURL` payload to the `dataTransfer` event and replacing raw file paths with web-safe preview URLs for the drag "ghost", we restored flawless internal drag-and-drop without sacrificing the ability to drag files out to the OS desktop.
+
+</details>
 ---
 
 ### 📦 Installation & Setup
