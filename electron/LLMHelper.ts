@@ -277,7 +277,10 @@ export class LLMHelper {
     }
 
     private getSystemInstruction(type: string, isCandidateMode: boolean, mode?: string): string {
-        if (type === "bypass") return "";
+        if (type === "bypassAll") return "";
+        if (type === "bypassPersona") {
+            return `${this.systemPrompt}\n\nTASK GOAL: Answer the user's request directly and concisely. NO <think> tags. No preamble.`;
+        }
         let userProfile = {
             targetPersona: "High School Graduate",
             communicationStyle: "Analogy-Heavy",

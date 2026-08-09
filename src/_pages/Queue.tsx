@@ -7,7 +7,7 @@ import {
     Scaling, Copy, Check, CheckCheck, Trash2, Mail,
     Calendar, Clock, ArrowRight, AlertCircle, Upload, UserCog,
     Eye, EyeOff, MessageCircle, Terminal, Edit2, RefreshCw, Plus, Maximize,
-    Video, Image, Code, Maximize2, Minimize2, Download, GraduationCap, Ghost, Music, Paperclip
+    Video, Image, Code, Maximize2, Minimize2, Download, GraduationCap, Ghost, Music, Paperclip, Settings
 } from "lucide-react"
 import moubelyIcon from "../../assets/Moubely_icon.png"
 
@@ -81,6 +81,7 @@ interface ChatContext {
     meetingTranscript: string;
     userImage?: string;
     bypassPersona?: boolean;
+    bypassInstructions?: boolean;
 }
 
 // --- HELPERS ---
@@ -102,7 +103,7 @@ const cleanMeetingTitle = (rawTitle: string): string => {
 };
 
 const preparePayload = (userMessage: string, context: ChatContext) => {
-    if (context.bypassPersona) {
+    if (context.bypassPersona || context.bypassInstructions) {
         return userMessage;
     }
 
@@ -604,6 +605,7 @@ const Queue: React.FC<any> = () => {
     const [showModeMenu, setShowModeMenu] = useState(false)
     const [isSmartMode, setIsSmartMode] = useState(false)
     const [bypassPersona, setBypassPersona] = useState(false)
+    const [bypassInstructions, setBypassInstructions] = useState(false)
 
     // --- BRAIN/GENERATION MODELS ---
     const [selectedModel, setSelectedModel] = useState("imagen-4-generate");
@@ -1736,7 +1738,8 @@ const Queue: React.FC<any> = () => {
             meetingTranscript: transcriptLogs.map(t => t.text).join("\n"),
             uploadedFilesContent: "",
             userImage: undefined,
-            bypassPersona: bypassPersona
+            bypassPersona: bypassPersona,
+            bypassInstructions: bypassInstructions
         };
         const finalPrompt = preparePayload(editText, contextData);
 
@@ -1748,14 +1751,15 @@ const Queue: React.FC<any> = () => {
                 const result = await window.electronAPI.generateMedia({ prompt: editText, model: selectedModel });
                 generatedMedia = result;
             } else if (hasAttachments) {
-                fullResponse = await window.electronAPI.chatWithAttachments(finalPrompt, attachmentsToSend, bypassPersona ? "bypass" : "answer", selectedVisionModel);
+                const overrideType = bypassInstructions ? "bypassAll" : bypassPersona ? "bypassPersona" : "answer";
+                fullResponse = await window.electronAPI.chatWithAttachments(finalPrompt, attachmentsToSend, overrideType, selectedVisionModel);
             } else {
                 fullResponse = await window.electronAPI.invoke("gemini-chat", {
                     message: finalPrompt,
                     mode: mode,
-                    history: bypassPersona ? [] : initialMessages.slice(0, -1).map(m => ({ role: m.role, text: m.text })),
-                    type: bypassPersona ? "bypass" : "general",
-                    isCandidateMode: bypassPersona ? false : (mode === 'Student')
+                    history: bypassInstructions ? [] : initialMessages.slice(0, -1).map(m => ({ role: m.role, text: m.text })),
+                    type: bypassInstructions ? "bypassAll" : bypassPersona ? "bypassPersona" : "general",
+                    isCandidateMode: (bypassPersona || bypassInstructions) ? false : (mode === 'Student')
                 });
             }
 
@@ -2228,7 +2232,8 @@ const Queue: React.FC<any> = () => {
             meetingTranscript: transcriptLogs.map(t => t.text).join("\n"),
             uploadedFilesContent: "",
             userImage: queuedScreenshots.length > 0 ? queuedScreenshots[0].preview : undefined,
-            bypassPersona: bypassPersona
+            bypassPersona: bypassPersona,
+            bypassInstructions: bypassInstructions
         };
 
         const finalPrompt = preparePayload(textToSend, contextData);
@@ -2248,14 +2253,15 @@ const Queue: React.FC<any> = () => {
                 const args = {
                     message: finalPrompt,
                     mode: mode,
-                    history: bypassPersona ? [] : messages.map(m => ({ role: m.role, text: m.text })),
-                    type: bypassPersona ? "bypass" : "general",
-                    isCandidateMode: bypassPersona ? false : (mode === 'Student'),
+                    history: bypassInstructions ? [] : messages.map(m => ({ role: m.role, text: m.text })),
+                    type: bypassInstructions ? "bypassAll" : bypassPersona ? "bypassPersona" : "general",
+                    isCandidateMode: (bypassPersona || bypassInstructions) ? false : (mode === 'Student'),
                     overrideModel: selectedChatModel
                 };
 
                 if (hasAttachments) {
-                    fullResponse = await window.electronAPI.chatWithAttachments(finalPrompt, attachmentsToSend, bypassPersona ? "bypass" : "answer", selectedVisionModel)
+                    const overrideType = bypassInstructions ? "bypassAll" : bypassPersona ? "bypassPersona" : "answer";
+                    fullResponse = await window.electronAPI.chatWithAttachments(finalPrompt, attachmentsToSend, overrideType, selectedVisionModel)
                 } else {
                     fullResponse = await window.electronAPI.invoke("gemini-chat", args)
                 }
@@ -3800,6 +3806,10 @@ const sizeClass = 'w-24 sm:w-28 aspect-square';
                                             <button onClick={() => setBypassPersona(!bypassPersona)} className={`control-btn hover:bg-white/15 py-2 px-3 shrink-0 ${bypassPersona ? 'active' : ''}`}>
                                                 <Ghost size={14} className={bypassPersona ? "text-purple-400" : "text-gray-400"} />
                                                 <span>Bypass Persona</span>
+                                            </button>
+                                            <button onClick={() => setBypassInstructions(!bypassInstructions)} className={`control-btn hover:bg-white/15 py-2 px-3 shrink-0 ml-1 ${bypassInstructions ? 'active bg-white/15' : ''}`}>
+                                                <Settings size={14} className={bypassInstructions ? "text-red-400" : "text-gray-400"} />
+                                                <span>Bypass</span>
                                             </button>
                                         </div>
                                     </div>

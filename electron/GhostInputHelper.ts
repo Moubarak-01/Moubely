@@ -170,7 +170,6 @@ export class GhostInputHelper {
                                     this.sendToFrontend({ shortcut: 'undo' });
                                     return 1;
                                 }
-                                // Let other Ctrl shortcuts pass through (like Ctrl+Tab, etc.)
                                 return CallNextHookEx(this.hookHandle, nCode, wParam, lParam);
                             }
 
