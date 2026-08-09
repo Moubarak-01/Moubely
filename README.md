@@ -65,8 +65,9 @@ Moubely is an advanced, always-on-top AI productivity hub designed for seamless 
 - ⏳ **Non-Blocking Task Queue**: Seamlessly queue up to 2 pending tasks while the AI processes your current request, complete with persistent UI status indicators
 - 🛡️ **Race-Condition Hardening**: Industrial-grade state protection using synchronous `useRef` guards to prevent double-triggering of chat actions or meeting finalization
 - 🧹 **Zero-Duplicate History**: Intelligent deduplication logic that automatically discards redundant session creations during high-velocity interactions
-- 🎭 **Bypass Persona Mode**: A specialized "raw mode" toggle that suspends Moubely's core system injections for direct, unfiltered LLM responses
+- 🎭 **Bypass Toggles (UI)**: Added dedicated quick-access buttons for "Bypass Persona" (keeps chat history, strips personality) and "Bypass All" (strips all history and personality for raw pass-through).
 - 🧲 **Native OS Drag & Drop**: Advanced drop-zone engineering allowing users to drag media in and out of Moubely directly into other OS applications via native file-system handlers
+- 👻 **Hardened Ghost Intercept**: Migrated invisible Ghost Mode typing from browser-level to OS-level Electron IPC clipboard APIs, allowing perfect `Ctrl+C`/`Ctrl+V` stability even when the window is hidden, plus safety blocks for `Ctrl+B` to prevent accidental stealth breakage.
 
 ---
 
