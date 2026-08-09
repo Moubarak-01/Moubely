@@ -170,6 +170,15 @@ export function initializeIpcHandlers(appState: AppState) {
     }
   });
 
+  ipcMain.handle("read-from-clipboard", (event) => {
+    try {
+      return clipboard.readText();
+    } catch (e) {
+      console.error("[IPC ⚡] ❌ Clipboard Read Failed:", e);
+      return "";
+    }
+  });
+
   // --- MOUSE CLICK-THROUGH HANDLERS ---
   ipcMain.handle("set-ignore-mouse-events", (event, ignore: boolean, options: any) => {
     const win = appState.getMainWindow();

@@ -25,6 +25,7 @@ const VK_DOWN = 0x28;
 const VK_INSERT = 0x2D;
 const VK_DELETE = 0x2E;
 const VK_A = 0x41;
+const VK_B = 0x42;
 const VK_C = 0x43;
 const VK_V = 0x56;
 const VK_X = 0x58;
@@ -150,6 +151,9 @@ export class GhostInputHelper {
 
                             // 3. Handle Special Shortcuts (Ctrl + Key)
                             if (ctrlDown && !altDown && !winDown) {
+                                if (vkCode === VK_B) {
+                                    return 1; // Block Ctrl+B so they don't accidentally ruin stealth!
+                                }
                                 if (vkCode === VK_A) {
                                     this.sendToFrontend({ shortcut: 'select-all' });
                                     return 1;

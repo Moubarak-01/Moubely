@@ -821,26 +821,28 @@ const Queue: React.FC<any> = () => {
                         break;
                     case 'copy':
                         const selectedText = el.value.substring(el.selectionStart, el.selectionEnd);
-                        if (selectedText) {
-                            navigator.clipboard.writeText(selectedText);
+                        if (selectedText && window.electronAPI?.copyToClipboard) {
+                            window.electronAPI.copyToClipboard(selectedText);
                         }
                         break;
                     case 'paste':
-                        navigator.clipboard.readText().then(text => {
-                            const start = el.selectionStart;
-                            const end = el.selectionEnd;
-                            setInput(prev => prev.substring(0, start) + text + prev.substring(end));
-                            setTimeout(() => {
-                                const newPos = start + text.length;
-                                el.setSelectionRange(newPos, newPos);
-                                el.focus();
-                            }, 0);
-                        });
+                        if (window.electronAPI?.readFromClipboard) {
+                            window.electronAPI.readFromClipboard().then((text: string) => {
+                                const start = el.selectionStart;
+                                const end = el.selectionEnd;
+                                setInput(prev => prev.substring(0, start) + text + prev.substring(end));
+                                setTimeout(() => {
+                                    const newPos = start + text.length;
+                                    el.setSelectionRange(newPos, newPos);
+                                    el.focus();
+                                }, 0);
+                            });
+                        }
                         break;
                     case 'cut':
                         const cutText = el.value.substring(el.selectionStart, el.selectionEnd);
-                        if (cutText) {
-                            navigator.clipboard.writeText(cutText);
+                        if (cutText && window.electronAPI?.copyToClipboard) {
+                            window.electronAPI.copyToClipboard(cutText);
                             const startX = el.selectionStart;
                             const endX = el.selectionEnd;
                             setInput(prev => prev.substring(0, startX) + prev.substring(endX));
@@ -851,6 +853,7 @@ const Queue: React.FC<any> = () => {
                         }
                         break;
                     case 'undo':
+                        el.focus(); // Force focus so execCommand might work
                         document.execCommand('undo');
                         break;
                 }

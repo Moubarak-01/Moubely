@@ -38,6 +38,7 @@ export interface ElectronAPI {
 
   // Utilities
   copyToClipboard: (text: string) => Promise<void>
+  readFromClipboard: () => Promise<string>
 
   // Debug / Processing Events (ALL WERE MISSING)
   onSolutionStart: (callback: () => void) => () => void

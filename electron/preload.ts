@@ -55,6 +55,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   takeScreenshot: () => ipcRenderer.invoke("take-screenshot"),
+  closeOverlayWindow: () => ipcRenderer.invoke("close-overlay-window"),
+  readFromClipboard: () => ipcRenderer.invoke("read-from-clipboard"),
+  takeFullScreenshot: () => ipcRenderer.invoke("take-full-screenshot"),
   saveUserProfile: (p: any) => ipcRenderer.invoke("save-user-profile", p),
   getUserProfile: () => ipcRenderer.invoke("get-user-profile"),
   getScreenshots: () => ipcRenderer.invoke("get-screenshots"),
