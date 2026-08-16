@@ -38,16 +38,17 @@ async function safePdfParse(buffer: Buffer) {
 // --- 1. THE EXPANDED WATERFALL BRAINS ---
 export const CHAT_MODELS = [
     // --- TIER 1 : Gemini (Gemma 4 / Flash / Lite) ---
+    { type: 'gemini', model: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite' }, // Active (500 RPD)
     { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B' },
     { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B' },
     { type: 'gemini', model: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
     { type: 'gemini', model: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash' },
+    { type: 'gemini', model: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-2.0-flash-lite-preview-02-05', name: 'Gemini 2.0 Flash Lite' }, // ZERO RPD
     { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' }, // ZERO RPD,
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-    { type: 'gemini', model: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite' }, // Active (500 RPD)
     { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' }, // Active (20 RPD)
     { type: 'openrouter', model: 'nvidia/nemotron-3-nano-30b-a3b:free', name: 'Nvidia Nemotron 3 Nano' },
     { type: 'gemini', model: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' }, // ZERO RPD,
@@ -81,11 +82,12 @@ export const CHAT_MODELS = [
 // --- 2. THE EYES (Vision Waterfall) ---
 export const VISION_MODELS = [
     // --- TIER 1: ELITE & RELIABLE VISION (Gemma 4 Upgrade) ---
+    { type: 'gemini', model: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
+    { type: 'gemini', model: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
+    { type: 'gemini', model: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash' },
+    { type: 'gemini', model: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash' },
     { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B (Vision)' }, // ADDED '-a4b-it'
     { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B (Vision)' }, // ADDED '-it'
-    { type: 'gemini', model: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
-    { type: 'gemini', model: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
-    { type: 'gemini', model: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash' },
     { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { type: 'gemini', model: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite' },
