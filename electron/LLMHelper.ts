@@ -45,6 +45,7 @@ export const CHAT_MODELS = [
     { type: 'gemini', model: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash' },
     { type: 'gemini', model: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash' },
+    { type: 'gemini', model: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
     { type: 'gemini', model: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-2.0-flash-lite-preview-02-05', name: 'Gemini 2.0 Flash Lite' }, // ZERO RPD
     { type: 'gemini', model: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' }, // ZERO RPD,
@@ -86,6 +87,7 @@ export const VISION_MODELS = [
     { type: 'gemini', model: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
     { type: 'gemini', model: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash' },
     { type: 'gemini', model: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash' },
+    { type: 'gemini', model: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
     { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B (Vision)' }, // ADDED '-a4b-it'
     { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B (Vision)' }, // ADDED '-it'
     { type: 'gemini', model: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
