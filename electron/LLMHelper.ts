@@ -39,10 +39,10 @@ async function safePdfParse(buffer: Buffer) {
 export const CHAT_MODELS = [
     // --- TIER 1 : Gemini (Gemma 4 / Flash / Lite) ---
     { type: 'gemini', model: 'gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite' }, // Active (500 RPD)
+    { type: 'gemini', model: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
     { type: 'gemini', model: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B' },
     { type: 'gemini', model: 'gemma-4-31b-it', name: 'Gemma 4 31B' },
     { type: 'gemini', model: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
-    { type: 'gemini', model: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
     { type: 'gemini', model: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash' },
     { type: 'gemini', model: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash' },
     { type: 'gemini', model: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
