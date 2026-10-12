@@ -565,6 +565,7 @@ const Queue: React.FC<any> = () => {
     const [hoverRect, setHoverRect] = useState<DOMRect | null>(null)
     const [needsEmailGeneration, setNeedsEmailGeneration] = useState(false)
     const isGeneratingMeetingRef = useRef(false);
+    const [isDraftingEmail, setIsDraftingEmail] = useState(false);
 
     const [input, setInput] = useState("")
     const [messages, setMessages] = useState<Message[]>([])
@@ -1462,6 +1463,8 @@ const Queue: React.FC<any> = () => {
             setTranscriptLogs([]);
             setShowPostMeeting(false);
             setEmailDraft("");
+            setIsDraftingEmail(false);
+            isGeneratingMeetingRef.current = false;
             setNeedsEmailGeneration(false);
 
             const startT = Date.now();
@@ -1539,8 +1542,7 @@ const Queue: React.FC<any> = () => {
         setShowPostMeeting(true);
         if (!isExpanded) handleExpandToggle();
         setActiveTab("Email");
-        setIsThinking(true);
-        setThinkingStep("Finalizing transcript...");
+        setIsDraftingEmail(true);
 
         let stableCount = 0;
         let lastLength = transcriptLengthRef.current;
@@ -1559,7 +1561,6 @@ const Queue: React.FC<any> = () => {
             }
         }
 
-        setThinkingStep("Drafting summary...");
         setIsFinalizing(false);
         setNeedsEmailGeneration(true);
     }
@@ -1569,8 +1570,7 @@ const Queue: React.FC<any> = () => {
             if (needsEmailGeneration && showPostMeeting && !emailDraft && transcriptLogs.length > 0 && window.electronAPI && !isGeneratingMeetingRef.current) {
                 isGeneratingMeetingRef.current = true;
                 setNeedsEmailGeneration(false);
-                setIsThinking(true);
-                setThinkingStep("Drafting summary...");
+                setIsDraftingEmail(true);
                 const fullTranscript = transcriptLogs.map(t => t.text).join(" ");
                 let generatedEmail = "";
                 let generatedTitle = `Meeting ${new Date().toLocaleDateString()}`;
@@ -1609,20 +1609,21 @@ const Queue: React.FC<any> = () => {
                     setEmailDraft("Failed to generate content.");
                 }
                 finally {
-                    setIsThinking(false);
-                    isThinkingRef.current = false;
+                    setIsDraftingEmail(false);
                     isGeneratingMeetingRef.current = false;
                     isFinalizingRef.current = false;
                 }
-            } else if (needsEmailGeneration && showPostMeeting && isThinking) {
+            } else if (needsEmailGeneration && showPostMeeting) {
                 // FALLBACK: empty transcript
                 console.warn("[Queue] Meeting ended but skipping email generation (likely empty transcript).");
                 setNeedsEmailGeneration(false);
-                setIsThinking(false);
+                setIsDraftingEmail(false);
+                isGeneratingMeetingRef.current = false;
+                isFinalizingRef.current = false;
             }
         };
         generateEmailAfterFinalize();
-    }, [needsEmailGeneration, showPostMeeting, isThinking, emailDraft, transcriptLogs, pastMeetings]);
+    }, [needsEmailGeneration, showPostMeeting, emailDraft, transcriptLogs, pastMeetings, selectedChatModel]);
 
     // --- INTERACTION FEEDBACK STATES ---
     const [isCopied, setIsCopied] = useState(false);
@@ -1691,6 +1692,7 @@ const Queue: React.FC<any> = () => {
         setTranscriptLogs([]);
         setMessages([]);
         setEmailDraft("");
+        setIsDraftingEmail(false);
         setShowPostMeeting(false);
         setActiveTab("Chat");
     };
@@ -3199,10 +3201,14 @@ const sizeClass = 'w-24 sm:w-28 aspect-square';
                                             </div>
                                             <MessageContent text={emailDraft} isStreaming={false} />
                                         </div>
-                                    ) : (
+                                    ) : (isDraftingEmail || isFinalizing) ? (
                                         <div className="flex flex-col items-center justify-center flex-1 text-gray-400 gap-3">
                                             <Loader2 size={24} className="animate-spin text-blue-400" />
-                                            <span>Drafting email...</span>
+                                            <span>{isFinalizing ? "Finalizing transcript..." : "Drafting email..."}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center flex-1 text-gray-500 gap-2">
+                                            <span>No email draft available</span>
                                         </div>
                                     )}
                                 </div>
