@@ -266,4 +266,22 @@ async function initializeApp() {
 
 }
 
-initializeApp();
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  console.log("[Main] ⚠️ Another instance of Moubely is already running. Quitting secondary instance.");
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    console.log("[Main] 🔔 Second instance launched -> Bringing primary window to focus");
+    const appState = AppState.getInstance();
+    const win = appState.getMainWindow();
+    if (win && !win.isDestroyed()) {
+      if (win.isMinimized()) win.restore();
+      appState.centerAndShowWindow();
+      win.focus();
+    }
+  });
+
+  initializeApp();
+}

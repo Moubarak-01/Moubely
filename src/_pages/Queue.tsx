@@ -1208,6 +1208,17 @@ const Queue: React.FC<any> = () => {
                 })
             );
 
+            // In-window Ctrl+H shortcut fallback
+            const handleLocalKeyDown = (e: KeyboardEvent) => {
+                if ((e.ctrlKey || e.metaKey) && (e.key === "h" || e.key === "H")) {
+                    e.preventDefault();
+                    console.log("[UI] ⌨️ In-window Ctrl+H detected -> Triggering capture");
+                    handleCapture();
+                }
+            };
+            window.addEventListener("keydown", handleLocalKeyDown);
+            cleanupFunctions.push(() => window.removeEventListener("keydown", handleLocalKeyDown));
+
         }
 
         return () => {

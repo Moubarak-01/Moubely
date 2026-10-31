@@ -107,7 +107,10 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false
-    }
+    },
+    "asarUnpack": [
+      "**/node_modules/screenshot-desktop/**/*"
+    ]
   },
   "keywords": [],
   "license": "ISC",
